@@ -1,15 +1,20 @@
+#CamIO2 dependency checker / installer
+
 import sys
 
-req_version = (2,5)
-cur_version = sys.version_info
+macos_apps_10_8_3        = { "clang":"" }
+freebsd_apps_9_1_amd64   = { "clang":"" }
+ubuntu_apps_13_04_amd64  = { "clang":"" }
 
-if cur_version >= req_version:
-    import camio_install
-    camio_install.run()
-else:
-    print "Your Python interpreter is older than version 2.5. CamIO requires version 2.5 or later. Please upgrade if you'd like to continue using CamIO"
+macos   = { "10.8.3" : macos_apps_10_8_3 }
+freebsd = { "9.1_amd64" : freebsd_apps_9_1_amd64 }
+ubuntu  = { "13.04_amd64" : ubuntu_apps_13_04_amd64 }
+
+system = { "macos" : macos , "freebsd" : freebsd,  "ubuntu": ubuntu }
 
 
-def run():
-    print "ha ha ha"
+#Main entry point
+def main():
+    print system
+
         
