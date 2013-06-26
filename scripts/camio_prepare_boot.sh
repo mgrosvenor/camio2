@@ -1,4 +1,4 @@
-#! /bin/bash
+#! /bin/sh
 
 #This scrpit kicks off the install process, it checks that a sufficiently new 
 #version of python is available assuming that it is, starts the installer script
