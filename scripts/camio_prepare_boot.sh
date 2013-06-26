@@ -19,6 +19,6 @@ then
 fi
 
 cd scripts
-python camio_install_boot.py
+python camio_prepare_boot.py
 
 
