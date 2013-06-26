@@ -59,7 +59,7 @@ def get_platform_defs():
         print "Detected system is running \"" + system + "\"..."
         import camio_prepare_arch_darwin
         mac_ver = platform.mac_ver()
-        return camio_prepare_arch_darwin.get_def(uname,mac_ver)
+        return camio_prepare_arch_darwin.get_defs(uname,mac_ver)
 
     if(system == "Free BSD"):
         print "Detected system is running \"" + system + "\"..."
