@@ -4,7 +4,7 @@ def find(dep):
 def install(dep):
     print "Not installing dependency \"" + dep + "\""
 
-def get_defs(uname)
+def get_defs(uname):
     print uname
     return (find,install)
 
