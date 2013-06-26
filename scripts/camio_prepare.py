@@ -1,6 +1,8 @@
 #CamIO2 dependency checker / installer
 
 import sys
+import os
+import platform
 
 macos_apps_10_8_3        = { "clang":"" }
 freebsd_apps_9_1_amd64   = { "clang":"" }
@@ -15,6 +17,14 @@ system = { "macos" : macos , "freebsd" : freebsd,  "ubuntu": ubuntu }
 
 #Main entry point
 def main():
+    print platform.version()
+    print platform.processor()
+    print platform.platform()
+    print platform.linux_distribution()
+    print platform.node()
+    print platform.system()
+
+    print os.name    
     print system
 
         
