@@ -17,14 +17,14 @@ system = { "macos" : macos , "freebsd" : freebsd,  "ubuntu": ubuntu }
 
 #Main entry point
 def main():
-    print platform.version()
-    print platform.processor()
-    print platform.platform()
-    print platform.linux_distribution()
-    print platform.node()
-    print platform.system()
+    print "version:", platform.version()
+    print "processor:", platform.processor()
+    print "platform:", platform.platform()
+    print "linux_dist:", platform.linux_distribution()
+    print "node:", platform.node()
+    print "system:", platform.system()
 
-    print os.name    
-    print system
+    print "name:", os.name    
+    #print system
 
         
