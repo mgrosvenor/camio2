@@ -1,3 +1,4 @@
+import sys
 
 def install(uname, arch_required, required, optional):
      print uname
