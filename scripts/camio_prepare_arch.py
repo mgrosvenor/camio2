@@ -31,7 +31,7 @@ import os
 
 
 #Figures out what platform we are on
-def get_platform_defs():
+def platform_install(arch_required, required, optional):
 
     #Gather some platform stats
     ostype   = os.name
@@ -50,23 +50,24 @@ def get_platform_defs():
 
     #Figure out what OS we're using
     if(system == "Linux"):
-        print "Detected system is running \"" + system + "\"..."
+        print "CamIO2 Prepare: Detected system is running \"" + system + "\"..."
         import camio_prepare_arch_linux
         distro = platform.linux_distribution()
-        return camio_prepare_arch_linux.get_defs(uname,distro)
+        return camio_prepare_arch_linux.install(uname,distro, arch_required, required, optional)
 
     if(system == "Darwin"):
-        print "Detected system is running \"" + system + "\"..."
+        print "CamIO2 Prepare: Detected system is running \"" + system + "\"..."
         import camio_prepare_arch_darwin
         mac_ver = platform.mac_ver()
-        return camio_prepare_arch_darwin.get_def(uname,mac_ver)
+        return camio_prepare_arch_darwin.install(uname,mac_ver, arch_required, required, optional)
 
-    if(system == "Free BSD"):
-        print "Detected system is running \"" + system + "\"..."
+    if(system == "FreeBSD"):
+        print "CamIO2 Prepare: Detected system is running \"" + system + "\"..."
         import camio_prepare_arch_freebsd
-        return camio_prepare_arch_freebsd.get_defs(uname)
+        return camio_prepare_arch_freebsd.install(uname, arch_required, required, optional)
    
-    print "Could not detect Operating System. Expected to find, Linux, FreeBSD or Darwin (MacOS X), but instead found \"" + system + "\". \nExiting now."
+    print "CamIO2 Prepare: Could not detect Operating System. Expected to find, Linux, FreeBSD or Darwin (MacOS X), but instead found \"" + system + "\"."
+    print "CamIO2 Prepare: Fatal Error! Exiting now."
     sys.exit(-1)
 
 

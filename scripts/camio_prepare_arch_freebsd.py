@@ -1,11 +1,11 @@
-def find(dep):
-    print "Not finding dependency \"" + dep + "\""
 
-def install(dep):
-    print "Not installing dependency \"" + dep + "\""
+def install(uname, arch_required, required, optional):
+     print uname
+     required = arch_required["FreeBSD"] + required
 
-def get_defs(uname)
-    print uname
-    return (find,install)
+     print required
+     print optional
 
-
+     print "CamIO2 Prepare: install_freebsd not implemented"
+     print "CamIO2 Prepare: Fatal Error. Exiting now."
+     sys.exit(-1)

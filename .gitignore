@@ -1,4 +1,4 @@
 *.o
 *.pyc
-
-
+deps/
+bin/
