@@ -173,7 +173,6 @@ def install_platform(required, optional, pman_name, find_pman, install_pman):
 
 ############################################################################################################################
 
-
 def install(uname):
     install_platform(required, optional, "pkg", find_pkg, install_pkg)
 

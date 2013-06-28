@@ -1,12 +1,12 @@
 import sys
+from camio_deps import *
 
-
-def install(uname, mac_ver, arch_required, required, optional):
+def install(uname, mac_ver, ):
      print uname
      print mac_ver
-     required = arch_required["Darwin"] + required
+     reqs = required_arch["Darwin"] + required
 
-     print required
+     print reqs
      print optional
 
      print "CamIO2 Prepare: install_darwin not implemented"
