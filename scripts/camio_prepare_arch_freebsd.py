@@ -1,11 +1,11 @@
 import sys
 from camio_deps import *
 
-def install(uname, arch_required ):
+def install(uname ):
      print uname
-     required = arch_required["FreeBSD"] + required
+     reqs = required_arch["FreeBSD"] + required
 
-     print required
+     print reqs 
      print optional
 
      print "CamIO2 Prepare: install_freebsd not implemented"
