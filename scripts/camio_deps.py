@@ -56,7 +56,7 @@ apt_deps    = {
               }
 
 #Translation from local package name to the name used by pkg_add (FreeBSD)
-pkg_add_deps  = {
+pkg_deps  = {
                 "make":     "make",
                 "clang":    "clang",
                 "svn":      "subversion",
