@@ -1,33 +1,8 @@
-import camio_prepare_repo_deps
 import subprocess
 import sys
 
-
-#Translation from local package name to the name used by RPM
-rpm_deps    = {
-                "make":  "make",
-                "clang": "clang",
-                "svn":   "subversion",
-                "wget":  "wget",
-                "unzip" : "unzip",
-                "yum" :  "yum",
-              }
-
-
-#Translation from local package name to the name used by APT
-apt_deps    = {
-                "make":  "make",
-                "clang": "clang",
-                "svn":   "subversion",
-                "apt":   "apt",
-                "wget":  "wget",
-                "unzip" : "unzip",
-              } 
-
-
-#Tools for handling the repo deps, these are assumed to be global across plaforms
-find_repo_deps    = camio_prepare_repo_deps.find_repo_deps
-install_repo_deps = camio_prepare_repo_deps.install_repo_deps 
+from camio_deps import *
+from camio_prepare_repo_deps import *
 
 ############################################################################################################################
 #Use apt tools to manage packages
@@ -151,7 +126,7 @@ def install_fedora(required, optional):
 ############################################################################################################################
 
 #Figure out which distribution we're running and use the appropriate find/install functions 
-def install(uname, distro, required_arch, required, optional):   
+def install(uname, distro):   
     
     (distname, ver, ver_name) = distro
     required = required_arch[distname] + required

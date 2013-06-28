@@ -1,5 +1,7 @@
+from camio_deps import *
 
-def install(uname, arch_required, required, optional):
+
+def install(uname, arch_required ):
      print uname
      required = arch_required["FreeBSD"] + required
 
