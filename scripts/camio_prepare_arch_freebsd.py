@@ -1,5 +1,5 @@
+import sys
 from camio_deps import *
-
 
 def install(uname, arch_required ):
      print uname
