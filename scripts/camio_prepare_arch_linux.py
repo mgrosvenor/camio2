@@ -131,12 +131,12 @@ def install_platform(required, optional, pman_name, find_pman, install_pman):
     for req in required:
         sys.stdout.write("CamIO2 Prepare: Looking for " + req + "...")
 
-        #Try using apt to find requirement, if it returns false, the requirement belongs to apt, but is not installed
+        #Try using pman to find requirement, if it returns false, the requirement belongs to pman, but is not installed
         result = find_pman(req)
-        if result == True: #The package is managed by apt, and is installed
+        if result == True: #The package is managed by pman, and is installed
             sys.stdout.write(" Found package.\n")
             continue
-        elif result == False: #The package is managed by apt, but is not installed
+        elif result == False: #The package is managed by pman, but is not installed
             #Try to install using apt
             sys.stdout.write(" Installing using %s...\n" % pman_name)
             result = install_pman(req)
