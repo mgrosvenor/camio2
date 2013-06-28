@@ -12,6 +12,7 @@ from camio_prepare_repo_deps import *
 
 def check_pkg():
     print "CamIO2 Prepare: check_pkg not implemented!"
+    return True 
     sys.exit(-1)
     
     #cmd = "dpkg --version"
@@ -26,15 +27,16 @@ def check_pkg():
 
 def find_pkg(dep):
     print "CamIO2 Prepare: find_pkg not implemented!"
-    sys.exit(-1)
+    #sys.exit(-1)
  
     #This one is special since we use it to figure out the rest...
-    if dep == "dpkg":
+    if dep == "pkg":
         return check_pkg()
 
     if dep not in pkg_deps:
         return None
 
+    return True
     #cmd = "dpkg -s " + apt_deps[dep] + " | grep \"Status: install ok installed\""
     result = subprocess.call(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     return not result #subprocess returns 0 on sucess, 1 on failure
@@ -42,12 +44,15 @@ def find_pkg(dep):
 
 def install_pkg(dep):
     print "CamIO2 Prepare: install_pkg not implemented"
-    sys.exit(-1)
+    #sys.exit(-1)
 
     if dep not in pkg_deps:
         return None
 
     deppkg = pkg_deps[dep]
+    
+    return True
+    
     #cmd = "sudo apt-get -y install " + deppkg 
     print "                Running \"" + cmd + "\""
     result = subprocess.call(cmd, shell=True)
@@ -176,6 +181,6 @@ def install_platform(required, optional, pman_name, find_pman, install_pman):
 def install(uname):
     install_platform(required, optional, "pkg", find_pkg, install_pkg)
 
-     print "CamIO2 Prepare: install_freebsd not implemented"
-     print "CamIO2 Prepare: Fatal Error. Exiting now."
-     sys.exit(-1)
+    print "CamIO2 Prepare: install_freebsd not implemented"
+    print "CamIO2 Prepare: Fatal Error. Exiting now."
+    sys.exit(-1)
