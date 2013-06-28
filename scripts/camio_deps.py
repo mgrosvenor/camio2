@@ -16,6 +16,9 @@ required_linux_fedora = [ "rpm", "yum", "wget" ]
 required_darwin = [ "curl" ]
 required_freebsd = [ "pkg_add", "fetch" ]
 
+#list of apps/libraries optional to build CamIO2 "exotic" transports
+optional = ["libnetmap", "libzeromq", "libopenssl" ]
+
 #All arch deps rolled into one structure to make it easy to pass around
 required_arch = {
                     "Ubuntu"  : required_linux_ubuntu,
@@ -37,6 +40,7 @@ rpm_deps    = {
                 "wget":     "wget",
                 "unzip":    "unzip",
                 "yum" :     "yum",
+                "bash":     "bash",
               }
 
 
@@ -48,6 +52,7 @@ apt_deps    = {
                 "apt":      "apt",
                 "wget":     "wget",
                 "unzip":    "unzip",
+                "bash":     "bash",
               }
 
 #Translation from local package name to the name used by pkg_add (FreeBSD)
@@ -58,6 +63,7 @@ pkg_add_deps  = {
                 "apt":      "apt",
                 "fetch":    "fetch",
                 "unzip" :   "unzip",
+                "bash":     "bash",
               }
 
 
@@ -94,8 +100,8 @@ libbstring_url = "http://sourceforge.net/projects/bstring/files/bstring/rc31/bst
 libbstring_zip_dest = "deps/libbstring/libbstring.zip"
 libbstring_dest = "deps/libbstring/"
 
-libbstring_linux_script = linux_wget_script(libbstrng_url, libbstring_zip_dest) + "\n"\
-                                  linux_unzip_script(libstring_zip_dest, libbstring_dest) + "\n"
+libbstring_linux_script = linux_wget_script( libbstring_url, libbstring_zip_dest) + " && " + \
+                          linux_unzip_script( libbstring_zip_dest, libbstring_dest) + "\n"
 libbstring_freebsd_script = ""
 libbstring_darwin_script  = ""
 
