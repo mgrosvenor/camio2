@@ -5,6 +5,9 @@ import platform
 import sys
 import os
 
+from camio_deps import *
+
+
 #Uname examples
 # Fedora 14:
 # uname() = ('Linux', 'nf-test109.cl.cam.ac.uk', '2.6.35.14-106.fc14.x86_64', '#1 SMP Wed Nov 23 13:07:52 UTC 2011', 'x86_64', 'x86_64')
@@ -31,7 +34,7 @@ import os
 
 
 #Figures out what platform we are on
-def platform_install(arch_required, required, optional):
+def platform_install():
 
     #Gather some platform stats
     ostype   = os.name
@@ -53,18 +56,18 @@ def platform_install(arch_required, required, optional):
         print "CamIO2 Prepare: Detected system is running \"" + system + "\"..."
         import camio_prepare_arch_linux
         distro = platform.linux_distribution()
-        return camio_prepare_arch_linux.install(uname,distro, arch_required, required, optional)
+        return camio_prepare_arch_linux.install(uname,distro)
 
     if(system == "Darwin"):
         print "CamIO2 Prepare: Detected system is running \"" + system + "\"..."
         import camio_prepare_arch_darwin
         mac_ver = platform.mac_ver()
-        return camio_prepare_arch_darwin.install(uname,mac_ver, arch_required, required, optional)
+        return camio_prepare_arch_darwin.install(uname,mac_ver)
 
     if(system == "FreeBSD"):
         print "CamIO2 Prepare: Detected system is running \"" + system + "\"..."
         import camio_prepare_arch_freebsd
-        return camio_prepare_arch_freebsd.install(uname, arch_required, required, optional)
+        return camio_prepare_arch_freebsd.install(uname )
    
     print "CamIO2 Prepare: Could not detect Operating System. Expected to find, Linux, FreeBSD or Darwin (MacOS X), but instead found \"" + system + "\"."
     print "CamIO2 Prepare: Fatal Error! Exiting now."
