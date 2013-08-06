@@ -1,0 +1,3 @@
+#! /bin/bash
+
+deps/cake/cake src/camio.c $@ --begintests tests/*.c --endtests
