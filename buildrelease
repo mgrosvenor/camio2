@@ -1,4 +1,0 @@
-#! /bin/bash
-
-rm -rf bin #This is intentional, if we build a release, make damn sure it's a brand new, fresh build
-deps/cake/cake src/camio.c --variant=release $@ --begintests tests/*.c --endtests
