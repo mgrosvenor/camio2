@@ -1,6 +1,6 @@
 *.o
 *.pyc
-deps/
+#deps/
 bin/
 *.swp
 
