@@ -13,5 +13,5 @@
 #      http://gcc.gnu.org/ml/gcc-bugs/1998-07/msg00128.html
 #-std=c11 We use anonymous unions and alligned_alloc
 
-buil/cake/cake src/camio2.c --append-CFLAGS="-Ideps -D_XOPEN_SOURCE=700 -D_BSD_SOURCE -std=c11 -Werror -Wall -Wextra -pedantic -Wno-missing-field-initializers" $@ --begintests tests/*.c --endtests
+build/cake/cake src/camio2.c --append-CFLAGS="-Ideps -D_XOPEN_SOURCE=700 -D_BSD_SOURCE -std=c11 -Werror -Wall -Wextra -pedantic -Wno-missing-field-initializers" $@ --begintests tests/*.c --endtests
 
