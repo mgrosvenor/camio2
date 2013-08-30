@@ -1,5 +1,6 @@
 *.o
 *.pyc
+deps/
 bin/
 *.swp
 
