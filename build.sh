@@ -1,4 +1,4 @@
-#! /bin/sh
+#! /bin/bash
 
 #use --variant=release to build a release version
 
