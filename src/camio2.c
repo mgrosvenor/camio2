@@ -4,11 +4,7 @@
 
 
 #include <stdio.h>
-#include <libm6/libm6.h>
 
-USE_M6_LOGGER_DEFAULT;
-USE_M6_OPTIONS;
-USE_M6_PERF(128*1000);
 
 int main(int argc, char** argv)
 {

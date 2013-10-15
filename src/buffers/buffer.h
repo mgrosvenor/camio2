@@ -5,23 +5,27 @@
 #ifndef BUFFER_H_
 #define BUFFER_H_
 
-#include <libm6/libm6.h>
+#include "../types/types.h"
 
-#define CAMIO2_BUFFER_NO_ERROR (0)
-#define CAMIO2_BUFFER_NO_FREESLOTS (-1)
-#define CAMIO2_BUFFER_NULL_POINTER (-2)
-#define CAMIO2_BUFFER_OUT_OF_RANGE (-3)
-#define CAMIO2_BUFFER_INVALID_SLOT_ID (-4)
+//Slot information
+typedef struct  {
+    int valid;         //True if the data is valid (can be set to untrue by read_release)
+    int data_len;     //Zero if there is no data. Length of data actually in the buffer
+    int read_len;    //Length of data actually read.
+    void* data_start; //Undefined if there is no data
 
-struct _camio2_buffer;
-typedef struct _camio2_buffer camio2_buffer_t;
+    int buffer_len;      //Undefined if there is no data. Buffer_len is always >= data_len + (buffer_start - data_start)
 
-struct _camio2_buffer {
-    i64 (*reserve)(camio2_buffer_t* this, i64* slot_id, i64* slot_size, u8** slot);
-    i64 (*release)(camio2_buffer_t* this, const i64 slot_id);
-    void (*cdelete)(camio2_buffer_t* this);
-    void* priv;
-};
+    void* buffer_start; //Undefined if there is no data
+
+    //Private - Don’t mess with these!
+    int __buffer_id;  //Undefined if there is no data
+    int __slot_id;   //Undefined if there is no data
+
+    int __do_release;; //Should release be called for this slot?
+    ciostr* __slot_parent; //Parent who generated this slot
+
+} cioslot_info;
 
 
 #endif /* BUFFER_H_ */
