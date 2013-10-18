@@ -5,6 +5,8 @@
 #ifndef TYPES_H_
 #define TYPES_H_
 
+#include "../selectors/selectable.h"
+
 struct ciostr_s;
 typedef struct ciostr_s ciostr;
 

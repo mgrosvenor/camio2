@@ -4,38 +4,45 @@
 #ifndef CIOSTREAM_H_
 #define CIOSTREAM_H_
 
-#include "../types/types.h"
 #include <stdbool.h>
 
+#include "../types/types.h"
 
 //Stream features
 typedef struct {
     bool is_reliable;       //Does this stream guarantee delivery
     bool is_encrypted;      //Is it encrypted
     bool has_async_arrv;    //Can messages arrive asynchronously
-    int mtu;                //Maximum transfer unit for this stream
+    bool is_bytestream;     //Do messages arrive as a stream of bytes or as a datagram
     bool can_read_off;      //Can the stream offset reads at zero cost
+    int mtu;                //Maximum transfer unit for this stream
     int scope;              //1 = local this machine only.
                             //2 = L2 point to point connectivity only,
                             //3 = L3 Global connectivity (eg IP).
     bool is_thread_safe;    // Calls to functions from multiple threads will not cause threading problems.
-} stream_inf;
+} ciostr_inf;
 
 
-//Request for stream features
+/**
+ * Request for stream features. Unless otherwise specified:
+ * 1 = require stream to support feature,
+ * 0 = require stream not to support feature,
+ * -1 = don't care if stream supports feature
+ */
+//
 typedef struct{
-    int reliable;       //Does this stream guarantee delivery. 1 = yes, 0 = no, -1 = don't care
-    int encrypted;      //Is it encrypted. 1 = yes, 0 = no, -1 = don't care
-    int async_arrv;     //Can messages arrive asynchronously. 1 = yes, 0 = no, -1 = don't care
+    int reliable;       //Does this stream guarantee delivery.
+    int encrypted;      //Is it encrypted.
+    int async_arrv;     //Can messages arrive asynchronously.
+    int bytestream;     //Do messages arrive as a continuous stream of bytes, or as a datagram.
+    int can_read_off;   //Can the stream offset reads into the receive buffer at zero cost.
     int mtu;            //Minimum value for maximum transfer unit for this stream,
-    int can_read_off;   //Can the stream offset reads at zero cost. 1 = yes, 0 = no, -1 = don't care
     int scope;          //-1 = Don't care,
                         // 1 = at least local this machine only.
                         // 2 = at least L2 point to point connectivity only,
                         // 3 = L3 Global connectivity (eg IP).
     int thread_safe;    // Calls to functions from multiple threads will not cause threading problems.
-                        // 1 = yes, 0 = no, -1 = don't care
-} stream_req;
+} ciostr_req;
 
 
 
@@ -43,7 +50,26 @@ struct ciostr_s {
     /**
      * Return the metadata structure describing the properties of this transport.
      */
-    stream_inf (*info)(ciostr* this);
+    ciostr_inf (*get_info)(ciostr* this);
+
+    /**
+     * Return the the selectable structure for adding into a selector
+     */
+    cioselable* (*get_selectable)(ciostr* this);
+
+
+    /**
+     * Non-blocking attempt to connect the underlying stream to it’s data source. If successful, the CamIO stram can be read
+     *  and/or written to. In many cases, the connect operation will return immediately, with a valid stream once only.
+     *  However, this is not guaranteed. Some streams may return multiple valid connection and some streams may take some
+     *  time before they return successfully. Streams can be placed into selectors to facilitate the blocking behavior
+     *  necessary to wait for these events to happen by listening for the  on connection signal.
+     *  Return values;
+     *  - ENOERROR: Stream was created successfully.
+     *  - ETRYAGAIN: The stream has nothing new to report at this time. No connection has yet happened.
+     *  - ECHECKERROR: The stream creation has failed. The stream will log an error message on the current logger.
+     */
+    int (*connect)( ciostr* this);
 
 
     /**
@@ -104,13 +130,17 @@ struct ciostr_s {
 
 
 /**
- * Create a new CamIO stream with with given URI.
- * Return:
- *  - ENOERROR:      All good, ciostream_out contains a valid stream.
- *  - EMALFORMEDURI: The URI supplied is malformed.
- *  - ENOSTREAM:     The stream type is unknown.
+ * Create a new CamIO stream with with given the uri and properties request. Return a connection If successful, put the new
+ * stream into stream_o pointer. The stream is created in the “closed” state. Meaning that reads and writes will fail until
+ * a call to  connect() succeeds.
+ * Returns:
+ * - ENOERROR:  All good. Nothing to see here.
+ * - EBADURI:   The URI supplied has a syntax error or is poorly formatted
+ * - ENOSTREAM: The stream type is unrecognized
+ * - EBADOPT:   The URI options have an error or are unsupported
+ * - EBADPROP:  The stream supplied in URI did not match the properties requested in probates.
  */
-int new_ciostr( char* uri ,  stream_req* properties, ciostr** ciostream_out );
+int new_ciostr( char* uri ,  ciostr_req* properties, ciostr** ciostream_o );
 
 
 #endif /* CIOSTREAM_H_ */
