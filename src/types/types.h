@@ -10,6 +10,9 @@
 struct ciostr_s;
 typedef struct ciostr_s ciostr;
 
+struct cioconn_s;
+typedef struct cioconn_s cioconn;
+
 struct ciobuff_s;
 typedef struct ciobuff_s ciobuff;
 

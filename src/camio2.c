@@ -4,7 +4,7 @@
 
 
 #include <stdio.h>
-
+#include "ciostreams/ciostream.h"
 
 int main(int argc, char** argv)
 {
@@ -13,8 +13,11 @@ int main(int argc, char** argv)
 
     printf("Hello  world\n");
     #if NDEBUG
-    printf("Release!\n");
+    printf("Release Mode on!!\n");
     #endif
+
+    cioconn* con;
+    new_cioconn("file:/tmp/myfile?ro,trunc",NULL,&con);
 
     return 0;
 }

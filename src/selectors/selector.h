@@ -9,9 +9,8 @@
 #define SELECTOR_H_
 
  //CamIO IO selector definition
-typedef struct {
-
-} ciosel;
+struct ciosel_s;
+typedef struct ciosel_s ciosel;
 
 typedef enum {
     CIOSEL_MODE_READ,
@@ -44,18 +43,18 @@ ciosel* new_selector(char* strategy);
  * - EUNSUPSTRAT: Unsupported selection strategy is requested.
  * - EUNSUPMODE: Unsupported selection mode is requested.
  */
-int insert(ciosel* this, cioselable* selectable,  cioselmode mode, int id);
+int ciosel_insert(ciosel* this, cioselable* selectable,  cioselmode mode, int id);
 
 
 /**
  * Remove the stream with the given id from the selector.
  */
-void remove(ciosel* this, int id);
+void ciosel_remove(ciosel* this, int id);
 
 /**
  * Return the ID and pointer to the selectable object when it becomes ready.
  */
-int select(ciosel* this, cioselable** selectable_o);
+int ciosel_select(ciosel* this, cioselable** selectable_o);
 
 
 
