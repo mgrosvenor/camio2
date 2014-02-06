@@ -8,7 +8,7 @@
 #include "../uri_parser/uri_parser.h"
 #include "ciostream.h"
 
-int fileio_new_cioconn( uri* uri_parsed , struct cioconn_s** cioconn_o, void** global_data );
+int new_cioconn_fileio( uri* uri_parsed , struct cioconn_s** cioconn_o, void** global_data );
 
 
 #endif /* CIOSTREAM_FILEIO_H_ */

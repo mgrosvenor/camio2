@@ -126,7 +126,6 @@ struct ciostrm_s {
 
 };
 
-
 struct cioconn_s {
     /**
      * Return the the selectable structure for adding into a selector

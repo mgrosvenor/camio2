@@ -19,7 +19,7 @@ define_ch_llist_compare(KV,key_val)
     }
 
     if(lhs->key_len > rhs->key_len){
-        return 0;
+        return 1;
     }
 
     //Key lens are the same now.
