@@ -1,10 +1,6 @@
-/*
- * selector.h
- *
- *  Created on: Oct 18, 2013
- *      Author: mgrosvenor
- */
-
+// CamIO 2: selector.h
+// Copyright (C) 2013: Matthew P. Grosvenor (matthew.grosvenor@cl.cam.ac.uk)
+// Licensed under BSD 3 Clause, please see LICENSE for more details.
 #ifndef SELECTOR_H_
 #define SELECTOR_H_
 
@@ -20,6 +16,43 @@ typedef enum {
 } cioselmode;
 
 
+struct ciosel_s {
+    /**
+     * Insert a new stream into the selector called “this”. The id will be returned by the selector when an event matching the
+     * mode happens. Mode may be either:
+     * - CIOSEL_MODE_READ - Only wake up when new data is ready to ready
+     * - CIOSEL_MODE_WRITE - Only wake up when data can be written
+     * - CIOSEL_MODE_CON - Wake up on a successful connection signal
+     * - CIOSEL_MODE_TIMEO - Wake up when a timeout happens
+     *
+     * Return values;
+     * - ENOERROR: Selector insertion was successful.
+     * - EUNSUPSTRAT: Unsupported selection strategy is requested.
+     * - EUNSUPMODE: Unsupported selection mode is requested.
+     */
+    int (*insert)(ciosel* this, cioselable* selectable,  cioselmode mode, int id);
+
+
+    /**
+     * Remove the stream with the given id from the selector.
+     */
+    void (*ciosel_remove)(ciosel* this, int id);
+
+    /**
+     * Return the ID and pointer to the selectable object when it becomes ready.
+     */
+    int (*ciosel_select)(ciosel* this, cioselable** selectable_o);
+
+    /*
+     * Returns the number of streams in this selctor
+     */
+     size_t (*count)(ciosel* this);
+
+     /**
+      * Per-selector data
+      */
+     void* __priv;
+};
 
 /**
  * All streams in CamIO are non-blocking. Blocking behaviour is achieved through using a selector. Both read and write
@@ -28,34 +61,6 @@ typedef enum {
  * case, streams that do not support the selection strategy will be rejected.
  */
 ciosel* new_selector(char* strategy);
-
-
-/**
- * Insert a new stream into the selector called “this”. The id will be returned by the selector when an event matching the
- * mode happens. Mode may be either:
- * - CIOSEL_MODE_READ - Only wake up when new data is ready to ready
- * - CIOSEL_MODE_WRITE - Only wake up when data can be written
- * - CIOSEL_MODE_CON - Wake up on a successful connection signal
- * - CIOSEL_MODE_TIMEO - Wake up when a timeout happens
- *
- * Return values;
- * - ENOERROR: Selector insertion was successful.
- * - EUNSUPSTRAT: Unsupported selection strategy is requested.
- * - EUNSUPMODE: Unsupported selection mode is requested.
- */
-int ciosel_insert(ciosel* this, cioselable* selectable,  cioselmode mode, int id);
-
-
-/**
- * Remove the stream with the given id from the selector.
- */
-void ciosel_remove(ciosel* this, int id);
-
-/**
- * Return the ID and pointer to the selectable object when it becomes ready.
- */
-int ciosel_select(ciosel* this, cioselable** selectable_o);
-
 
 
 #endif /* SELECTOR_H_ */
