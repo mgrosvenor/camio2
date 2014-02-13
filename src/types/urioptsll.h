@@ -6,6 +6,7 @@
 #define URIOPTSLL_H_
 
 #include "../types/stdinclude.h"
+#include "deps/chaste/types/types.h"
 
 typedef enum { URIOPT_FLAG, URIOPT_REQUIRED, URIOPT_OPTIONAL } uri_opt_mode;
 
@@ -15,6 +16,7 @@ typedef struct {
     ch_types_e opt_type; //Will use the chaste options parser
     bool found;
     void* result;
+    uint64_t result_size;
 } uri_opt;
 
 #include "../../deps/chaste/data_structs/linked_list/linked_list_typed_declare_template.h"

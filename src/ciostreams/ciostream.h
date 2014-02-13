@@ -25,7 +25,7 @@ typedef struct {
                             //2 = L2 point to point connectivity only,
                             //3 = L3 Global connectivity (eg IP).
     bool is_thread_safe;    // Calls to functions from multiple threads will not cause threading problems.
-} ciostr_inf;
+} ciostrm_inf;
 
 
 /**
@@ -47,19 +47,19 @@ typedef struct{
                         // 2 = at least L2 point to point connectivity only,
                         // 3 = L3 Global connectivity (eg IP).
     int thread_safe;    // Calls to functions from multiple threads will not cause threading problems.
-} ciostr_req;
+} ciostrm_req;
 
 
 struct ciostrm_s {
     /**
      * Return the metadata structure describing the properties of this transport.
      */
-    ciostr_inf (*get_info)(ciostr* this);
+    ciostrm_inf (*get_info)(ciostrm* this);
 
     /**
      * Return the the selectable structure for adding into a selector
      */
-    cioselable* (*get_selectable)(ciostr* this);
+    cioselable* (*get_selectable)(ciostrm* this);
 
 
     /**
@@ -72,7 +72,7 @@ struct ciostrm_s {
      * - ENOSLOTS:  The stream could not allocate more slots for the read. Free some slots by releasing a read or write
      *              transaction.
      */
-    int (*read_acquire)( ciostr* this, cioslot_info* slot_inf_o, int padding) ;
+    int (*read_acquire)( ciostrm* this, cioslot_info* slot_inf_o, int padding) ;
 
 
     /**
@@ -84,7 +84,7 @@ struct ciostrm_s {
      *  - ENOSLOTS: The stream could not allocate more slots for the read. Free some slots by releasing a read or write
      *              transaction.
      */
-    int (*write_aquire)(ciostr* this, cioslot_info* slot_inf_o);
+    int (*write_aquire)(ciostrm* this, cioslot_info* slot_inf_o);
 
 
     /* Try to write data described by slot_info_i to the given stream called “this”.  If auto_release is set to true,
@@ -99,7 +99,7 @@ struct ciostrm_s {
      * - ECOPYOP: A copy operation was required to complete this commit.
      * - or: the bytes remaining for this stream. Since writing is non-blocking, this may not always be 0.
      */
-    int (*write_commit)(ciostr* this, cioslot_info* slot_inf_i, int auto_release,  int enqueue);
+    int (*write_commit)(ciostrm* this, cioslot_info* slot_inf_i, int auto_release,  int enqueue);
 
 
     /**
@@ -112,12 +112,12 @@ struct ciostrm_s {
      * - ENOERROR: All good, please continue
      * - EINVALID: Your data got trashed, time to recover!
      */
-    int (*release)(ciostr* this, cioslot_info* slot_inf_i);
+    int (*release)(ciostrm* this, cioslot_info* slot_inf_i);
 
     /**
      * Free resources associated with this stream, but not with its connector. 
      */
-    void (*destroy)(ciostr* this);
+    void (*destroy)(ciostrm* this);
 
     /**
      * Pointer to stream specific data structures.
@@ -130,7 +130,7 @@ struct cioconn_s {
     /**
      * Return the the selectable structure for adding into a selector
      */
-    cioselable* (*get_selectable)(ciostr* this);
+    cioselable* (*get_selectable)(cioconn* this);
 
 
     /**
@@ -144,12 +144,12 @@ struct cioconn_s {
      *  - ETRYAGAIN: The stream has nothing new to report at this time. No connection has yet happened.
      *  - ECHECKERROR: The stream creation has failed. 
      */
-    int (*connect)( ciostr* this, struct ciostrm_s* ciostrm_o );
+    int (*connect)( cioconn* this, ciostrm* ciostrm_o );
 
     /**
      * Free resources associated with this connector, but not with any of the streams it has created. 
      */
-    void (*destroy)(ciostr* this);
+    void (*destroy)(cioconn* this);
 
 
     /**
@@ -169,7 +169,7 @@ struct cioconn_s {
  * - EBADOPT:   The URI options have an error or are unsupported
  * - EBADPROP:  The stream supplied in URI did not match the properties requested.
  */
-int new_cioconn( char* uri , ciostr_req* properties, struct cioconn_s** cioconn_o );
+int new_cioconn( char* uri , ciostrm_req* properties, struct cioconn_s** cioconn_o );
 
 
 /**
@@ -185,6 +185,6 @@ int new_cioconn( char* uri , ciostr_req* properties, struct cioconn_s** cioconn_
  * - ETRYAGAIN: The stream has nothing new to report at this time. No connection has yet happened.
  * - ECHECKERROR: The stream creation has failed. 
  */
-int new_ciostrm( char* uri ,  ciostr_req* properties, ciosel selector, uint64_t timeout_ns, ciostr** ciostream_o );
+int new_ciostrm( char* uri ,  ciostrm_req* properties, ciosel selector, uint64_t timeout_ns, ciostrm** ciostream_o );
 
 #endif //CIOSTREAM_H_

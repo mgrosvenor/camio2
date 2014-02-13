@@ -11,77 +11,28 @@
 #include "../errors/errors.h"
 
 #include "../types/urioptsll.h"
+#include "uri_opts.h"
+#include "uri_parser.h"
 
 /*
- * typedef enum { URIOPT_FLAG, URIOPT_REQUIRED, URIOPT_OPTIONAL } uri_opt_mode;
-
-typedef struct {
-    char* opt_name;
-    uri_opt_mode opt_mode;
-    ch_types_e opt_type; //Will use the chaste options parser
-    bool found;
-    void* result;
-} uri_opt;
- *
+ * The URI parser allows streams to add options (parameters) to their URIs that are required, optional or flags. The URI
+ * parser will then do the necessary checking and type conversion to make these parameters useful.
  */
-
 
 typedef struct {
     CH_LIST(URIOPT)* uri_opts;
 } uri_opt_parser;
 
+//Make a new uri parser
+int uri_opt_parser_new(uri_opt_parser** opt_praser_o);
 
-int uri_opt_parser_new(uri_opt_parser** opt_praser_o)
-{
-    uri_opt_parser* result = calloc(1,sizeof(uri_opt_parser));
-    if(!result){
-        return CIO_ENOMEM;
-    }
+//Free a uri parser
+void uri_opt_parser_free(uri_opt_parser** opt_parser_o);
 
-    result->uri_opts = CH_LIST_NEW(URIOPT,NULL);
-    if(!result->uri_opts){
-        return CIO_ENOMEM;
-    }
+//Add a new option to the URI parser and point it to a variable to contain the results
+int uri_opt_parser_add(uri_opt_parser* parser, char* name, uri_opt_mode mode, ch_types_e type, void* result);
 
-
-    *opt_praser_o = result;
-    return CIO_ENOERROR;
-}
-
-
-void uri_opt_parser_free(uri_opt_parser** opt_parser_o)
-{
-    if(!opt_parser_o){
-        return;
-    }
-
-    if(!*opt_parser_o){
-        return;
-    }
-
-    if(*opt_parser_o->uri_opts){
-        (*opt_parser_o)->uri_opts->delete(*opt_parser_o->uri_opts);
-    }
-
-    free(*opt_parser_o);
-
-    *opt_parser_o = NULL;
-}
-
-
-int uri_opt_parser_add(uri_opt_parser* parser, char* name, uri_opt_mode mode, ch_types_e type, void* result)
-{
-    uri_opt tmp = { .opt_name = name, .opt_mode = mode, .opt_type = type, .found = false, .result = result };
-
-    //Check that the name is not in the list
-    CH_LIST_IT(URIOPT)* it = parser->uri_opts->find(parser->uri_opts, tmp);
-    if(it->value){
-        return CIO_EURIOPTEXITS;
-    }
-
-    parser->uri_opts->push_back(parser->uri_opts,tmp);
-    return CIO_ENOERROR;
-}
-
+//Parse the URI. It this fails return an error otherwise return ENOERROR
+int uri_opt_parser_parse(uri_opt_parser* opt_parser, uri* parsed_uri);
 
 #endif /* URI_OPTS_H_ */

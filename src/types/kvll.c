@@ -10,7 +10,7 @@
 define_ch_llist(KV,key_val)
 
 //Compare only the key in the key_value pair, as this is the useful thing
-//TODO XXX: Port this to using the chaste generic hash map ... when it exits
+//TODO XXX: Port this to using the chaste generic hash map ... when it exists
 define_ch_llist_compare(KV,key_val)
 {
 

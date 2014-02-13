@@ -45,7 +45,7 @@ typedef struct  {
     uint64_t __slot_id;     //Undefined if there is no data
 
     bool __do_release;      //Should release be called for this slot?
-    ciostr* __slot_parent;  //Parent who generated this slot
+    ciostrm* __slot_parent;  //Parent who generated this slot
 
     void* __priv;             //Per stream private data if necessary
 

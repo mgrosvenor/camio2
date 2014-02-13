@@ -18,12 +18,12 @@ typedef struct {
 
 //Should this be in a .h file?? Hmm, feels right, but looks wrong. Like your mum.
 static cio_stream_entry cio_stream_registry[] = {
-        {"file", NULL, fileio_new_cioconn},
+        {"file", NULL, new_cioconn_fileio},
         {0} //Null last entry
 };
 
 
-int new_cioconn( char* uri_str , ciostr_req* properties, struct cioconn_s** cioconn_o )
+int new_cioconn( char* uri_str , ciostrm_req* properties, struct cioconn_s** cioconn_o )
 {
     uri* uri_parsed;
     int result = parse_uri(uri_str, &uri_parsed);

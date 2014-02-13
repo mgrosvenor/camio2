@@ -11,7 +11,7 @@
 define_ch_llist(URIOPT,uri_opt)
 
 //Compare only the opt_name in the uri_opt structure, as this is the useful thing
-//TODO XXX: Port this to using the chaste generic hash map or dictionary... when it exits
+//TODO XXX: Port this to using the chaste generic hash map or dictionary... when it exists
 define_ch_llist_compare(URIOPT,uri_opt)
 {
 

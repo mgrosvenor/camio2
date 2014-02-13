@@ -7,8 +7,8 @@
 
 #include "../selectors/selectable.h"
 
-struct ciostr_s;
-typedef struct ciostr_s ciostr;
+struct ciostrm_s;
+typedef struct ciostrm_s ciostrm;
 
 struct cioconn_s;
 typedef struct cioconn_s cioconn;
