@@ -8,6 +8,8 @@
 #ifndef ERRORS_H_
 #define ERRORS_H_
 
+//TODO XXX: Move to using an enum, write a string translation table for displaying the errors nicely
+
 #define CIO_ENOERROR              0LL
 #define CIO_ETRYAGAIN            -1LL
 #define CIO_ECHECKERROR          -2LL
@@ -33,5 +35,8 @@
 #define CHI_EURIOPTREQUIRED     -22LL
 #define CIO_EFILEIOEXCLUSIVERW  -23LL
 #define CIO_ETOOMANYFLAGS       -24LL
+#define CIO_NOTSELECTABLE       -25LL
+#define CIO_SELECTORFULL        -26LL
+#define CIO_EINDEXNOTFOUND      -27LL
 
 #endif /* ERRORS_H_ */

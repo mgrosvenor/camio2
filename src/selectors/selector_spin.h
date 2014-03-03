@@ -21,8 +21,9 @@ typedef struct {
 #define SELECTOR_SPIN_MAX_ITEMS 4096
 
 typedef struct {
+    //XXX TODO: Convert to using chaste vector type for more flexibility and power
+
     //Statically allow up to n streams on this (simple) selector
-    //XXX TODO: Convert to using chaste vector type for flexibility and power
     selector_spin_item_t items[SELECTOR_SPIN_MAX_ITEMS];
     //Number of streams added to the selector
     int64_t stream_count;

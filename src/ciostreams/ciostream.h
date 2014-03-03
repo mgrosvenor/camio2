@@ -4,8 +4,6 @@
 #ifndef CIOSTREAM_H_
 #define CIOSTREAM_H_
 
-#include <stdbool.h>
-
 #include "../types/types.h"
 #include "../errors/errors.h"
 #include "../buffers/buffer.h"
@@ -51,28 +49,18 @@ typedef struct{
 
 
 struct ciostrm_s {
-    /**
-     * Return the metadata structure describing the properties of this transport.
-     */
-    ciostrm_inf (*get_info)(ciostrm* this);
-
-    /**
-     * Return the the selectable structure for adding into a selector
-     */
-    cioselable* (*get_selectable)(ciostrm* this);
-
 
     /**
      * This function tries to do a non-blocking read for new data from the CamIO Stream called “this” and return slot info
-     * pointer called “slot_inf”. If the stream is empty, (e.g. end of file) or closed (e.g. disconnected) it is valid to return
+     * pointer called “slot”. If the stream is empty, (e.g. end of file) or closed (e.g. disconnected) it is valid to return
      * 0 bytes.
      * Return values:
-     * - ENOERROR:  Completed successfully, slot_info contains a valid structure.
+     * - ENOERROR:  Completed successfully, sloto contains a valid structure.
      * - ETRYAGAIN: There was no data available at this time, but there might be some more later.
      * - ENOSLOTS:  The stream could not allocate more slots for the read. Free some slots by releasing a read or write
      *              transaction.
      */
-    int (*read_acquire)( ciostrm* this, cioslot_info* slot_inf_o, int padding) ;
+    int (*read_acquire)( ciostrm* this, cioslot* slot_o, int padding) ;
 
 
     /**
@@ -80,17 +68,17 @@ struct ciostrm_s {
      * streams offer a limited number of slots, and some streams offer only one. If you are using stream association for
      * zero-copy data movement, calling read_aquire has the effect as calling write_acquire.
      * Returns:
-     *  - ENOERROR: Completed successfully, slot_info contains a valid structure.
+     *  - ENOERROR: Completed successfully, sloto contains a valid structure.
      *  - ENOSLOTS: The stream could not allocate more slots for the read. Free some slots by releasing a read or write
      *              transaction.
      */
-    int (*write_aquire)(ciostrm* this, cioslot_info* slot_inf_o);
+    int (*write_aquire)(ciostrm* this, cioslot* slot_o);
 
 
-    /* Try to write data described by slot_info_i to the given stream called “this”.  If auto_release is set to true,
+    /* Try to write data described by sloto_i to the given stream called “this”.  If auto_release is set to true,
      * write_commit will release the resources associated with the slot when it is done. Some streams support bulk transfer
      * options to amortise the cost of system calls. For these streams, you can set enqueue to true. Release()
-     * with enqueue set to 0 will flush the queue. Write_release() can be called with a NULL slot_inf_i parameter to flush
+     * with enqueue set to 0 will flush the queue. Write_release() can be called with a NULL slot_i parameter to flush
      * the queue. Unlike POSIX, write_comit() returns the number of bytes remaining rather than the number of bytes sent
      * to make it easy to wait until a write is committed.
      * Returns:
@@ -99,7 +87,7 @@ struct ciostrm_s {
      * - ECOPYOP: A copy operation was required to complete this commit.
      * - or: the bytes remaining for this stream. Since writing is non-blocking, this may not always be 0.
      */
-    int (*write_commit)(ciostrm* this, cioslot_info* slot_inf_i, int auto_release,  int enqueue);
+    int (*write_commit)(ciostrm* this, cioslot* slot_i, int auto_release,  int enqueue);
 
 
     /**
@@ -112,12 +100,24 @@ struct ciostrm_s {
      * - ENOERROR: All good, please continue
      * - EINVALID: Your data got trashed, time to recover!
      */
-    int (*release)(ciostrm* this, cioslot_info* slot_inf_i);
+    int (*release)(ciostrm* this, cioslot* slot_i);
 
     /**
      * Free resources associated with this stream, but not with its connector. 
      */
     void (*destroy)(ciostrm* this);
+
+
+    /**
+     * Return the metadata structure describing the properties of this transport.
+     */
+    ciostrm_inf info;
+
+
+    /**
+     * Return the the selectable structure for adding into a selector
+     */
+    cioselable selectable;
 
     /**
      * Pointer to stream specific data structures.
@@ -130,7 +130,7 @@ struct cioconn_s {
     /**
      * Return the the selectable structure for adding into a selector
      */
-    cioselable* (*get_selectable)(cioconn* this);
+    cioselable selectable;
 
 
     /**

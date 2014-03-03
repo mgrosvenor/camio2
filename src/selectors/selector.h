@@ -4,7 +4,7 @@
 #ifndef SELECTOR_H_
 #define SELECTOR_H_
 
- //CamIO IO selector definition
+//CamIO IO selector definition
 struct ciosel_s;
 typedef struct ciosel_s ciosel;
 
@@ -36,22 +36,28 @@ struct ciosel_s {
     /**
      * Remove the stream with the given id from the selector.
      */
-    void (*ciosel_remove)(ciosel* this, int id);
+    void (*remove)(ciosel* this, int id);
 
     /**
      * Return the ID and pointer to the selectable object when it becomes ready.
      */
-    int (*ciosel_select)(ciosel* this, cioselable** selectable_o);
+    int (*select)(ciosel* this, cioselable** selectable_o);
 
     /*
      * Returns the number of streams in this selctor
      */
-     size_t (*count)(ciosel* this);
+    size_t (*count)(ciosel* this);
 
-     /**
-      * Per-selector data
-      */
-     void* __priv;
+    /*
+     * Free any resources associated with this selector
+     */
+    size_t (*destroy)(ciosel* this);
+
+
+    /**
+     * Per-selector data
+     */
+    void* __priv;
 };
 
 /**
@@ -60,7 +66,9 @@ struct ciosel_s {
  * a string based target optimisation criteria or all streams can be forced to use a single selection strategy. In this
  * case, streams that do not support the selection strategy will be rejected.
  */
-ciosel* new_selector(char* strategy);
+typedef enum { LOW_LATENCY, LOW_CPU, __SPIN, __POLL,  __EPOLL,  __SELECT } ciosel_strategy;
+
+ciosel* new_selector(ciosel_strategy strategy);
 
 
 #endif /* SELECTOR_H_ */

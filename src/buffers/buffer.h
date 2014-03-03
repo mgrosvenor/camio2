@@ -49,7 +49,7 @@ typedef struct  {
 
     void* __priv;             //Per stream private data if necessary
 
-} cioslot_info;
+} cioslot;
 
 
 #endif /* BUFFER_H_ */
