@@ -3,6 +3,11 @@ CamIO2
 
 The Cambridge IO Library. Please see the license at the end of this file. 
 
+This is a work in progress. For an idea of what's going on here, take a look at this: 
+
+https://github.com/mgrosvenor/camio2/blob/master/src/ciostreams/ciostream.h
+
+As work progressess, this will eventually compile....
 
 Installing and building
 =======================
