@@ -18,6 +18,7 @@ int main(int argc, char** argv)
 
     cioconn* con;
     new_cioconn("file:/tmp/myfile?ro,trunc",NULL,&con);
+    con->connect(con);
 
     return 0;
 }

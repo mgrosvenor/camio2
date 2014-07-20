@@ -38,5 +38,6 @@
 #define CIO_NOTSELECTABLE       -25LL
 #define CIO_SELECTORFULL        -26LL
 #define CIO_EINDEXNOTFOUND      -27LL
+#define CIO_EEMPTY				-28LL
 
 #endif /* ERRORS_H_ */

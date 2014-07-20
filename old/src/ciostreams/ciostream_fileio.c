@@ -11,6 +11,8 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <errno.h>
+#include "../buffers/malloc_buffer.h"
 
 //Keep these definitions in the C file, so they can't escape.
 typedef struct {
@@ -22,23 +24,52 @@ typedef struct {
 
 typedef struct {
 	int fd;
+	malloc_buffer* buff;
+	int slot_idx;
 } strm_private;
-
-
 
 /**
  * This function tries to do a non-blocking read for new data from the CamIO Stream called “this” and return slot info
- * pointer called “slot”. If the stream is empty, (e.g. end of file) or closed (e.g. disconnected) it is valid to return
- * 0 bytes.
+ * pointer called “slot”. If the stream is empty, (e.g. end of file) or closed (e.g. disconnected) it is EEMPTU is
+ * returned
  * Return values:
  * - ENOERROR:  Completed successfully, sloto contains a valid structure.
  * - ETRYAGAIN: There was no data available at this time, but there might be some more later.
  * - ENOSLOTS:  The stream could not allocate more slots for the read. Free some slots by releasing a read or write
  *              transaction.
+ * - EEMPTY:	The stream has run out of data
  */
 static int strm_read_acquire( ciostrm* this, cioslot* slot_o, int padding)
 {
-	return 0;
+	strm_private* priv = (strm_private*)this->__priv;
+	cioslot* result = NULL;
+	for(int i = priv->slot_idx; i < priv->buff->slot_count; i++){
+		if(!priv->buff->slots[i].__in_use){
+			priv->slot_idx = i;
+			result = &priv->buff->slots[i];
+		}
+	}
+
+	if(!result){
+		return CIO_ENOSLOTS;
+	}
+
+	//TODO XXX: Add padding logic here!!!
+	result->data_len = read(priv->fd,result->slot_start,result->slot_len);
+	if(result->data_len == 0){
+		return CIO_EEMPTY;
+	}
+
+	if(result->data_len < 0){
+		if(errno == EAGAIN || errno == EWOULDBLOCK){
+			return CIO_ETRYAGAIN;
+		}
+
+		return errno;
+	}
+
+
+	return CIO_ENOERROR;
 }
 
 
@@ -103,6 +134,7 @@ static void strm_destroy(ciostrm* this)
 
     strm_private* priv = (strm_private*)this->__priv;
     if(priv){
+    	free_malloc_buffer(priv->buff);
         free(priv);
     }
 
@@ -113,18 +145,17 @@ static void strm_destroy(ciostrm* this)
 
 static int strm_ready(cioselable* this)
 {
-    (void)this;
-    return 1; //This stream is always ready!
+	return 0;
 }
 
 
-//Make a new fileio connector
+//Make a new fileio stream
 static int new_ciostrm_fileio( conn_private* conn_priv, ciostrm** ciostrm_o)
 {
     int result = CIO_ENOERROR;
 
     //Make a new connector
-    ciostrm* stream = calloc(0,sizeof(ciostrm));
+    ciostrm* stream = calloc(1,sizeof(ciostrm));
     if(!stream){
         return CIO_ENOMEM;
     }
@@ -144,12 +175,16 @@ static int new_ciostrm_fileio( conn_private* conn_priv, ciostrm** ciostrm_o)
 
     //Populate it
     strm_private* priv   = stream->__priv;
-    priv->fd			 = conn_priv->fd;
+    priv->fd			 = conn_priv->fd; //Link back so we can recover from the selectable
+    int ret = new_malloc_buffer(8,4096,&priv->buff); //TODO XXX: These are nasty constants, should be fixed
+    if(ret){
+    	return ret;
+    }
 
     //Set up the selector
     stream->selectable.ready  = strm_ready;
     stream->selectable.fd     = priv->fd;
-    stream->selectable.__priv = NULL;
+    stream->selectable.__priv = priv;
 
     //Set up the stream info
     stream->info->can_read_off 		= true;
@@ -163,7 +198,7 @@ static int new_ciostrm_fileio( conn_private* conn_priv, ciostrm** ciostrm_o)
     stream->info->mtu				= 0; //XXX TODO: Don't know yet. This is buffer size dependent
     stream->info->scope				= 1;
 
-    //Output the connector
+    //Output the stream
     *ciostrm_o = stream;
 
     //Done!
@@ -183,6 +218,8 @@ static int conn_connect( cioconn* this, ciostrm** ciostrm_o )
     return new_ciostrm_fileio(priv,ciostrm_o);
 }
 
+
+
 static void conn_destroy(cioconn* this)
 {
     if(!this){
@@ -200,8 +237,13 @@ static void conn_destroy(cioconn* this)
 
 static int conn_ready(cioselable* this)
 {
-    (void)this;
-    return 1; //This stream is always ready!
+	//Connector is ready until it is connected
+	conn_private* priv = (conn_private*) this->__priv;
+	if(priv->fd < 0){
+		return 1;
+	}
+
+	return 0;
 }
 
 
@@ -285,7 +327,7 @@ int new_cioconn_fileio( uri* uri_parsed , struct cioconn_s** cioconn_o, void** g
     //Set up the selector
     connector->selectable.ready  = conn_ready;
     connector->selectable.fd     = -1; //Can only use this in a spinner selector right now. TODO XXX: Fake this out.
-    connector->selectable.__priv = NULL;
+    connector->selectable.__priv = priv; //Close the loop
 
     //Output the connector
     *cioconn_o = connector;
