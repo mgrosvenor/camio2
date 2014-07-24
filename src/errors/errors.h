@@ -13,7 +13,7 @@
 #define ERRORS_H_
 //TODO XXX: Move to using an enum, write a string translation table for displaying the errors nicely
 
-typedef enum cioerr_e {
+typedef enum camio_error_e {
     CIO_ENOERROR,
     CIO_ETRYAGAIN,
     CIO_ECHECKERROR,
@@ -43,6 +43,6 @@ typedef enum cioerr_e {
     CIO_SELECTORFU,
     CIO_EINDEXNOTFOUND,
     CIO_EEMPTY,
-} cioerr_t;
+} camio_error_t;
 
 #endif /* ERRORS_H_ */

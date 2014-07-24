@@ -21,5 +21,19 @@
 
 #include "../../deps/chaste/types/types.h"
 
+//Forward declaration, the real definition is found in streams/stream.h
+struct camio_stream_s;
+typedef struct camio_stream_s camio_stream_t;
 
+//Forward declaration, the real definition is found in buffers/buffer.h
+struct camio_buffer_s;
+typedef struct camio_buffer_s camio_buffer_t;
+
+//Forward declaration, the real definition is found in streams/connector.h
+struct camio_connector_s;
+typedef struct camio_connector_s camio_connector_t;
+
+//Forward declaration, the real definition is found in selectors/selectable.h
+struct camio_selectable_s;
+typedef struct camio_selectable_s camio_selectable_t;
 #endif /* TYPES_H_ */

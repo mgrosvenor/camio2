@@ -33,7 +33,7 @@ typedef struct {
     uint64_t __buffer_id;       //Undefined if there is no data
 
     bool __do_release;          //Should release be called for this slot?
-    ciostrm_t* __buffer_parent;   //Parent who generated this slot
+    camio_stream_t* __buffer_parent;   //Parent who generated this slot
 
     union {
         struct timespec ts_timespec;
@@ -46,14 +46,14 @@ typedef struct {
 
     //Per stream private data goes here! (This must go last!)
     //**********************************************************************************************************************
+    ch_word __priv;
 
-
-} ciobuff_priv_t;
+} camio_buffer_priv_t;
 
 
 
 //Buffer information
-typedef struct ciobuff_s {
+typedef struct camio_buffer_s {
     bool valid;          //True if the data is valid (can be set to untrue by read_release)
     int timestamp_type; //The type of timestamp associated with this stream
 
@@ -68,16 +68,16 @@ typedef struct ciobuff_s {
     uint64_t buffer_len;    //Undefined if there is no data. Buffer_len is always >= data_len + (buffer_start - data_start)
     void* buffer_start;     //Undefined if there is no data
 
-    struct ciobuff_s* next; //Pointer to the next buffer in this queue, if null, there is no more.
+    camio_buffer_t* next; //Pointer to the next buffer in this queue, if null, there is no more.
 
     //Private - "Consumers" should not mess with these! (This must go last!)
     //**********************************************************************************************************************
-    ciobuff_priv_t __priv;
+    camio_buffer_priv_t __priv;
 
-} ciobuff_t;
+} camio_buffer_t;
 
-typedef ciobuff_t ciobuff_rd_t; //We make these incompatible so that the type checker will help us. The only way to get
-typedef ciobuff_t ciobuff_wr_t; //from a read (rd) buffer to a write (wr) buffer is to do a buffer copy. Sometimes a real
+typedef camio_buffer_t camio_rd_buffer_t; //We make these incompatible so that the type checker will help us. The only way to get
+typedef camio_buffer_t camio_wr_buffer_t; //from a read (rd) buffer to a write (wr) buffer is to do a buffer copy. Sometimes a real
                                 //copy will happen as a result.
 
 #endif /* BUFFER_H_ */
