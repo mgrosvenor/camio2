@@ -34,7 +34,7 @@ typedef struct{
     ch_word async_arrv;     // req/res: Can messages arrive asynchronously.
     ch_word bytestream;     // req/res: Do messages arrive as a continuous stream of bytes, or as a datagram.
     ch_word can_read_off;   // req/res: Can the stream offset reads into the receive buffer at zero cost.
-    ch_word mtu;            // req: Minimum value for maximum transfer unit for this stream,
+    ch_word mtu;            // req: Minimum value for maximum transfer unit for this stream, -1 for don't care
                             // res: Maximum transfer unit for this stream.
     ch_word scope;          // req/res:
                             // -1 = Don't care,
