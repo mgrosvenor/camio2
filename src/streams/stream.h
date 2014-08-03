@@ -15,7 +15,6 @@
 #include "../types/types.h"
 
 
-
 /**
  * Every CamIO stream must implement this interface, see function prototypes later for full details
  */
