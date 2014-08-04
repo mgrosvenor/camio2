@@ -22,7 +22,7 @@ typedef struct camio_connector_interface_s{
 } camio_connector_interface_t;
 
 
-struct camio_connector_s {
+typedef struct camio_connector_s {
 
     /**
      * vtable that holds the function pointers, usually this would be a pointer, but saving 2x8bytes seems a little silly
@@ -35,12 +35,12 @@ struct camio_connector_s {
      * Return the the selectable structure for adding into a selector
      */
     cioselable selectable;
-};
+} camio_connector_t;
 
 /**
  *  Attempt to connect the underlying stream to it’s data source. This may or may not block. If successful, the CamIO stream
- *  can be read and/or written to. In many cases, the connect operation will return immediately, with a valid stream once only.
- *  However, this is not guaranteed. Some streams may return multiple valid connection and some streams may take some
+ *  can be read and/or written to. In many cases, the connect operation will return immediately, with a valid stream once
+ *  only. However, this is not guaranteed. Some streams may return multiple valid connection and some streams may take some
  *  time before they return successfully. Streams can be placed into selectors to facilitate the blocking behaviour
  *  necessary to wait for these events to happen by listening for the  on connection signal.
  *  Return values;
@@ -48,12 +48,12 @@ struct camio_connector_s {
  *  - ETRYAGAIN: The stream has nothing new to report at this time. No connection has yet happened.
  *  - ECHECKERROR: The stream creation has failed.
  */
-int (*connect)( cioconn* this, ciostrm* ciostrm_o );
+camio_error_t camio_connect( camio_connector_t* this, camio_stream_t* stream_o );
 
 /**
  * Free resources associated with this connector, but not with any of the streams it has created.
  */
-void (*destroy)(cioconn* this);
+void camio_destroy(camio_connector_t* this);
 
 
 /**
@@ -65,7 +65,8 @@ void (*destroy)(cioconn* this);
  * - EBADOPT:   The arguments have an error or are unsupported
  * - EBADPROP:  The stream supplied in did not match the properties requested.
  */
-camio_error_t new_cioconn( ch_word type, ciostrm_req* properties,  ... );
+camio_error_t camio_connector_new_bin( camio_connector_t** connector, camio_stream_type_t type,
+                                       camio_stream_features_t* properties,  ... );
 
 
 /**
@@ -78,7 +79,7 @@ camio_error_t new_cioconn( ch_word type, ciostrm_req* properties,  ... );
  * - EBADOPT:   The URI options have an error or are unsupported
  * - EBADPROP:  The stream supplied in URI did not match the properties requested.
  */
-camio_error_t new_cioconn( char* uri , ciostrm_req* properties, struct cioconn_s** cioconn_o );
+camio_error_t camio_connector_new_uri( camio_connector_t** connector, char* uri , camio_stream_features_t* properties );
 
 
 #endif /* CONNECTOR_H_ */

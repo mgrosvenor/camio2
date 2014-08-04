@@ -17,23 +17,25 @@
 #include "../types/stdinclude.h"
 #include "../types/types.h"
 
-#define CIO_BUFFER_TST_NONE       0   //No timestamp on this stream
-#define CIO_BUFFER_TST_S_1970     1   //Timestamp is seconds since 1970
-#define CIO_BUFFER_TST_US_1970    2   //Timestamp is microseconds since 1970
-#define CIO_BUFFER_TST_NS_1970    3   //Timestamp is nanoseconds since 1970
-#define CIO_BUFFER_TST_TIMESPEC   4   //Timestamp is a timespec
-#define CIO_BUFFER_TST_TIMEVAL    5   //Timestamp is a timeval
-#define CIO_BUFFER_TST_FIXED3232  6   //Timestamp is a 32.32 fixed point value
+typedef enum camio_buffer_timestamp_e {
+    CIO_BUFFER_TST_NONE,          //No timestamp on this stream
+    CIO_BUFFER_TST_S_1970,        //Timestamp is seconds since 1970
+    CIO_BUFFER_TST_US_1970,       //Timestamp is microseconds since 1970
+    CIO_BUFFER_TST_NS_1970,       //Timestamp is nanoseconds since 1970
+    CIO_BUFFER_TST_TIMESPEC,      //Timestamp is a timespec
+    CIO_BUFFER_TST_TIMEVAL,       //Timestamp is a timeval
+    CIO_BUFFER_TST_FIXED3232,     //Timestamp is a 32.32 fixed point value
+} camio_buffer_timestamp_t;
 
 
 //TODO XXX: Hide this from consumers by putting the definition in another file
 typedef struct {
-    bool __in_use;              //Is the buffer in use? If not, it can be reserved by someone
-    uint64_t __pool_id;         //Undefined if there is no data
-    uint64_t __buffer_id;       //Undefined if there is no data
+    bool __in_use;                      //Is the buffer in use? If not, it can be reserved by someone
+    uint64_t __pool_id;                 //Undefined if there is no data
+    uint64_t __buffer_id;               //Undefined if there is no data
 
-    bool __do_release;          //Should release be called for this slot?
-    camio_stream_t* __buffer_parent;   //Parent who generated this slot
+    bool __do_release;                  //Should release be called for this slot?
+    camio_stream_t* __buffer_parent;    //Parent who generated this slot
 
     union {
         struct timespec ts_timespec;
@@ -44,10 +46,6 @@ typedef struct {
         uint64_t        ts_fixed3232;
     } __ts; //Private, don't play with this directly!
 
-    //Per stream private data goes here! (This must go last!)
-    //**********************************************************************************************************************
-    ch_word __priv;
-
 } camio_buffer_priv_t;
 
 
@@ -55,7 +53,7 @@ typedef struct {
 //Buffer information
 typedef struct camio_buffer_s {
     bool valid;          //True if the data is valid (can be set to untrue by read_release)
-    int timestamp_type; //The type of timestamp associated with this stream
+    camio_buffer_timestamp_t timestamp_type; //The type of timestamp associated with this stream
 
     //Some timestamps are inline with the data, some are not, this will point to the timestamp regardless of where it is.
     void* ts;
@@ -70,14 +68,10 @@ typedef struct camio_buffer_s {
 
     camio_buffer_t* next; //Pointer to the next buffer in this queue, if null, there is no more.
 
-    //Private - "Consumers" should not mess with these! (This must go last!)
-    //**********************************************************************************************************************
-    camio_buffer_priv_t __priv;
-
 } camio_buffer_t;
 
-typedef camio_buffer_t camio_rd_buffer_t; //We make these incompatible so that the type checker will help us. The only way to get
-typedef camio_buffer_t camio_wr_buffer_t; //from a read (rd) buffer to a write (wr) buffer is to do a buffer copy. Sometimes a real
-                                //copy will happen as a result.
+typedef camio_buffer_t camio_rd_buffer_t; //We make these incompatible so that the type checker will help us. The only way to
+typedef camio_buffer_t camio_wr_buffer_t; //get from a read (rd) buffer to a write (wr) buffer is to do a buffer copy.
+                                          //Sometimes a real copy will happen as a result.
 
 #endif /* BUFFER_H_ */

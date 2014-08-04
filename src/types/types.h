@@ -19,7 +19,10 @@
 #include <string.h>
 #include <stdio.h>
 
-#include "../../deps/chaste/types/types.h"
+#include "../../deps/chaste/types/types.h"//TODO XXX move this into a <> #include.
+
+#include "../errors/errors.h"
+
 //Forward declaration, the real definition is found in streams/features.h
 struct camio_stream_s;
 typedef struct camio_stream_s camio_stream_t;

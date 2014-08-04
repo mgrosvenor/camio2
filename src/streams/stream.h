@@ -32,12 +32,15 @@ typedef struct camio_stream_interface_s{
 
 } camio_stream_interface_t;
 
-
+/**
+ * This is a basic CamIO stream structure. All streams must implement this. Streams will use the macros provided to overload
+ * this structure with and include a private data structure.
+ */
 typedef struct camio_stream_s {
 
     /**
-     * vtable that holds the function pointers, usually this would be a pointer, but saving 6x8bytes seems a little silly
-     * when it will cost a pointer dereference on the critical
+     * vtable that holds the function pointers, usually this would be a pointer to a constan, but saving 6x8bytes seems a
+     * little silly when it will cost a pointer dereference on the critical
      * path.
      */
     camio_stream_interface_t vtable;
