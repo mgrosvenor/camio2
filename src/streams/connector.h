@@ -15,12 +15,21 @@
 #include "../types/types.h"
 #include "features.h"
 #include "stream.h"
+#include "stream_types.h"
+
+/**
+ * Every CamIO stream must implement this interface, see function prototypes later for full details
+ */
 
 typedef struct camio_connector_interface_s{
     int (*connect)( camio_connector_t* this, camio_stream_t** stream_o );
     void (*destroy)(camio_connector_t* this);
 } camio_connector_interface_t;
 
+/**
+ * This is a basic CamIO connector structure. All streams must implement this. Streams will use the macros provided to
+ * overload this structure with and include a private data structures..
+ */
 
 typedef struct camio_connector_s {
 
@@ -36,6 +45,7 @@ typedef struct camio_connector_s {
      */
     cioselable selectable;
 } camio_connector_t;
+
 
 /**
  *  Attempt to connect the underlying stream to it’s data source. This may or may not block. If successful, the CamIO stream
@@ -61,7 +71,7 @@ void camio_destroy(camio_connector_t* this);
  * order of these arguments is stream specific. The camio_connector_o is only valid id ENOERROR is returned.
  * Returns:
  * - ENOERROR:  All good. Nothing to see here.
- * - ENOSTREAM: The stream type is unrecognized
+ * - ENOSTREAM: The stream type is unrecognised
  * - EBADOPT:   The arguments have an error or are unsupported
  * - EBADPROP:  The stream supplied in did not match the properties requested.
  */
@@ -75,7 +85,7 @@ camio_error_t camio_connector_new_bin( camio_connector_t** connector, camio_stre
  * Returns:
  * - ENOERROR:  All good. Nothing to see here.
  * - EBADURI:   The URI supplied has a syntax error or is poorly formatted
- * - ENOSTREAM: The stream type is unrecognized
+ * - ENOSTREAM: The stream type is unrecognised
  * - EBADOPT:   The URI options have an error or are unsupported
  * - EBADPROP:  The stream supplied in URI did not match the properties requested.
  */
