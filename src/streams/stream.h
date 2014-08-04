@@ -20,13 +20,15 @@
  */
 typedef struct camio_stream_interface_s{
     //Read operations
-    camio_error_t (*read_acquire)(camio_stream_t* this,  camio_rd_buffer_t* buffer_chain_o, ch_word offset_hint) ;
+    camio_error_t (*read_acquire)( camio_stream_t* this,  camio_rd_buffer_t** buffer_chain_o, ch_word buffer_offset,
+                                ch_word source_offset);
     camio_error_t (*read_release)(camio_stream_t* this, camio_rd_buffer_t* buffer_chain);
 
     //Write operations
-    camio_error_t (*write_aquire)(camio_stream_t* this, camio_wr_buffer_t* buffer_chain_o, ch_word* count_io);
-    camio_error_t (*write_commit)(camio_stream_t* this, camio_rd_buffer_t* buffer_chain, ch_word* bytes_remain_o);
-    camio_error_t (*write_release)(camio_stream_t* this, camio_wr_buffer_t* buffer_chain);
+    camio_error_t (*write_aquire)(camio_stream_t* this, camio_wr_buffer_t** buffer_chain_o, ch_word* count_io);
+    camio_error_t (*write_commit)(camio_stream_t* this, camio_wr_buffer_t* buffer_chain, ch_word buffer_offset,
+                               ch_word dest_offset);
+    camio_error_t (*write_release)(camio_stream_t* this, camio_wr_buffer_t* buffers_chain);
 
     void (*destroy)(camio_stream_t* this);
 
@@ -76,8 +78,8 @@ typedef struct camio_stream_s {
  * - ENOBUFFS:  The stream could not allocate more buffers for the read. Free some buffers by releasing an outstanding read
  *              or write transaction.
  */
-camio_error_t read_acquire( camio_stream_t* this,  camio_rd_buffer_t** buffer_chain_o, ch_word buffer_offset,
-                            ch_word source_offset);
+camio_error_t cmaio_read_acquire( camio_stream_t* this,  camio_rd_buffer_t** buffer_chain_o, ch_word buffer_offset,
+                                  ch_word source_offset);
 
 /**
  * Relinquish resources associated with the given read buffer chain. Streams with the async_arrv feature enabled support
@@ -91,7 +93,7 @@ camio_error_t read_acquire( camio_stream_t* this,  camio_rd_buffer_t** buffer_ch
  * - EINVALID: Your data got trashed, time to recover!
  * - EBADSEQ:  You cannot release this buffer without releasing previous buffers in the sequence too
  */
-camio_error_t read_release(camio_stream_t* this, camio_rd_buffer_t* buffer_chain);
+camio_error_t camio_read_release(camio_stream_t* this, camio_rd_buffer_t* buffer_chain);
 
 
 
@@ -106,20 +108,20 @@ camio_error_t read_release(camio_stream_t* this, camio_rd_buffer_t* buffer_chain
  *  - ENOSLOTS: The stream could not allocate more slots for the read. Free some slots by releasing a read or write
  *              transaction.
  */
-camio_error_t write_aquire(camio_stream_t* this, camio_wr_buffer_t** buffer_chain_o, ch_word* count_io);
+camio_error_t camio_write_aquire(camio_stream_t* this, camio_wr_buffer_t** buffer_chain_o, ch_word* count_io);
 
 
-/* Write data described by buffer_chain to the given stream called “this”. Write may or may not block. Use the selector loop
- * to ensure that the stream is ready for more writing. If the dest_offset is non-zero, the write will try to place
- * data at offset bytes from the beginning of the destination. This may fail and is only supported if the write_to_dst_off
+
+/* Write data described by buffer_chain to the  stream called “this”. Write may or may not block. Use the selector loop
+ * to ensure that the stream is ready for writing. If the dest_offset is non-zero, the write will try to place data starting
+ * at offset bytes from the beginning of the destination. This may fail and is only supported if the write_to_dst_off
  * feature is supported by the stream. If buffer_offset is non-zero, the write will try to take data from offset bytes into
- * each buffer.
+ * each buffer. This may fail and is only supported if the write_from_buff feature is supported by the stream.
  * Returns:
  * - ENOERROR: Completed successfully.
- * - ECOPYOP:  A copy operation was required to complete this commit.This may happen if the write buffer belonged to another
- *             stream.
+ * - TODO XXX: Add more here
  */
-camio_error_t write_commit(camio_stream_t* this, camio_wr_buffer_t* buffer_chain, ch_word buffer_offset,
+camio_error_t camio_write_commit(camio_stream_t* this, camio_wr_buffer_t* buffer_chain, ch_word buffer_offset,
                            ch_word dest_offset);
 
 
@@ -130,13 +132,13 @@ camio_error_t write_commit(camio_stream_t* this, camio_wr_buffer_t* buffer_chain
  * - ENOERROR: All good, please continue.
  * - EBADSEQ:  You cannot release this buffer without releasing previous buffers in the sequence too.
  */
-camio_error_t write_release(camio_stream_t* this, camio_wr_buffer_t* buffers_chain);
+camio_error_t camio_write_release(camio_stream_t* this, camio_wr_buffer_t* buffers_chain);
 
 
 /**
  * Free resources associated with this stream, but not with its connector.
  */
-void destroy(camio_stream_t* this);
+void camio_destroy(camio_stream_t* this);
 
 
 
