@@ -14,7 +14,8 @@
 //TODO XXX: write a string translation table for displaying the errors nicely
 
 typedef enum camio_error_e {
-    CAMIO_ENOERROR,
+    CAMIO_NOTIMPLEMENTED = -1,
+    CAMIO_ENOERROR = 0,
     CAMIO_ETRYAGAIN,
     CAMIO_ECHECKERROR,
     CAMIO_ENOSLOTS,
