@@ -14,8 +14,7 @@
 
 #include <time.h>
 #include <sys/time.h>
-#include "../types/stdinclude.h"
-#include "../types/types.h"
+#include <types/types.h>
 
 typedef enum camio_buffer_timestamp_e {
     CIO_BUFFER_TST_NONE,          //No timestamp on this stream

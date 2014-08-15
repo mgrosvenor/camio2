@@ -17,7 +17,7 @@
  * Enumerate all of the built in stream types here
  */
 typedef enum camio_stream_type_e {
-
+    CAMIO_STREAM_NETMAP
 } camio_stream_type_t;
 
 #endif /* STREAM_TYPES_H_ */

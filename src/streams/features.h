@@ -12,7 +12,7 @@
 #ifndef FEATURES_H_
 #define FEATURES_H_
 
-#include "../types/types.h"
+#include <types/types.h>
 
 /**
  * Request (req) for stream features. Unless otherwise specified:

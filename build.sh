@@ -16,15 +16,25 @@
 #      http://gcc.gnu.org/ml/gcc-bugs/1998-07/msg00059.html
 #      http://gcc.gnu.org/ml/gcc-bugs/1998-07/msg00128.html
 
-#-std=c11 We use anonymous unions and alligned_alloc
+#-std=c11 We use anonymous unions, anonymous structures and alligned_alloc
 
 set -x
 
-CFLAGS="-Ideps -Ideps -D_XOPEN_SOURCE=700 -D_BSD_SOURCE -std=c11 -Werror -Wall -Wextra -pedantic -Wno-missing-field-initializers"
+INCLUDES="-Ideps -Isrc"
+CFLAGS="-D_XOPEN_SOURCE=700 -D_BSD_SOURCE -std=c11 -Werror -Wall -Wextra -pedantic -Wno-missing-field-initializers -ggdb"
 LINKFLAGS="-lrt"
 #LINKFLAGS="-Ldeps/chaste -lchaste -lrt"
 #CAKECONFIG=$(build/cake/cake-config-chooser)
 CAKECONFIG=cake.conf
-SRC=src/camio2.c
+SRC=src/camio.c
+#TESTS="--begintests  tests/*.c --endtests"
 
-build/cake/cake $SRC --config=build/cake/$CAKECONFIG --append-CFLAGS="$CFLAGS"  --LINKFLAGS="$LINKFLAGS"  --LINKFLAGS="$LINKFLAGS" $@ --begintests  tests/*.c --endtests
+build/cake/cake $SRC\
+    --variant=release\
+    --config=build/cake/$CAKECONFIG\
+    --append-CFLAGS="$INCLUDES $CFLAGS"\
+    --LINKFLAGS="$LINKFLAGS"\
+    --LINKFLAGS="$LINKFLAGS"\
+    --static-library\
+    $TESTS\
+
