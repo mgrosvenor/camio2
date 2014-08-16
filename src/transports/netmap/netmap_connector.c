@@ -11,35 +11,43 @@
 
 #include "connector.h"
 
+
+typedef struct netmap_priv_s {
+    int fd;
+} netmap_priv_t;
+
+
+
 static camio_error_t connect( camio_connector_t* this, camio_stream_t* stream_o )
 {
+    netmap_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
+    (void)priv;
     return CAMIO_NOTIMPLEMENTED;
 }
+
 
 static void connector_destroy(camio_connector_t* this)
 {
-
+    netmap_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
+    (void)priv;
 }
 
-const static camio_connector_interface_t connector_interface = {
-        .connect = connect,
-        .destroy = connector_destroy,
-};
 
-static camio_connector_t connector = {
-        .vtable = connector_interface
-        /*.selectable = TODO XXX*/
-};
+CONNECTOR_DECLARE(netmap_priv_t);
 
 
-camio_error_t connector_new_bin( camio_connector_t** connector_o, camio_stream_type_t type,
-        camio_stream_features_t* properties,  ... )
+camio_error_t new_netmap_connector_bin( camio_connector_t** connector_o, camio_stream_features_t* properties,  ... )
 {
+    camio_connector_t* this = new_connector();
+    netmap_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
+
+
+    *connector_o = this;
     return CAMIO_NOTIMPLEMENTED;
 }
 
 
-camio_error_t connector_new_uri( camio_connector_t** connector_o, char* uri , camio_stream_features_t* properties )
+camio_error_t new_netmap_connector_uri( camio_connector_t** connector_o, char* uri , camio_stream_features_t* properties )
 {
     return CAMIO_NOTIMPLEMENTED;
 }
