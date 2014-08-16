@@ -26,8 +26,8 @@ LINKFLAGS="-lrt"
 #LINKFLAGS="-Ldeps/chaste -lchaste -lrt"
 #CAKECONFIG=$(build/cake/cake-config-chooser)
 CAKECONFIG=cake.conf
-SRC=src/camio.c
-#TESTS="--begintests  tests/*.c --endtests"
+SRC=tests/camio_api_test.c
+TESTS="--begintests  tests/camio_api_test.c --endtests"
 
 build/cake/cake $SRC\
     --variant=release\
@@ -35,6 +35,7 @@ build/cake/cake $SRC\
     --append-CFLAGS="$INCLUDES $CFLAGS"\
     --LINKFLAGS="$LINKFLAGS"\
     --LINKFLAGS="$LINKFLAGS"\
-    --static-library\
     $TESTS\
+    #--static-library\
+
 

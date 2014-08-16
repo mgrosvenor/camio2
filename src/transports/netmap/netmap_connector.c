@@ -36,13 +36,14 @@ static void connector_destroy(camio_connector_t* this)
 CONNECTOR_DECLARE(netmap_priv_t);
 
 
-camio_error_t new_netmap_connector_bin( camio_connector_t** connector_o, camio_stream_features_t* properties,  ... )
+camio_error_t new_netmap_connector_bin_va( camio_connector_t** connector_o, camio_stream_features_t* properties,
+        va_list args )
 {
     camio_connector_t* this = new_connector();
     netmap_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
-
-
     *connector_o = this;
+
+
     return CAMIO_NOTIMPLEMENTED;
 }
 

@@ -12,6 +12,11 @@
 #ifndef NETMAP_CONNECTOR_H_
 #define NETMAP_CONNECTOR_H_
 
+#include <stdarg.h>
 
+camio_error_t new_netmap_connector_bin_va( camio_connector_t** connector_o, camio_stream_features_t* properties,
+        va_list args );
+
+camio_error_t new_netmap_connector_uri( camio_connector_t** connector_o, char* uri , camio_stream_features_t* properties );
 
 #endif /* NETMAP_CONNECTOR_H_ */

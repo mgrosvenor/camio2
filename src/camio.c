@@ -11,3 +11,7 @@
 
 #include "camio.h"
 
+camio_t* init_camio()
+{
+    return &__camio_state_container;
+}
