@@ -12,7 +12,7 @@
 #ifndef STREAM_H_
 #define STREAM_H_
 
-#include <types/types.h>
+#include "../types/types.h"
 
 
 /**
@@ -25,7 +25,7 @@ typedef struct camio_stream_interface_s{
     camio_error_t (*read_release)(camio_stream_t* this, camio_rd_buffer_t* buffer_chain);
 
     //Write operations
-    camio_error_t (*write_aquire)(camio_stream_t* this, camio_wr_buffer_t** buffer_chain_o, ch_word* count_io);
+    camio_error_t (*write_acquire)(camio_stream_t* this, camio_wr_buffer_t** buffer_chain_o, ch_word* count_io);
     camio_error_t (*write_commit)(camio_stream_t* this, camio_wr_buffer_t* buffer_chain, ch_word buffer_offset,
                                ch_word dest_offset);
     camio_error_t (*write_release)(camio_stream_t* this, camio_wr_buffer_t* buffers_chain);
@@ -50,7 +50,7 @@ typedef struct camio_stream_s {
     /**
      * Holds the meta-data structure describing the properties of this transport.
      */
-    camio_stream_features_t features;
+    camio_transport_features_t features;
 
 
     /**

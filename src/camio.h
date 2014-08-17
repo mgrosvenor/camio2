@@ -12,16 +12,16 @@
 #ifndef CAMIO_H_
 #define CAMIO_H_
 
-#include <api/api.h>
+#include "api/api.h"
 
 //Container for all CamIO state
 typedef struct camio_s {
-    int some_state;
+    ch_bool is_initialized;
 } camio_t;
 
 extern camio_t __camio_state_container;
 
-#define USE_CAMIO camio_t __camio_state_container
+#define USE_CAMIO camio_t __camio_state_container = { 0 }
 
 camio_t* init_camio();
 

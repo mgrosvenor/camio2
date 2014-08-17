@@ -12,10 +12,10 @@
 #ifndef API_H_
 #define API_H_
 
-#include <types/types.h>
-#include <streams/stream_types.h>
-#include <streams/features.h>
-#include <buffers/buffer.h>
+#include "../types/types.h"
+#include "../streams/transport_types.h"
+#include "../streams/features.h"
+#include "../buffers/buffer.h"
 
 
 /**
@@ -29,39 +29,12 @@
  *  - ETRYAGAIN: The stream has nothing new to report at this time. No connection has yet happened.
  *  - ECHECKERROR: The stream creation has failed.
  */
-camio_error_t camio_connect( camio_connector_t* this, camio_stream_t* stream_o );
+camio_error_t camio_connect( camio_connector_t* this, camio_stream_t** stream_o );
 
 /**
  * Free resources associated with this connector, but not with any of the streams it has created.
  */
 void camio_connector_destroy(camio_connector_t* this);
-
-
-/**
- * Create a new CamIO connector of type "type" with the properties requested and otherwise binary arguments. The type and
- * order of these arguments is stream specific. The camio_connector_o is only valid id ENOERROR is returned.
- * Returns:
- * - ENOERROR:  All good. Nothing to see here.
- * - ENOSTREAM: The stream type is unrecognised
- * - EBADOPT:   The arguments have an error or are unsupported
- * - EBADPROP:  The stream supplied in did not match the properties requested.
- */
-camio_error_t camio_connector_new_bin( camio_connector_t** connector_o, camio_stream_type_t type,
-                                       camio_stream_features_t* properties,  ... );
-
-
-/**
- * Create a new CamIO connector with with given the URI and properties request. Return a pointer to connection object in
- * cioconn_o. Cioconn_o is only valid id ENOERROR is returned.
- * Returns:
- * - ENOERROR:  All good. Nothing to see here.
- * - EBADURI:   The URI supplied has a syntax error or is poorly formatted
- * - ENOSTREAM: The stream type is unrecognised
- * - EBADOPT:   The URI options have an error or are unsupported
- * - EBADPROP:  The stream supplied in URI did not match the properties requested.
- */
-camio_error_t camio_connector_new_uri( camio_connector_t** connector_o, char* uri , camio_stream_features_t* properties );
-
 
 
 
@@ -80,7 +53,7 @@ camio_error_t camio_connector_new_uri( camio_connector_t** connector_o, char* ur
  * - ENOBUFFS:  The stream could not allocate more buffers for the read. Free some buffers by releasing an outstanding read
  *              or write transaction.
  */
-camio_error_t cmaio_read_acquire( camio_stream_t* this,  camio_rd_buffer_t** buffer_chain_o, ch_word buffer_offset,
+camio_error_t camio_read_acquire( camio_stream_t* this,  camio_rd_buffer_t** buffer_chain_o, ch_word buffer_offset,
                                   ch_word source_offset);
 
 /**
@@ -110,7 +83,7 @@ camio_error_t camio_read_release(camio_stream_t* this, camio_rd_buffer_t* buffer
  *  - ENOSLOTS: The stream could not allocate more slots for the read. Free some slots by releasing a read or write
  *              transaction.
  */
-camio_error_t camio_write_aquire(camio_stream_t* this, camio_wr_buffer_t** buffer_chain_o, ch_word* count_io);
+camio_error_t camio_write_acquire(camio_stream_t* this, camio_wr_buffer_t** buffer_chain_o, ch_word* count_io);
 
 
 
@@ -124,7 +97,7 @@ camio_error_t camio_write_aquire(camio_stream_t* this, camio_wr_buffer_t** buffe
  * - TODO XXX: Add more here
  */
 camio_error_t camio_write_commit(camio_stream_t* this, camio_wr_buffer_t* buffer_chain, ch_word buffer_offset,
-                           ch_word dest_offset);
+        ch_word dest_offset);
 
 
 /**
@@ -141,6 +114,22 @@ camio_error_t camio_write_release(camio_stream_t* this, camio_wr_buffer_t* buffe
  * Free resources associated with this stream, but not with its connector.
  */
 void camio_stream_destroy(camio_stream_t* this);
+
+
+
+/**
+ * Create a new CamIO transport of type "type" with the properties requested and otherwise binary arguments, return its
+ * connector. The type and order of these arguments is stream specific. The camio_connector_o is only valid id ENOERROR is
+ * returned.
+ * Returns:
+ * - ENOERROR:  All good. Nothing to see here.
+ * - ENOSTREAM: The stream type is unrecognised
+ * - EBADOPT:   The arguments have an error or are unsupported
+ * - EBADPROP:  The stream supplied in did not match the properties requested.
+ */
+camio_error_t new_camio_transport( camio_connector_t** connector_o, camio_transport_type_t type,
+        camio_transport_features_t* features,  void* parameters, ch_word parameters_size);
+
 
 
 

@@ -13,15 +13,17 @@
 #define CONNECTOR_H_
 
 #include <stdlib.h>
-#include <types/types.h>
+#include "../types/types.h"
 #include "features.h"
+#include "../selectors/selectable.h"
 
 /**
  * Every CamIO stream must implement this interface, see function prototypes in api.h
  */
 
 typedef struct camio_connector_interface_s{
-    int (*connect)( camio_connector_t* this, camio_stream_t** stream_o );
+    camio_error_t (*construct)(void* parameters, ch_word parameters_size );
+    camio_error_t (*connect)( camio_connector_t* this, camio_stream_t** stream_o );
     void (*destroy)(camio_connector_t* this);
 } camio_connector_interface_t;
 
@@ -40,9 +42,15 @@ typedef struct camio_connector_s {
     camio_connector_interface_t vtable;
 
     /**
-     * Return the the selectable structure for adding into a selector
+     * Return the the selectable structure for adding into a selector. Not valid until the connector constructor has been
+     * called.
      */
-    cioselable selectable;
+    camio_selectable_t selectable;
+
+    /**
+     * Return the features supported by this transport. Not valid until the connector constructor has been called.
+     */
+    camio_transport_features_t features;
 } camio_connector_t;
 
 
@@ -53,8 +61,9 @@ typedef struct camio_connector_s {
  */
 #define CONNECTOR_GET_PRIVATE(this) ( (void*)(this + 1))
 
-#define CONNECTOR_DECLARE(connector_private_type) \
+#define CONNECTOR_DEFINE(name, connector_private_type) \
     const static camio_connector_interface_t connector_interface = {\
+            .construct = construct,\
             .connect = connect,\
             .destroy = connector_destroy,\
     };\

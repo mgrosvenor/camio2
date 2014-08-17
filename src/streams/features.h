@@ -15,17 +15,17 @@
 #include <types/types.h>
 
 /**
- * Request (req) for stream features. Unless otherwise specified:
- *  1 = require stream to support feature,
- *  0 = require stream not to support feature,
- * -1 = don't care if stream supports feature
+ * Request (req) for transport features. Unless otherwise specified:
+ *  1 = require transport to support feature,
+ *  0 = require transport not to support feature,
+ * -1 = don't care if transport supports feature
  *
- * Result (res) from stream feature request. Unless otherwise specified:
- *  1 = stream supports feature
- *  0 = stream does not support feature
+ * Result (res) from transport feature request. Unless otherwise specified:
+ *  1 = transport supports feature
+ *  0 = transport does not support feature
  */
 //
-typedef struct camio_stream_features_s {
+typedef struct camio_transport_features_s {
     ch_word readable;               // req/res: Does this stream support read operations (read_aquire & read_release)
     ch_word read_to_buff_off;       // req/res: Can the stream deposit read data at any offset in the receive buffer.
     ch_word read_from_src_off;      // req/res: Can the stream read from an offset in the source stream (eg disk or RDMA)
@@ -54,7 +54,7 @@ typedef struct camio_stream_features_s {
     ch_word thread_safe;            // req/res: Calls to functions from multiple threads will not cause threading problems.
                                     //          this may introduce performance bottlenecks. Thread safety is both a compile-
                                     //          time and a runtime option. Both should be enabled for thread safety.
-} camio_stream_features_t;
+} camio_transport_features_t;
 
 
 

@@ -55,7 +55,7 @@ const static camio_stream_interface_t stream_interface =
 {
         .read_acquire   = read_acquire,
         .read_release   = read_release,
-        .write_aquire   = write_acquire,
+        .write_acquire  = write_acquire,
         .write_commit   = write_commit,
         .write_release  = write_release,
         .destory        = stream_destroy

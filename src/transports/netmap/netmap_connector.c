@@ -17,8 +17,13 @@ typedef struct netmap_priv_s {
 } netmap_priv_t;
 
 
+static camio_error_t construct(void* parameters, ch_word parameters_size )
+{
 
-static camio_error_t connect( camio_connector_t* this, camio_stream_t* stream_o )
+}
+
+
+static camio_error_t connect(camio_connector_t* this, camio_stream_t* stream_o )
 {
     netmap_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
     (void)priv;
