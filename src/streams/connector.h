@@ -22,7 +22,7 @@
  */
 
 typedef struct camio_connector_interface_s{
-    camio_error_t (*construct)(void* parameters, ch_word parameters_size );
+    camio_error_t (*construct)(camio_connector_t* this, void* parameters, ch_word parameters_size );
     camio_error_t (*connect)( camio_connector_t* this, camio_stream_t** stream_o );
     void (*destroy)(camio_connector_t* this);
 } camio_connector_interface_t;
@@ -59,19 +59,25 @@ typedef struct camio_connector_s {
  * Some macros to make life easier CONNECTOR_GET_PRIVATE helps us grab the private members out of the public connector_t and
  * CONNECTOR_DECLARE help to make a custom allocator for each stream
  */
-#define CONNECTOR_GET_PRIVATE(this) ( (void*)(this + 1))
+#define CONNECTOR_GET_PRIVATE(THIS) ( (void*)(THIS + 1))
 
-#define CONNECTOR_DEFINE(name, connector_private_type) \
-    const static camio_connector_interface_t connector_interface = {\
+#define NEW_CONNECTOR(name)\
+        new_##name##_connector
+
+#define CONNECTOR_DECLARE(NAME)\
+        camio_connector_t* new_##NAME##_connector()
+
+#define CONNECTOR_DEFINE(NAME, PRIVATE_TYPE) \
+    const static camio_connector_interface_t NAME##_connector_interface = {\
             .construct = construct,\
-            .connect = connect,\
-            .destroy = connector_destroy,\
+            .connect   = connect,\
+            .destroy   = destroy,\
     };\
     \
-    static camio_connector_t* new_connector()\
+    CONNECTOR_DECLARE(NAME)\
     {\
-        camio_connector_t* result = (camio_connector_t*)calloc(sizeof(camio_connector_t) + sizeof(connector_private_type));\
-        result->vtable = connector_interface;\
+        camio_connector_t* result = (camio_connector_t*)calloc(sizeof(camio_connector_t) + sizeof(PRIVATE_TYPE));\
+        result->vtable = NAME##_connector_interface;\
         return result;\
     }\
 

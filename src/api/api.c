@@ -86,16 +86,3 @@ void camio_stream_destroy(camio_stream_t* this)
 
 
 
-camio_error_t new_camio_transport( camio_connector_t** connector_o, camio_transport_type_t type,
-        camio_transport_features_t* features,  void* parameters, ch_word parameters_size)
-{
-    (void)connector_o;
-    (void)type;
-    (void)features;
-    (void)parameters;
-    (void)parameters_size;
-
-    return CAMIO_NOTIMPLEMENTED;
-}
-
-

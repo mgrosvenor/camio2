@@ -12,6 +12,6 @@
 #ifndef NETMAP_TRANSPORT_H_
 #define NETMAP_TRANSPORT_H_
 
-
+#include "netmap_connector.h"
 
 #endif /* NETMAP_TRANSPORT_H_ */
