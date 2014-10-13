@@ -14,7 +14,9 @@
 
 #include "netmap_connector.h"
 
-
+typedef struct netmap_global_s{
+    int fd;
+} netmap_global_t;
 
 
 void netmap_init();

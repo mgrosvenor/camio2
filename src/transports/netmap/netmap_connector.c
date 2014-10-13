@@ -10,6 +10,7 @@
  */
 
 #include "netmap_connector.h"
+#include "../../camio.h"
 
 
 typedef struct netmap_priv_s {
@@ -22,6 +23,11 @@ static camio_error_t construct_str(camio_connector_t* this, camio_uri_t* uri)
     netmap_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
     (void)priv;
     (void)uri;
+
+    void* global_store = NULL;
+    camio_transport_get_global("netm", 4, &global_store);
+    printf("Netmap construct str - global store at %p\n", global_store);
+
     return CAMIO_NOTIMPLEMENTED;
 }
 
@@ -30,6 +36,12 @@ static camio_error_t construct_bin(camio_connector_t* this, va_list args)
     netmap_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
     (void)priv;
     (void)args;
+
+    void* global_store = NULL;
+    camio_transport_get_global("netm", 4, &global_store);
+    printf("Netmap construct bin - global store at %p\n", global_store);
+
+
     return CAMIO_NOTIMPLEMENTED;
 }
 

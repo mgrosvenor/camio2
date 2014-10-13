@@ -44,5 +44,5 @@ static camio_error_t construct_bin(camio_connector_t** connector_o, va_list args
 
 void netmap_init()
 {
-    register_new_transport(scheme,strlen(scheme),construct_str, construct_bin,0,NULL);
+    register_new_transport(scheme,strlen(scheme),construct_str, construct_bin,sizeof(netmap_global_t));
 }

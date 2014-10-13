@@ -22,11 +22,14 @@ int main(int argc, char** argv)
 
     printf("Hello CamIO\n");
 
-    camio_connector_t* connector = NULL;
+    camio_connector_t* connector1 = NULL;
+    camio_connector_t* connector2 = NULL;
 
-    new_camio_transport_str("netm:/dev/netmap/",NULL,&connector);
+    new_camio_transport_str("netm:/dev/netmap/",NULL,&connector1);
+    new_camio_transport_bin("netm",NULL,&connector2);
 
-    printf("Got new connector at address %p\n", connector);
+    printf("Got new connector at address %p\n", connector1);
+    printf("Got new connector at address %p\n", connector2);
 
     /*
     camio_stream_t* stream = NULL;

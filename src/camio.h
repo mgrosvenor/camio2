@@ -30,12 +30,14 @@ extern camio_t __camio_state_container;
 camio_t* init_camio();
 
 camio_error_t register_new_transport(ch_ccstr scheme, ch_word scheme_len, camio_construct_str_f construct_str,
-    camio_construct_bin_f construct_bin, ch_word global_store_size, void** global_store );
+    camio_construct_bin_f construct_bin, ch_word global_store_size);
 
 camio_error_t new_camio_transport_str( ch_cstr uri, camio_transport_features_t* features, camio_connector_t** connector_o);
 
 camio_error_t new_camio_transport_bin(ch_ccstr scheme, camio_transport_features_t* features,
     camio_connector_t** connector_o, ...);
+
+camio_error_t camio_transport_get_global(ch_ccstr scheme, ch_word scheme_len, void** global_store);
 
 
 
