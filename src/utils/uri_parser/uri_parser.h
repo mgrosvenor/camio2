@@ -5,7 +5,7 @@
 #ifndef URI_PARSER_H_
 #define URI_PARSER_H_
 
-#include "../types/kvll.h"
+#include "../../types/kvll.h"
 
 //<scheme name> :["] <hierarchical part> ["][ ? <query> ] [ # <fragment> ]
 typedef struct camio_uri_s{

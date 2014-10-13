@@ -28,9 +28,14 @@ extern camio_t __camio_state_container;
 #define USE_CAMIO camio_t __camio_state_container = { 0 }
 
 camio_t* init_camio();
-camio_error_t register_new_transport(ch_cstr scheme, ch_word scheme_len, camio_stream_t* (*construct_str)( camio_uri_t* uri),
-                camio_stream_t* (*construct_bin)( va_list args ), ch_word global_store_size, void** global_store );
 
+camio_error_t register_new_transport(ch_ccstr scheme, ch_word scheme_len, camio_construct_str_f construct_str,
+    camio_construct_bin_f construct_bin, ch_word global_store_size, void** global_store );
+
+camio_error_t new_camio_transport_str( ch_cstr uri, camio_transport_features_t* features, camio_connector_t** connector_o);
+
+camio_error_t new_camio_transport_bin(ch_ccstr scheme, camio_transport_features_t* features,
+    camio_connector_t** connector_o, ...);
 
 
 

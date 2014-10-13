@@ -16,13 +16,25 @@
 #include "../types/types.h"
 #include "features.h"
 #include "../selectors/selectable.h"
+#include "../utils/uri_parser/uri_parser.h"
+
+
+
+typedef camio_error_t (*camio_construct_str_f)( camio_uri_t* uri, camio_connector_t** connector_o);
+typedef camio_error_t (*camio_construct_bin_f)( camio_connector_t** connector_o, va_list args);
+
+
+typedef camio_error_t (*camio_conn_construct_str_f)( camio_connector_t* this, camio_uri_t* uri);
+typedef camio_error_t (*camio_conn_construct_bin_f)( camio_connector_t* this, va_list args);
+
 
 /**
  * Every CamIO stream must implement this interface, see function prototypes in api.h
  */
 
 typedef struct camio_connector_interface_s{
-    camio_error_t (*construct)(camio_connector_t* this, void* parameters, ch_word parameters_size );
+    camio_conn_construct_str_f construct_str;
+    camio_conn_construct_bin_f construct_bin;
     camio_error_t (*connect)( camio_connector_t* this, camio_stream_t** stream_o );
     void (*destroy)(camio_connector_t* this);
 } camio_connector_interface_t;
@@ -71,17 +83,19 @@ typedef struct camio_connector_s {
 
 #define CONNECTOR_DEFINE(NAME, PRIVATE_TYPE) \
     const static camio_connector_interface_t NAME##_connector_interface = {\
-            .construct = construct,\
+            .construct_str = construct_str,\
+            .construct_bin = construct_bin,\
             .connect   = connect,\
             .destroy   = destroy,\
     };\
     \
     CONNECTOR_DECLARE(NAME)\
     {\
-        camio_connector_t* result = (camio_connector_t*)calloc(sizeof(camio_connector_t) + sizeof(PRIVATE_TYPE));\
+        camio_connector_t* result = (camio_connector_t*)calloc(1,sizeof(camio_connector_t) + sizeof(PRIVATE_TYPE));\
+        if(!result) return NULL;\
         result->vtable = NAME##_connector_interface;\
         return result;\
-    }\
+    }
 
 
 

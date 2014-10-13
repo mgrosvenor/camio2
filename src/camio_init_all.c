@@ -16,6 +16,8 @@
 
 camio_error_t camio_init_all_transports(){
 
+
+
     netmap_init();
 
 

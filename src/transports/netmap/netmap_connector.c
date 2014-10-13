@@ -17,18 +17,28 @@ typedef struct netmap_priv_s {
 } netmap_priv_t;
 
 
-static camio_error_t construct(camio_connector_t* this, void* parameters, ch_word parameters_size )
+static camio_error_t construct_str(camio_connector_t* this, camio_uri_t* uri)
 {
     netmap_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
     (void)priv;
+    (void)uri;
+    return CAMIO_NOTIMPLEMENTED;
+}
+
+static camio_error_t construct_bin(camio_connector_t* this, va_list args)
+{
+    netmap_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
+    (void)priv;
+    (void)args;
     return CAMIO_NOTIMPLEMENTED;
 }
 
 
-static camio_error_t connect(camio_connector_t* this, camio_stream_t* stream_o )
+static camio_error_t connect(camio_connector_t* this, camio_stream_t** stream_o )
 {
     netmap_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
     (void)priv;
+    (void)stream_o;
     return CAMIO_NOTIMPLEMENTED;
 }
 
@@ -40,7 +50,5 @@ static void destroy(camio_connector_t* this)
 }
 
 
-CONNECTOR_DEFINE(netmap, netmap_priv_t);
-
-
+CONNECTOR_DEFINE(netmap, netmap_priv_t)
 

@@ -24,7 +24,9 @@ int main(int argc, char** argv)
 
     camio_connector_t* connector = NULL;
 
-    new_camio_transport(&connector, CAMIO_TRANSPORT_NETMAP, NULL, NULL, 0);
+    new_camio_transport_str("netm:/dev/netmap/",NULL,&connector);
+
+    printf("Got new connector at address %p\n", connector);
 
     /*
     camio_stream_t* stream = NULL;

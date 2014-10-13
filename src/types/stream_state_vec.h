@@ -15,28 +15,26 @@
 
 #include "types.h"
 #include "../../deps/chaste/data_structs/vector/vector_typed_declare_template.h"
-
-
-typedef struct {
-    uint64_t;
-    uint64_t;
-} camio_uuid_t;
+#include "../utils/uri_parser/uri_parser.h"
+#include "../streams/connector.h"
 
 
 typedef struct camio_stream_state_s {
-    ch_cstr scheme;                                         // The short name for this stream eg: "tcp" or "udp"
+    ch_ccstr scheme;                            // The short name for this stream eg: "tcp" or "udp"
     ch_word scheme_len;
 
-    camio_stream_t* (*construct_str)( camio_uri_t* uri);    // Construct from a string
-    camio_stream_t* (*construct_bin)( va_list args );       // Construct from a binary
+    camio_construct_str_f construct_str;        // Construct from a string
+    camio_construct_bin_f construct_bin;        // Construct from a binary
 
-    void* global_store;                                     // Pointer to a global store for all instances to share state
+    void* global_store;                         // Pointer to a global store for all instances to share state
+    ch_word global_store_size;                  // Size of the global store
+
 } camio_stream_state_t;
 
 
 //Declare a linked list of key_value items
 declare_ch_vector(CAMIO_STREAM_STATE_VEC,camio_stream_state_t)
-declare_ch_vector_cmp(CAMIO_STREAM_STATE_VEC,camio_stream_state_t);
+declare_ch_vector_cmp(CAMIO_STREAM_STATE_VEC,camio_stream_state_t)
 
 
 #endif /* SRC_TYPES_STREAM_STATE_VEC_H_ */

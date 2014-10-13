@@ -35,6 +35,10 @@ typedef struct camio_stream_s camio_stream_t;
 struct camio_connector_s;
 typedef struct camio_connector_s camio_connector_t;
 
+//Forward declaration, the real definition is found in streams/connector.h
+struct camio_connector_interface_s;
+typedef struct camio_connector_interface_s camio_connector_interface_t;
+
 //Forward declaration, the real definition is found in buffers/buffer.h
 struct camio_buffer_s;
 typedef struct camio_buffer_s camio_buffer_t;

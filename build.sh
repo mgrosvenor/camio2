@@ -30,7 +30,7 @@ SRC=tests/camio_api_test.c
 TESTS="--begintests  tests/camio_api_test.c --endtests"
 
 build/cake/cake $SRC\
-    --variant=release\
+    --variant=debug\
     --config=build/cake/$CAKECONFIG\
     --append-CFLAGS="$INCLUDES $CFLAGS"\
     --LINKFLAGS="$LINKFLAGS"\

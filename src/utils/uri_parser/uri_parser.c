@@ -14,9 +14,9 @@
 
 
 #include "uri_parser.h"
-#include "../types/stdinclude.h"
-#include "../errors/errors.h"
-#include "../types/kvll.h"
+#include "../../types/types.h"
+#include "../../errors/errors.h"
+#include "../../types/kvll.h"
 
 
 
