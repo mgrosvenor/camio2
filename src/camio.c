@@ -19,8 +19,18 @@
 camio_t* init_camio()
 {
     printf("Initializing CamIO 2.0...\n");
+    camio_init_all_transports();
     return &__camio_state_container;
 }
+camio_error_t register_new_transport(ch_cstr scheme, ch_word scheme_len, camio_stream_t* (*construct_str)( camio_uri_t* uri),
+                camio_stream_t* (*construct_bin)( va_list args ), ch_word global_store_size, void** global_store )
+{
+    //First check that the scheme hasn't already been registered
+
+}
+
+
+
 
 
 camio_error_t new_camio_transport( camio_connector_t** connector_o, camio_transport_type_t type,

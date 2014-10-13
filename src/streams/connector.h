@@ -27,6 +27,8 @@ typedef struct camio_connector_interface_s{
     void (*destroy)(camio_connector_t* this);
 } camio_connector_interface_t;
 
+
+
 /**
  * This is a basic CamIO connector structure. All streams must implement this. Streams will use the macros provided to
  * overload this structure with and include a private data structures..

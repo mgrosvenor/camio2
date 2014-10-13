@@ -9,7 +9,7 @@
  *  <INSERT DESCRIPTION HERE> 
  */
 
-#include "connector.h"
+#include "netmap_connector.h"
 
 
 typedef struct netmap_priv_s {

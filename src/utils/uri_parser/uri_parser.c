@@ -21,12 +21,12 @@
 
 
 typedef enum { PARSE_SCHEME, PARSE_HIER, PARSE_FRAG, PARSE_KEY_INIT, PARSE_KEY, PARSE_VALUE} uri_parser_states;
-int parse_uri(char* uri_str, uri** result_o)
+int parse_uri(char* uri_str, camio_uri_t** result_o)
 {
 
-    uri* result = calloc(1,sizeof(uri));
+    camio_uri_t* result = (camio_uri_t*)calloc(1,sizeof(camio_uri_t));
     if(! result){
-        return CIO_ENOMEM;
+        return CAMIO_ENOMEM;
     }
 
     //State machine for parsing URIs
@@ -97,7 +97,7 @@ int parse_uri(char* uri_str, uri** result_o)
 
                 if(c == '='){
                     //The key length is empty, and we've found an equals, must be a syntax error
-                    return CIO_ENOKEY;
+                    return CAMIO_ENOKEY;
                 }
 
                 state = PARSE_KEY;
@@ -143,19 +143,19 @@ int parse_uri(char* uri_str, uri** result_o)
                 continue;
             }
             default:{
-                return CIO_EUNKNOWNSTATE;
+                return CAMIO_EUNKNOWNSTATE;
                 break;
             }
         }
     }
 
     *result_o = result;
-    return CIO_ENOERROR;
+    return CAMIO_ENOERROR;
 //
 }
 
 
-void free_uri(uri** u)
+void free_uri(camio_uri_t** u)
 {
     //Free up the linked list
     if( (*u)->key_vals ){

@@ -8,22 +8,22 @@
 #include "../types/kvll.h"
 
 //<scheme name> :["] <hierarchical part> ["][ ? <query> ] [ # <fragment> ]
-typedef struct{
-    char* scheme_name;
+typedef struct camio_uri_s{
+    ch_cstr scheme_name;
     uint64_t scheme_name_len;
 
-    char* hierarchical;
+    ch_cstr hierarchical;
     uint64_t hierarchical_len;
 
     CH_LIST(KV)* key_vals;
 
-    char* fragement;
+    ch_cstr  fragement;
     uint64_t fragement_len;
 
-} uri;
+} camio_uri_t;
 
-int parse_uri(char* uri_str, uri** result);
-void free_uri(uri** u);
+int parse_uri(ch_cstr uri_str, camio_uri_t** result);
+void free_uri(camio_uri_t** u);
 
 
 
