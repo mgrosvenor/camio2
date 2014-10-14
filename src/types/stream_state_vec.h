@@ -13,10 +13,10 @@
 #define SRC_TYPES_STREAM_STATE_VEC_H_
 
 
+#include <src/transports/connector.h>
 #include "types.h"
 #include "../../deps/chaste/data_structs/vector/vector_typed_declare_template.h"
 #include "../utils/uri_parser/uri_parser.h"
-#include "../streams/connector.h"
 
 
 typedef struct camio_stream_state_s {

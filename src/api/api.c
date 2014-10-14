@@ -22,12 +22,12 @@
  */
 
 
+#include <src/transports/connector.h>
+#include <src/transports/features.h>
+#include <src/transports/stream.h>
+#include <src/transports/transport_types.h>
 #include "../types/types.h"
-#include "../streams/transport_types.h"
-#include "../streams/features.h"
 #include "../buffers/buffer.h"
-#include "../streams/connector.h"
-#include "../streams/stream.h"
 #include "api.h"
 
 inline camio_error_t camio_connect( camio_connector_t* this, camio_stream_t** stream_o )

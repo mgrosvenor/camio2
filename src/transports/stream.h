@@ -13,7 +13,7 @@
 #define STREAM_H_
 
 #include "../types/types.h"
-
+#include "../buffers/buffer.h"
 
 /**
  * Every CamIO stream must implement this interface, see function prototypes in api.h

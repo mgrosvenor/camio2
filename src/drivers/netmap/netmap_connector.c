@@ -9,7 +9,7 @@
  *  <INSERT DESCRIPTION HERE> 
  */
 
-#include "netmap_connector.h"
+#include <src/drivers/netmap/netmap_connector.h>
 #include "../../camio.h"
 
 

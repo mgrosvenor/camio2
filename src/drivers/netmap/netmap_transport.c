@@ -9,8 +9,8 @@
  *  <INSERT DESCRIPTION HERE> 
  */
 
-#include "netmap_transport.h"
-#include "netmap_connector.h"
+#include <src/drivers/netmap/netmap_connector.h>
+#include <src/drivers/netmap/netmap_transport.h>
 #include "../../camio.h"
 
 const char* scheme = "netm";

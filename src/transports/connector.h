@@ -12,9 +12,9 @@
 #ifndef CONNECTOR_H_
 #define CONNECTOR_H_
 
+#include <src/transports/features.h>
 #include <stdlib.h>
 #include "../types/types.h"
-#include "features.h"
 #include "../selectors/selectable.h"
 #include "../utils/uri_parser/uri_parser.h"
 

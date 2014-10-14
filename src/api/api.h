@@ -12,9 +12,9 @@
 #ifndef API_H_
 #define API_H_
 
+#include <src/transports/features.h>
+#include <src/transports/transport_types.h>
 #include "../types/types.h"
-#include "../streams/transport_types.h"
-#include "../streams/features.h"
 #include "../buffers/buffer.h"
 
 

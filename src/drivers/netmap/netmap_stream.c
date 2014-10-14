@@ -10,7 +10,7 @@
  */
 
 
-#include "stream.h"
+#include <src/transports/stream.h>
 
 
 static camio_error_t read_acquire( camio_stream_t* this,  camio_rd_buffer_t** buffer_chain_o, ch_word buffer_offset,

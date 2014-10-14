@@ -12,8 +12,8 @@
 #ifndef NETMAP_CONNECTOR_H_
 #define NETMAP_CONNECTOR_H_
 
+#include <src/transports/connector.h>
 #include <stdarg.h>
-#include "../../streams/connector.h"
 
 CONNECTOR_DECLARE(netmap);
 
