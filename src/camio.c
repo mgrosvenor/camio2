@@ -163,7 +163,8 @@ camio_error_t new_camio_transport_str( ch_cstr uri, camio_transport_features_t* 
         return result;
     }
 
-    return found->construct_str(uri_o,connector_o);
+    result = found->construct_str(uri_o,connector_o);
+    return result;
 
 }
 
@@ -186,7 +187,9 @@ camio_error_t new_camio_transport_bin(ch_ccstr scheme, camio_transport_features_
     va_start(args, connector_o);
     result = found->construct_bin(connector_o,args);
     va_end(args);
+
     return result;
+
 
 }
 

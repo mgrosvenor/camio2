@@ -25,9 +25,11 @@ int main(int argc, char** argv)
     camio_connector_t* connector2 = NULL;
 
     new_camio_transport_str("netm:/dev/netmap/",NULL,&connector1);
+    DBG("Got new connector at address %p\n", connector1);
+
     new_camio_transport_bin("netm",NULL,&connector2);
 
-    DBG("Got new connector at address %p\n", connector1);
+
     DBG("Got new connector at address %p\n", connector2);
 
     /*

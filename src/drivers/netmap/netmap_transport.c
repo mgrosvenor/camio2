@@ -12,6 +12,7 @@
 #include <src/drivers/netmap/netmap_connector.h>
 #include <src/drivers/netmap/netmap_transport.h>
 #include "../../camio.h"
+#include "../../camio_debug.h"
 
 const char* scheme = "netm";
 
@@ -24,6 +25,7 @@ static camio_error_t construct_str(camio_uri_t* uri, camio_connector_t** connect
     }
 
     *connector_o = conn;
+    DBG("Connector address=%p (%p)\n",conn, *connector_o);
 
     return conn->vtable.construct_str(conn,uri);
 }
@@ -38,6 +40,8 @@ static camio_error_t construct_bin(camio_connector_t** connector_o, va_list args
 
     *connector_o = conn;
 
+    DBG("Connector address=%i (%i)(%i) (%i)\n",1,2, 3, 4);
+    camio_debug_out_(3,"testfile","test %i\n ",42);
     return conn->vtable.construct_bin(conn,args);
 }
 

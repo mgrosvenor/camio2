@@ -32,16 +32,20 @@ static camio_error_t construct(camio_connector_t* this, ch_cstr dev, ch_cstr pat
     }
 
 
-
     DBG("Netmap  global store at \n");
 
     //Already initialised, so we can just reuse that state
     if(global->is_init){
         DBG("Reusing global state\n");
         priv->fd = global->fd;
+        return CAMIO_ENOERROR;
     }
 
     DBG("No global state\n");
+
+
+    global->is_init = true;
+    DBG("Global state is initialised\n");
 
 
 
@@ -49,7 +53,6 @@ static camio_error_t construct(camio_connector_t* this, ch_cstr dev, ch_cstr pat
     (void) path;
     (void) use_host_ring;
     (void) ring_id;
-
 
     return CAMIO_NOTIMPLEMENTED;
 }

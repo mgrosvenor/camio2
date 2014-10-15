@@ -17,7 +17,7 @@
 #ifndef NDEBUG
     ch_word camio_debug_out_(ch_word line_num, const char* filename, const char* format, ... );
     #define DBG( /*format, args*/...)  camio_debug_helper(__VA_ARGS__, "")
-    #define camio_debug_helper(format, ...) camio_debug_out_(__LINE__, __FILE__, format, __VA_ARGS__, "" )
+    #define camio_debug_helper(format, ...) camio_debug_out_(__LINE__, __FILE__, format, __VA_ARGS__ )
 #else
     #define DBG( /*format, args*/...)
 #endif
