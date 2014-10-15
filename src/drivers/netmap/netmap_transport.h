@@ -16,7 +16,7 @@
 
 typedef struct netmap_global_s{
     ch_bool is_init;
-    int fd;
+    int netmap_fd;
 } netmap_global_t;
 
 

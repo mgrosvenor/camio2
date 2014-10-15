@@ -20,9 +20,11 @@
 #include <stdio.h>
 #include <fcntl.h>
 #include <sys/ioctl.h>
+#include "netmap_if_vec.h"
 
 typedef struct netmap_priv_s {
-    int fd;
+    int netmap_fd;
+    CH_VECTOR(netmap_if)* interfaces;
 } netmap_priv_t;
 
 
@@ -43,7 +45,7 @@ static camio_error_t construct(camio_connector_t* this, ch_cstr dev, ch_cstr pat
     //Already initialised, so we can just reuse that state
     if(global->is_init){
         DBG("Reusing global state\n");
-        priv->fd = global->fd;
+        priv->netmap_fd = global->netmap_fd;
         return CAMIO_ENOERROR;
     }
 
