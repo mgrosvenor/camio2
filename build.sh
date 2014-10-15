@@ -18,10 +18,10 @@
 
 #-std=c11 We use anonymous unions, anonymous structures and alligned_alloc
 
-set -x
+#set -x
 
 INCLUDES="-Ideps -Isrc"
-CFLAGS="-D_XOPEN_SOURCE=700 -D_BSD_SOURCE -std=c11 -Werror -Wall -Wextra -pedantic -Wno-missing-field-initializers -ggdb"
+CFLAGS="-O3 -g -D_XOPEN_SOURCE=700 -D_BSD_SOURCE -std=c11 -Werror -Wall -Wextra -pedantic -Wno-missing-field-initializers -ggdb"
 LINKFLAGS="-lrt"
 #LINKFLAGS="-Ldeps/chaste -lchaste -lrt"
 #CAKECONFIG=$(build/cake/cake-config-chooser)
@@ -29,8 +29,9 @@ CAKECONFIG=cake.conf
 SRC=tests/camio_api_test.c
 TESTS="--begintests  tests/camio_api_test.c --endtests"
 
+    #--variant=CLANG_RELEASE\
 build/cake/cake $SRC\
-    --variant=debug\
+    --variant=CLANG_DEBUG\
     --config=build/cake/$CAKECONFIG\
     --append-CFLAGS="$INCLUDES $CFLAGS"\
     --LINKFLAGS="$LINKFLAGS"\

@@ -15,6 +15,7 @@
 #include <src/drivers/netmap/netmap_connector.h>
 
 typedef struct netmap_global_s{
+    ch_bool is_init;
     int fd;
 } netmap_global_t;
 

@@ -9,13 +9,50 @@
  *  <INSERT DESCRIPTION HERE> 
  */
 
-#include <src/drivers/netmap/netmap_connector.h>
+#include "netmap_transport.h"
+#include "netmap_connector.h"
 #include "../../camio.h"
+#include "../../camio_debug.h"
 
 
 typedef struct netmap_priv_s {
     int fd;
 } netmap_priv_t;
+
+
+static camio_error_t construct(camio_connector_t* this, ch_cstr dev, ch_cstr path, ch_bool use_host_ring, ch_word ring_id)
+{
+
+    netmap_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
+
+    netmap_global_t* global = NULL;
+    camio_error_t result = camio_transport_get_global("netm", (void**)&global);
+    if(result){
+        return result;
+    }
+
+
+
+    DBG("Netmap  global store at \n");
+
+    //Already initialised, so we can just reuse that state
+    if(global->is_init){
+        DBG("Reusing global state\n");
+        priv->fd = global->fd;
+    }
+
+    DBG("No global state\n");
+
+
+
+    (void) dev;
+    (void) path;
+    (void) use_host_ring;
+    (void) ring_id;
+
+
+    return CAMIO_NOTIMPLEMENTED;
+}
 
 
 static camio_error_t construct_str(camio_connector_t* this, camio_uri_t* uri)
@@ -24,11 +61,14 @@ static camio_error_t construct_str(camio_connector_t* this, camio_uri_t* uri)
     (void)priv;
     (void)uri;
 
-    void* global_store = NULL;
-    camio_transport_get_global("netm", 4, &global_store);
-    printf("Netmap construct str - global store at %p\n", global_store);
+    // TODO XXX: Convert the URI into a bunch of opts here...
 
-    return CAMIO_NOTIMPLEMENTED;
+    ch_cstr dev             = "eth0";
+    ch_cstr path            = "/dev/netmap";
+    ch_bool use_host_ring   = false;
+    ch_word ring_id         = 0;
+
+    return construct(this,dev,path,use_host_ring,ring_id);
 }
 
 static camio_error_t construct_bin(camio_connector_t* this, va_list args)
@@ -37,12 +77,15 @@ static camio_error_t construct_bin(camio_connector_t* this, va_list args)
     (void)priv;
     (void)args;
 
-    void* global_store = NULL;
-    camio_transport_get_global("netm", 4, &global_store);
-    printf("Netmap construct bin - global store at %p\n", global_store);
+    // TODO XXX: Convert the va_list into a bunch of opts here
 
+    ch_cstr dev             = "eth0";
+    ch_cstr path            = "/dev/netmap";
+    ch_bool use_host_ring   = false;
+    ch_word ring_id         = 0;
 
-    return CAMIO_NOTIMPLEMENTED;
+    return construct(this,dev,path,use_host_ring,ring_id);
+
 }
 
 

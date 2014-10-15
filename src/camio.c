@@ -12,6 +12,7 @@
 #include <stdio.h>
 
 #include "camio.h"
+#include "camio_debug.h"
 #include "camio_init_all.h"
 #include "types/stream_state_vec.h"
 #include "utils/uri_parser/uri_parser.h"
@@ -22,7 +23,7 @@
 
 camio_t* init_camio()
 {
-    printf("Initializing CamIO 2.0...\n");
+    DBG("Initializing CamIO 2.0...\n");
 
     //Set up the stream state list, this should really be a hashmap one day....
     CH_VECTOR(CAMIO_STREAM_STATE_VEC)* stream_state =
@@ -114,7 +115,7 @@ camio_error_t new_camio_transport_generic(ch_ccstr scheme, ch_word scheme_len, c
 }
 
 
-camio_error_t camio_transport_get_global(ch_ccstr scheme, ch_word scheme_len, void** global_store)
+camio_error_t camio_transport_get_global(ch_ccstr scheme, void** global_store)
 {
 
     //Find the stream
@@ -122,7 +123,7 @@ camio_error_t camio_transport_get_global(ch_ccstr scheme, ch_word scheme_len, vo
 
     camio_stream_state_t state = {
         .scheme             = scheme,
-        .scheme_len         = scheme_len,
+        .scheme_len         = strlen(scheme),
         .construct_str      = NULL,
         .construct_bin      = NULL,
         .global_store_size  = 0,
@@ -188,3 +189,6 @@ camio_error_t new_camio_transport_bin(ch_ccstr scheme, camio_transport_features_
     return result;
 
 }
+
+
+

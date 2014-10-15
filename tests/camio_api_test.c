@@ -11,6 +11,7 @@
 
 #include "../src/camio.h"
 #include <stdio.h>
+#include "../src/camio_debug.h"
 
 USE_CAMIO;
 
@@ -20,16 +21,14 @@ int main(int argc, char** argv)
     (void)argc; //We don't use these for the test ... yet
     (void)argv;
 
-    printf("Hello CamIO\n");
-
     camio_connector_t* connector1 = NULL;
     camio_connector_t* connector2 = NULL;
 
     new_camio_transport_str("netm:/dev/netmap/",NULL,&connector1);
     new_camio_transport_bin("netm",NULL,&connector2);
 
-    printf("Got new connector at address %p\n", connector1);
-    printf("Got new connector at address %p\n", connector2);
+    DBG("Got new connector at address %p\n", connector1);
+    DBG("Got new connector at address %p\n", connector2);
 
     /*
     camio_stream_t* stream = NULL;

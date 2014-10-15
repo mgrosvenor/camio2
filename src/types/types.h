@@ -9,8 +9,8 @@
  *  <INSERT DESCRIPTION HERE> 
  */
 
-#ifndef TYPES_H_
-#define TYPES_H_
+#ifndef SRC_TYPES_TYPES_H_
+#define SRC_TYPES_TYPES_H_
 
 #include <stdint.h>
 #include <stdbool.h>
@@ -46,4 +46,5 @@ typedef struct camio_buffer_s camio_buffer_t;
 //Forward declaration, the real definition is found in selectors/selectable.h
 struct camio_selectable_s;
 typedef struct camio_selectable_s camio_selectable_t;
-#endif /* TYPES_H_ */
+
+#endif /* SRC_TYPES_TYPES_H_ */
