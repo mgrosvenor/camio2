@@ -85,7 +85,7 @@ typedef struct camio_connector_s {
     const static camio_connector_interface_t NAME##_connector_interface = {\
             .construct_str = construct_str,\
             .construct_bin = construct_bin,\
-            .connect   = connect,\
+            .connect   = cconnect,\
             .destroy   = destroy,\
     };\
     \

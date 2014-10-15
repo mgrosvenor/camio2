@@ -13,7 +13,13 @@
 #include "netmap_connector.h"
 #include "../../camio.h"
 #include "../../camio_debug.h"
+#include "netmap.h"
+#include "netmap_user.h"
 
+#include <errno.h>
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/ioctl.h>
 
 typedef struct netmap_priv_s {
     int fd;
@@ -32,7 +38,7 @@ static camio_error_t construct(camio_connector_t* this, ch_cstr dev, ch_cstr pat
     }
 
 
-    DBG("Netmap  global store at \n");
+    DBG("Netmap  global store at %p\n", global);
 
     //Already initialised, so we can just reuse that state
     if(global->is_init){
@@ -44,10 +50,65 @@ static camio_error_t construct(camio_connector_t* this, ch_cstr dev, ch_cstr pat
     DBG("No global state\n");
 
 
+    int netmap_fd = -1;
+    struct nmreq req;
+
+    DBG("Opening %s\n", path);
+    netmap_fd = open(path, O_RDWR);
+    if(unlikely(netmap_fd < 0)){
+        DBG( "Could not open file \"%s\". Error=%s\n", "/dev/netmap", strerror(errno));
+        return CAMIO_EINVALID;//TODO XXX FIXME
+    }
+
+    //Request a specific interface
+    bzero(&req, sizeof(req));
+    req.nr_version = NETMAP_API;
+    strncpy(req.nr_name, dev, sizeof(req.nr_name));
+    req.nr_ringid = 0; //All hw rings
+
+    if(ioctl(netmap_fd, NIOCGINFO, &req)){
+        DBG( "Could not get info on netmap interface %s\n",dev);
+        return CAMIO_EINVALID;//TODO XXX FIXME
+    }
+
+    DBG(  "\nVersion    = %u\n"
+            "Memsize    = %u\n"
+            "Ringid     = %u\n"
+            "Nr Offset  = %u\n"
+            "rx rings   = %u\n"
+            "rx slots   = %u\n"
+            "tx rings   = %u\n"
+            "tx slots   = %u\n",
+            req.nr_version,
+            req.nr_memsize / 1024 / 1204,
+            req.nr_ringid,
+            req.nr_offset,
+            req.nr_rx_rings,
+            req.nr_rx_slots,
+            req.nr_tx_rings,
+            req.nr_tx_slots);
+
+
+    if(ioctl(netmap_fd, NIOCREGIF, &req)){
+        DBG( "Could not register netmap interface %s\n", dev);
+        return CAMIO_EINVALID;//TODO XXX FIXME
+    }
+
+    DBG("\nMemsize      = %u\n"
+            "Ringid     = %u\n"
+            "Nr Offset  = %u\n"
+            "rx rings   = %u\n"
+            "rx slots   = %u\n",
+            req.nr_memsize / 1024 / 1204,
+            req.nr_ringid,
+            req.nr_offset,
+            req.nr_rx_rings,
+            req.nr_rx_slots);
+
+
+
     global->is_init = true;
     DBG("Global state is initialised\n");
-
-
 
     (void) dev;
     (void) path;
@@ -56,6 +117,7 @@ static camio_error_t construct(camio_connector_t* this, ch_cstr dev, ch_cstr pat
 
     return CAMIO_NOTIMPLEMENTED;
 }
+
 
 
 static camio_error_t construct_str(camio_connector_t* this, camio_uri_t* uri)
@@ -92,7 +154,7 @@ static camio_error_t construct_bin(camio_connector_t* this, va_list args)
 }
 
 
-static camio_error_t connect(camio_connector_t* this, camio_stream_t** stream_o )
+static camio_error_t cconnect(camio_connector_t* this, camio_stream_t** stream_o )
 {
     netmap_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
     (void)priv;
