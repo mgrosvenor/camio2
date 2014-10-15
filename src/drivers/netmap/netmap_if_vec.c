@@ -12,7 +12,7 @@
 #include "netmap_if_vec.h"
 #include "../../../deps/chaste/data_structs/vector/vector_typed_define_template.h"
 
-define_ch_vector(netmap_if,netmap_if_t);
+define_ch_vector(netmap_if,netmap_if_t)
 
 define_ch_vector_compare(netmap_if,netmap_if_t)
 {
