@@ -76,20 +76,20 @@ typedef struct camio_connector_s {
 #define CONNECTOR_GET_PRIVATE(THIS) ( (void*)(THIS + 1))
 
 #define NEW_CONNECTOR(name)\
-        new_##name##_connector
+        new_##name##_connector()
 
-#define CONNECTOR_DECLARE(NAME)\
+#define NEW_CONNECTOR_DECLARE(NAME)\
         camio_connector_t* new_##NAME##_connector()
 
-#define CONNECTOR_DEFINE(NAME, PRIVATE_TYPE) \
+#define NEW_CONNECTOR_DEFINE(NAME, PRIVATE_TYPE) \
     const static camio_connector_interface_t NAME##_connector_interface = {\
-            .construct_str = construct_str,\
-            .construct_bin = construct_bin,\
-            .connect   = cconnect,\
-            .destroy   = destroy,\
+            .construct_str = NAME##_construct_str,\
+            .construct_bin = NAME##_construct_bin,\
+            .connect   = NAME##_connect,\
+            .destroy   = NAME##_destroy,\
     };\
     \
-    CONNECTOR_DECLARE(NAME)\
+    NEW_CONNECTOR_DECLARE(NAME)\
     {\
         camio_connector_t* result = (camio_connector_t*)calloc(1,sizeof(camio_connector_t) + sizeof(PRIVATE_TYPE));\
         if(!result) return NULL;\

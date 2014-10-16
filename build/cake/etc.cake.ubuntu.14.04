@@ -35,7 +35,7 @@ CAKE_CLANG_CPPFLAGS=" -I . -std=gnu++0x"
 CAKE_CLANG_CFLAGS=" -I . -fPIC -g -Wall"
 CAKE_CLANG_CXXFLAGS=" -I . -std=c++0x -fPIC -g -Wall "
 CAKE_CLANG_LINKFLAGS="-fPIC -Wall -Werror -Xlinker --build-id"
-CAKE_CLANG_TESTPREFIX="timeout 300 valgrind --quiet --error-exitcode=1"
+CAKE_CLANG_TESTPREFIX="timeout 15 valgrind --quiet --error-exitcode=1"
 CAKE_CLANG_POSTPREFIX="timeout 120"
 
 CAKE_CLANG_DEBUG_ID="$CAKE_CLANG_ID"

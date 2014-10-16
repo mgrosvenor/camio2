@@ -25,7 +25,6 @@
 #include <src/transports/connector.h>
 #include <src/transports/features.h>
 #include <src/transports/stream.h>
-#include <src/transports/transport_types.h>
 #include "../types/types.h"
 #include "../buffers/buffer.h"
 #include "api.h"

@@ -21,16 +21,14 @@ int main(int argc, char** argv)
     (void)argc; //We don't use these for the test ... yet
     (void)argv;
 
-    camio_connector_t* connector1 = NULL;
-    camio_connector_t* connector2 = NULL;
+    camio_connector_t* connector = NULL;
 
-    new_camio_transport_str("netm:/dev/netmap/",NULL,&connector1);
-    DBG("Got new connector at address %p\n", connector1);
+    new_camio_transport_bin("netm",NULL,&connector);
 
-    new_camio_transport_bin("netm",NULL,&connector2);
+    DBG("Got new connector at address %p\n", connector);
 
-
-    DBG("Got new connector at address %p\n", connector2);
+    camio_stream_t* stream = NULL;
+    connector->vtable.connect(connector,&stream);
 
     /*
     camio_stream_t* stream = NULL;
@@ -65,6 +63,7 @@ int main(int argc, char** argv)
 
     camio_write_release(stream,wr_buffer_chain);
     */
+
 
 
     return 0;

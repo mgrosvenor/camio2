@@ -14,11 +14,11 @@
 #include "../../camio.h"
 #include "../../camio_debug.h"
 
-const char* scheme = "netm";
+const char * const scheme = "netm";
 
 static camio_error_t construct_str(camio_uri_t* uri, camio_connector_t** connector_o)
 {
-    camio_connector_t* conn = NEW_CONNECTOR(netmap)();
+    camio_connector_t* conn = NEW_CONNECTOR(netmap);
     if(!conn){
         *connector_o = NULL;
         return CAMIO_ENOMEM;
@@ -32,7 +32,7 @@ static camio_error_t construct_str(camio_uri_t* uri, camio_connector_t** connect
 
 static camio_error_t construct_bin(camio_connector_t** connector_o, va_list args)
 {
-    camio_connector_t* conn = NEW_CONNECTOR(netmap)();
+    camio_connector_t* conn = NEW_CONNECTOR(netmap);
     if(!conn){
         *connector_o = NULL;
         return CAMIO_ENOMEM;
@@ -48,5 +48,5 @@ static camio_error_t construct_bin(camio_connector_t** connector_o, va_list args
 
 void netmap_init()
 {
-    register_new_transport(scheme,strlen(scheme),construct_str, construct_bin,sizeof(netmap_global_t));
+    register_new_transport(scheme,strlen(scheme),construct_str, construct_bin,0);
 }

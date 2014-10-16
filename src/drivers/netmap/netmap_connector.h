@@ -15,6 +15,6 @@
 #include <src/transports/connector.h>
 #include <stdarg.h>
 
-CONNECTOR_DECLARE(netmap);
+NEW_CONNECTOR_DECLARE(netmap);
 
 #endif /* NETMAP_CONNECTOR_H_ */

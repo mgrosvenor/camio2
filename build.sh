@@ -31,6 +31,7 @@ TESTS="--begintests  tests/camio_api_test.c --endtests"
 
     #--variant=CLANG_RELEASE\
 build/cake/cake $SRC\
+    --verbose\
     --variant=CLANG_DEBUG\
     --config=build/cake/$CAKECONFIG\
     --append-CFLAGS="$INCLUDES $CFLAGS"\

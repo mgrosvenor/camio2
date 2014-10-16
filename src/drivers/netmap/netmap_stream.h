@@ -12,6 +12,8 @@
 #ifndef NETMAP_STREAM_H_
 #define NETMAP_STREAM_H_
 
+#include "../../transports/stream.h"
 
+NEW_STREAM_DECLARE(netmap);
 
 #endif /* NETMAP_STREAM_H_ */

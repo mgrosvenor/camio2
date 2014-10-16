@@ -13,7 +13,6 @@
 #define API_H_
 
 #include <src/transports/features.h>
-#include <src/transports/transport_types.h>
 #include "../types/types.h"
 #include "../buffers/buffer.h"
 
@@ -116,20 +115,20 @@ camio_error_t camio_write_release(camio_stream_t* this, camio_wr_buffer_t* buffe
 void camio_stream_destroy(camio_stream_t* this);
 
 
-
-/**
- * Create a new CamIO transport of type "type" with the properties requested and otherwise binary arguments, return its
- * connector. The type and order of these arguments is stream specific. The camio_connector_o is only valid id ENOERROR is
- * returned.
- * Returns:
- * - ENOERROR:  All good. Nothing to see here.
- * - ENOSTREAM: The stream type is unrecognised
- * - EBADOPT:   The arguments have an error or are unsupported
- * - EBADPROP:  The stream supplied in did not match the properties requested.
- */
-camio_error_t new_camio_transport( camio_connector_t** connector_o, camio_transport_type_t type,
-        camio_transport_features_t* features,  void* parameters, ch_word parameters_size);
-
+//
+///**
+// * Create a new CamIO transport of type "type" with the properties requested and otherwise binary arguments, return its
+// * connector. The type and order of these arguments is stream specific. The camio_connector_o is only valid id ENOERROR is
+// * returned.
+// * Returns:
+// * - ENOERROR:  All good. Nothing to see here.
+// * - ENOSTREAM: The stream type is unrecognised
+// * - EBADOPT:   The arguments have an error or are unsupported
+// * - EBADPROP:  The stream supplied in did not match the properties requested.
+// */
+//camio_error_t new_camio_transport( camio_connector_t** connector_o, camio_transport_type_t type,
+//        camio_transport_features_t* features,  void* parameters, ch_word parameters_size);
+//
 
 
 
