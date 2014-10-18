@@ -142,6 +142,11 @@ static camio_error_t netmap_connect(camio_connector_t* this, camio_stream_t** st
         return CAMIO_EINVALID;//TODO XXX FIXME use the correct error ID
     }
 
+    //These hold the range of valid rings to look at
+    ch_word rings_start = -1;
+    ch_word rings_end   = -1;
+
+
     // From netmap.h
     // all the NIC rings        0x0000  -
     // only HOST ring           0x2000  -
@@ -149,9 +154,16 @@ static camio_error_t netmap_connect(camio_connector_t* this, camio_stream_t** st
     // all the NIC+HOST rings   0x6000  -
     if(sw_ring && !hw_ring){ //SW ring only
         req.nr_ringid = 0x2000;
+
+        rings_start = req.nr_rx_rings + 1; //Software ring is located at ring n + 1
+        rings_end   = rings_start + 1;
     }
     else if(!sw_ring && hw_ring && ring_id < 0){//Use all HW rings
         req.nr_ringid = 0x0000;
+
+        rings_start = 0;
+        rings_end   = req.nr_rx_rings;
+
     }
     else if(!sw_ring && hw_ring && ring_id >= 0){//a single HW ring
         if(ring_id >= req.nr_rx_rings ){ //Assume the same number of RX and TX rings
@@ -159,9 +171,17 @@ static camio_error_t netmap_connect(camio_connector_t* this, camio_stream_t** st
             return CAMIO_EINVALID;//TODO XXX FIXME use the correct error ID
         }
         req.nr_ringid = 0x4000 + ring_id;
+
+        rings_start = ring_id;
+        rings_end   = rings_start + 1;
+
     }
     else if(sw_ring && hw_ring && ring_id < 0){ //Use all HW + SW rings
         req.nr_ringid = 0x6000;
+
+        rings_start = 0;
+        rings_end   = req.nr_rx_rings + 1 + 1; //Software ring is located at ring n + 1
+
     }
     else{
         DBG( "Invaluid request sw_ring=%i hw_ring=%i ring_id=%i\n", sw_ring, hw_ring, ring_id);
@@ -195,24 +215,23 @@ static camio_error_t netmap_connect(camio_connector_t* this, camio_stream_t** st
 
 
     //Get the netmap interface pointer
-    void* netmap_region = mmap(0, req.nr_memsize, PROT_WRITE | PROT_READ, MAP_PRIVATE, netmap_fd, 0);
+    void* netmap_region = mmap(0, req.nr_memsize, PROT_WRITE | PROT_READ, MAP_SHARED, netmap_fd, 0);
     if(unlikely(netmap_region == MAP_FAILED)){
         DBG( "Could not memory map netmap region for interface \"%s\". Error=%s\n", dev, strerror(errno));
         return CAMIO_EINVALID;//TODO XXX FIXME use the correct error ID
     }
-    struct netmap_if* net_if     = NETMAP_IF(netmap_region, req.nr_offset);
-    (void)net_if;
+    struct netmap_if* net_if = NETMAP_IF(netmap_region, req.nr_offset);
 
     camio_stream_t* stream = NEW_STREAM(netmap);
     if(!stream){
         *stream_o = NULL;
         return CAMIO_ENOMEM;
     }
-
     *stream_o = stream;
     DBG("Stream address=%p (%p)\n",stream, *stream_o);
 
-    return CAMIO_ENOERROR;
+
+    return netmap_stream_construct(stream,netmap_fd,net_if,rings_start, rings_end);
 }
 
 

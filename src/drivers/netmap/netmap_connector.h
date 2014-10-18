@@ -17,4 +17,5 @@
 
 NEW_CONNECTOR_DECLARE(netmap);
 
+
 #endif /* NETMAP_CONNECTOR_H_ */

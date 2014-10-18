@@ -22,8 +22,7 @@
  * Every CamIO stream must implement this interface, see function prototypes in api.h
  */
 typedef struct camio_stream_interface_s{
-    //Construct /destroy
-    camio_error_t (*construct)(camio_stream_t* this);
+
     void (*destroy)(camio_stream_t* this);
 
     //Read operations
@@ -79,7 +78,6 @@ typedef struct camio_stream_s {
 
 #define NEW_STREAM_DEFINE(NAME, PRIVATE_TYPE) \
     const static camio_stream_interface_t NAME##_stream_interface = {\
-            .construct      = NAME##_construct,\
             .read_acquire   = NAME##_read_acquire,\
             .read_release   = NAME##_read_release,\
             .write_acquire  = NAME##_write_acquire,\

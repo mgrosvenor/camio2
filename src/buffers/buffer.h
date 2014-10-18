@@ -17,13 +17,13 @@
 #include "../types/types.h"
 
 typedef enum camio_buffer_timestamp_e {
-    CIO_BUFFER_TST_NONE,          //No timestamp on this stream
-    CIO_BUFFER_TST_S_1970,        //Timestamp is seconds since 1970
-    CIO_BUFFER_TST_US_1970,       //Timestamp is microseconds since 1970
-    CIO_BUFFER_TST_NS_1970,       //Timestamp is nanoseconds since 1970
-    CIO_BUFFER_TST_TIMESPEC,      //Timestamp is a timespec
-    CIO_BUFFER_TST_TIMEVAL,       //Timestamp is a timeval
-    CIO_BUFFER_TST_FIXED3232,     //Timestamp is a 32.32 fixed point value
+    CAMIO_BUFFER_TST_NONE,          //No timestamp on this stream
+    CAMIO_BUFFER_TST_S_1970,        //Timestamp is seconds since 1970
+    CAMIO_BUFFER_TST_US_1970,       //Timestamp is microseconds since 1970
+    CAMIO_BUFFER_TST_NS_1970,       //Timestamp is nanoseconds since 1970
+    CAMIO_BUFFER_TST_TIMESPEC,      //Timestamp is a timespec
+    CAMIO_BUFFER_TST_TIMEVAL,       //Timestamp is a timeval
+    CAMIO_BUFFER_TST_FIXED3232,     //Timestamp is a 32.32 fixed point value
 } camio_buffer_timestamp_t;
 
 
