@@ -30,6 +30,11 @@ if [ "0" = "$?" ]; then
 fi
 
 # Darwin
+if [ "Darwin" = $(uname -s) ]; then
+    MAJOR_RELEASE=$(uname -r)
+    echo etc.cake.darwin.$MAJOR_RELEASE
+    exit 0
+fi
 
 # FreeBSD
 if [ "FreeBSD" = $(uname -o) ]; then
@@ -37,4 +42,5 @@ if [ "FreeBSD" = $(uname -o) ]; then
     echo etc.cake.freebsd.$MAJOR_RELEASE
     exit 0
 fi
+
 # Solaris
