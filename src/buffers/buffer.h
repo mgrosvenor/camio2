@@ -28,8 +28,9 @@ typedef enum camio_buffer_timestamp_e {
 
 
 //TODO XXX: Hide this from consumers by putting the definition in another file
-typedef struct {
-    bool __in_use;                      //Is the buffer in use? If not, it can be reserved by someone
+typedef struct camio_buffer_internal_s {
+    ch_bool __in_use;                   //Is the buffer in use? If not, it can be reserved by someone
+    ch_bool __read_only;                //For read buffers to protect against copying. Not bullet proof, but no harm
     uint64_t __pool_id;                 //Undefined if there is no data
     uint64_t __buffer_id;               //Undefined if there is no data
 
@@ -45,12 +46,21 @@ typedef struct {
         uint64_t        ts_fixed3232;
     } __ts; //Private, don't play with this directly!
 
-} camio_buffer_priv_t;
+} camio_buffer_internal_t;
+
+
+//Place holder for functions
+//typedef struct camio_buffer_interface_s{
+//} camio_buffer_interface_t;
+
 
 
 
 //Buffer information
 typedef struct camio_buffer_s {
+    //camio_buffer_interface_t vtable; //Place holder for functions
+
+
     bool valid;          //True if the data is valid (can be set to untrue by read_release)
     camio_buffer_timestamp_t timestamp_type; //The type of timestamp associated with this stream
 
@@ -65,12 +75,39 @@ typedef struct camio_buffer_s {
     uint64_t buffer_len;    //Undefined if there is no data. Buffer_len is always >= data_len + (buffer_start - data_start)
     void* buffer_start;     //Undefined if there is no data
 
-    camio_buffer_t* next; //Pointer to the next buffer in this queue, if null, there is no more.
+    camio_buffer_t* next;   //Pointer to the next buffer in this queue, if null, there is no more.
+
+    camio_buffer_internal_t _internal; //Internal state, not for access by users
 
 } camio_buffer_t;
 
 typedef camio_buffer_t camio_rd_buffer_t; //We make these incompatible so that the type checker will help us. The only way to
 typedef camio_buffer_t camio_wr_buffer_t; //get from a read (rd) buffer to a write (wr) buffer is to do a buffer copy.
                                           //Sometimes a real copy will happen as a result.
+
+
+/**
+ * Some macros to make life easier CONNECTOR_GET_PRIVATE helps us grab the private members out of the public connector_t and
+ * CONNECTOR_DECLARE help to make a custom allocator for each stream
+ */
+#define BUFFER_GET_PRIVATE(THIS) ( (void*)((THIS) + 1))
+
+#define CALLOC_BUFFER(name, number)\
+        calloc_##name##_buffer(number)
+
+#define NEW_BUFFER(name)\
+        calloc_##name##_buffer(1)
+
+#define CALLOC_BUFFER_DECLARE(NAME)\
+        camio_buffer_t* calloc_##NAME##_buffer(ch_word number)
+
+#define CALLOC_BUFFER_DEFINE(NAME, PRIVATE_TYPE) \
+    CALLOC_BUFFER_DECLARE(NAME)\
+    {\
+        camio_buffer_t* result = (camio_buffer_t*)calloc(number,sizeof(camio_buffer_t) + sizeof(PRIVATE_TYPE));\
+        if(!result) return NULL;\
+        return result;\
+    }
+
 
 #endif /* BUFFER_H_ */

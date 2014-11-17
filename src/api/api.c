@@ -41,10 +41,10 @@ inline void camio_connector_destroy(camio_connector_t* this)
 }
 
 
-inline camio_error_t camio_read_acquire( camio_stream_t* this,  camio_rd_buffer_t** buffer_chain_o, ch_word buffer_offset,
-        ch_word source_offset)
+inline camio_error_t camio_read_acquire( camio_stream_t* this,  camio_rd_buffer_t** buffer_chain_o, ch_word* chain_len_o,
+        ch_word buffer_offset, ch_word source_offset)
 {
-    return this->vtable.read_acquire(this, buffer_chain_o, buffer_offset, source_offset);
+    return this->vtable.read_acquire(this, buffer_chain_o, chain_len_o, buffer_offset, source_offset);
 }
 
 
