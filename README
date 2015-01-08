@@ -3,11 +3,12 @@ CamIO2
 
 The Cambridge IO Library. Please see the license at the end of this file. 
 
+CamIO is a generic, high speed I/O interface designed to give programmers straightforward access to kernel bypass I/O at the along with regular I/O methods (files, sockets etc). CamIO is different to most interfaces in that memory management is done internally giving the library the ability to expose hadrware buffers directly to applications for very high-speed, low-latency I/O access. 
+
 This is a work in progress. For an idea of what's going on here, take a look at this: 
 
-https://github.com/mgrosvenor/camio2/blob/master/src/ciostreams/ciostream.h
+https://github.com/mgrosvenor/camio2/blob/mpg39/src/api/api.h
 
-As work progressess, this will eventually compile....
 
 Installing and building
 =======================
