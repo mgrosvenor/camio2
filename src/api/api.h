@@ -52,8 +52,8 @@ void camio_connector_destroy(camio_connector_t* this);
  * - ENOBUFFS:  The stream could not allocate more buffers for the read. Free some buffers by releasing an outstanding read
  *              or write transaction.
  */
-camio_error_t camio_read_acquire( camio_stream_t* this,  camio_rd_buffer_t** buffer_chain_o, ch_word buffer_offset,
-                                  ch_word source_offset);
+camio_error_t camio_read_acquire( camio_stream_t* this,  camio_rd_buffer_t** buffer_chain_o, ch_word* chain_len_o,
+        ch_word buffer_offset, ch_word source_offset);
 
 /**
  * Relinquish resources associated with the given read buffer chain. Streams with the async_arrv feature enabled support

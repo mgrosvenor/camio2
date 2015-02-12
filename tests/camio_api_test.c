@@ -28,7 +28,11 @@ int main(int argc, char** argv)
     DBG("Got new connector at address %p\n", connector);
 
     camio_stream_t* stream = NULL;
-    connector->vtable.connect(connector,&stream);
+    camio_connect(connector,&stream);
+
+    camio_rd_buffer_t* rd_buff = NULL;
+    ch_word rd_buff_len = 0;
+    camio_read_acquire(stream,&rd_buff,&rd_buff_len,0, 0);
 
     /*
     camio_stream_t* stream = NULL;
