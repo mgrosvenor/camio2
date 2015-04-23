@@ -12,10 +12,10 @@
 #ifndef API_H_
 #define API_H_
 
-#include <types/types.h>
-#include <streams/stream_types.h>
-#include <streams/features.h>
-#include <buffers/buffer.h>
+#include <src/types/types.h>
+#include <src/streams/stream_types.h>
+#include <src/streams/features.h>
+#include <src/buffers/buffer.h>
 
 
 /**

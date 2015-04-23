@@ -82,6 +82,7 @@ def parse_etc(config_file):
     f.close()
 
     for l in lines:
+        
         if l.startswith("#"):
             continue
         l = l.strip()
@@ -90,6 +91,7 @@ def parse_etc(config_file):
             continue
         key = l[0:l.index("=")].strip()
         value = l[l.index("=") + 1:].strip()
+        print "---->", key, value
 
         for k in os.environ:
             value = value.replace('"', "")

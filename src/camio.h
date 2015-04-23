@@ -12,6 +12,6 @@
 #ifndef CAMIO_H_
 #define CAMIO_H_
 
-#include <api/api.h>
+#include "api/api.h"
 
 #endif /* CAMIO_H_ */

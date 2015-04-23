@@ -19,9 +19,9 @@
 #include <string.h>
 #include <stdio.h>
 
-#include <chaste/types/types.h>
+#include <deps/chaste/types/types.h>
 
-#include <errors/errors.h>
+#include <src/errors/errors.h>
 
 //Forward declaration, the real definition is found in streams/features.h
 struct camio_stream_s;
