@@ -26,7 +26,7 @@ LINKFLAGS="-Ideps/chaste -lchaste -lrt"
 SRC=src/camio.c
 #TESTS="--begintests  tests/*.c --endtests"
 
-cake --verbose $SRC\
+cake $SRC\
     --variant=release\
     --append-CFLAGS="$INCLUDES $CFLAGS"\
     --LINKFLAGS="$LINKFLAGS"\

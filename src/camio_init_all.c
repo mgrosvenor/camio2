@@ -5,8 +5,8 @@
  *      Author: mgrosvenor
  */
 
-#include <src/drivers/netmap/netmap_transport.h>
-#include <src/drivers/udp/udp_transport.h>
+//#include <src/drivers/netmap/netmap_transport.h>
+//#include <src/drivers/udp/udp_transport.h>
 #include "camio_init_all.h"
 
 
@@ -20,8 +20,8 @@ camio_error_t camio_init_all_transports(){
 
 
 
-    netmap_init();
-    udp_init();
+    //netmap_init();
+    //udp_init();
 
 
     return CAMIO_ENOERROR;
