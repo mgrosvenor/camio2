@@ -22,10 +22,7 @@
 
 INCLUDES="-Ideps -Isrc"
 CFLAGS="-D_XOPEN_SOURCE=700 -D_BSD_SOURCE -std=c11 -Werror -Wall -Wextra -pedantic -Wno-missing-field-initializers -ggdb"
-#LINKFLAGS="-lrt"
 LINKFLAGS="-Ideps/chaste -lchaste -lrt"
-#CAKECONFIG=$(build/cake/cake-config-chooser)
-#CAKECONFIG=cake.conf
 SRC=src/camio.c
 #TESTS="--begintests  tests/*.c --endtests"
 
@@ -34,5 +31,5 @@ cake --verbose $SRC\
     --append-CFLAGS="$INCLUDES $CFLAGS"\
     --LINKFLAGS="$LINKFLAGS"\
     --static-library\
-    $TESTS\
+
 
