@@ -22,14 +22,19 @@
 
 INCLUDES="-Ideps -Isrc"
 CFLAGS="-D_XOPEN_SOURCE=700 -D_BSD_SOURCE -std=c11 -Werror -Wall -Wextra -pedantic -Wno-missing-field-initializers -ggdb"
-LINKFLAGS="-Ideps/chaste -lchaste -lrt"
+LINKFLAGS="-Ideps/chaste"
 SRC=src/camio.c
-#TESTS="--begintests  tests/*.c --endtests"
+TESTS="--begintests  tests/camio_udp_test.c --endtests"
 
 cake $SRC\
     --variant=release\
     --append-CFLAGS="$INCLUDES $CFLAGS"\
     --LINKFLAGS="$LINKFLAGS"\
     --static-library\
-
-
+ 
+SRC=tests/camio_udp_test.c
+cake $SRC\
+    --append-CFLAGS="$INCLUDES $CFLAGS"\
+    --LINKFLAGS="$LINKFLAGS"\
+    $TESTS
+ 

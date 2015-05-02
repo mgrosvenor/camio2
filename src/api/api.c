@@ -49,7 +49,7 @@ inline camio_error_t camio_read_acquire( camio_stream_t* this,  camio_rd_buffer_
 
 
 
-inline camio_error_t camio_read_release(camio_stream_t* this, camio_rd_buffer_t* buffer_chain)
+inline camio_error_t camio_read_release(camio_stream_t* this, camio_rd_buffer_t** buffer_chain)
 {
     return this->vtable.read_release(this, buffer_chain);
 }
@@ -63,7 +63,7 @@ camio_error_t camio_write_acquire(camio_stream_t* this, camio_wr_buffer_t** buff
 
 
 
-camio_error_t camio_write_commit(camio_stream_t* this, camio_wr_buffer_t* buffer_chain, ch_word buffer_offset,
+camio_error_t camio_write_commit(camio_stream_t* this, camio_wr_buffer_t** buffer_chain, ch_word buffer_offset,
         ch_word dest_offset)
 {
     return this->vtable.write_commit(this, buffer_chain, buffer_offset, dest_offset);
@@ -71,7 +71,7 @@ camio_error_t camio_write_commit(camio_stream_t* this, camio_wr_buffer_t* buffer
 
 
 
-camio_error_t camio_write_release(camio_stream_t* this, camio_wr_buffer_t* buffers_chain)
+camio_error_t camio_write_release(camio_stream_t* this, camio_wr_buffer_t** buffers_chain)
 {
     return this->vtable.write_release(this, buffers_chain);
 }

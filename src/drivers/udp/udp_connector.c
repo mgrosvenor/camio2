@@ -26,27 +26,33 @@
 
 
 
+#define CAMIO_UDP_MAX_STR_ARG 1024
 typedef struct udp_priv_s {
+
+    //Parameters used when a connection happens
+    char rd_address[CAMIO_UDP_MAX_STR_ARG];
+    char wr_address[CAMIO_UDP_MAX_STR_ARG];
+    char rd_port[CAMIO_UDP_MAX_STR_ARG];
+    char wr_port[CAMIO_UDP_MAX_STR_ARG];
+
+    //Local state
+    int fd;
 
 } udp_priv_t;
 
 
 
 
-static camio_error_t udp_construct(camio_connector_t* this, ch_cstr dev, ch_cstr path, ch_bool sw_ring, ch_bool hw_ring,
-        ch_word ring_id)
+static camio_error_t udp_construct(camio_connector_t* this, ch_cstr rd_address, ch_cstr rd_port, ch_cstr wr_address,
+        ch_cstr wr_port)
 {
 
     udp_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
 
-    //Not much to do here. The connector doesn't have much internal state that it needs.
-
-    //TODO Should think about making a copy here since these strings could go away between now and when we want to use them
-//    priv->dev       = dev;
-//    priv->path      = path;
-//    priv->sw_ring   = sw_ring;
-//    priv->hw_ring   = hw_ring;
-//    priv->ring_id   = ring_id;
+    strncpy(priv->rd_address,rd_address,CAMIO_UDP_MAX_STR_ARG);
+    strncpy(priv->wr_address,wr_address,CAMIO_UDP_MAX_STR_ARG);
+    strncpy(priv->rd_port,rd_port,CAMIO_UDP_MAX_STR_ARG);
+    strncpy(priv->wr_port,wr_port,CAMIO_UDP_MAX_STR_ARG);
 
     return CAMIO_ENOERROR;
 
@@ -70,15 +76,15 @@ static camio_error_t udp_construct_str(camio_connector_t* this, camio_uri_t* uri
     (void)priv;
     (void)uri;
 
-    // TODO XXX: Convert the URI into a bunch of opts here...
+    // TODO XXX: Convert the URI into a bunch of opts here... need to and add a parser like chaste options.
 
-    ch_cstr dev       = "eth0";
-    ch_cstr path      = "/dev/udp";
-    ch_bool sw_ring   = false;
-    ch_bool hw_ring   = true;
-    ch_word ring_id   = 0;
+    ch_cstr rd_address  = "127.0.0.1"; //TODO Should add proper resolution handler for domain names
+    ch_cstr wr_address  = "127.0.0.1"; //TODO Should add proper resolution handler for domain names
+    ch_cstr rd_port     = "3000";
+    ch_cstr wr_port     = "4000";
 
-    return udp_construct(this,dev,path,sw_ring,hw_ring, ring_id);
+    return udp_construct(this,rd_address,rd_port,wr_address,wr_port);
+
 }
 
 
@@ -92,13 +98,12 @@ static camio_error_t udp_construct_bin(camio_connector_t* this, va_list args)
 
     // TODO XXX: Convert the va_list into a bunch of opts here
 
-    ch_cstr dev             = "eth0";
-    ch_cstr path            = "/dev/udp";
-    ch_bool sw_ring   = false;
-    ch_bool hw_ring   = true;
-    ch_word ring_id   = 0;
+    ch_cstr rd_address  = "127.0.0.1"; //TODO Should add proper resolution handler for domain names
+    ch_cstr wr_address  = "127.0.0.1"; //TODO Should add proper resolution handler for domain names
+    ch_cstr rd_port     = "3000";
+    ch_cstr wr_port     = "4000";
 
-    return udp_construct(this,dev,path,sw_ring,hw_ring, ring_id);
+    return udp_construct(this,rd_address,rd_port,wr_address,wr_port);
 
 }
 
@@ -109,8 +114,9 @@ static camio_error_t udp_connect(camio_connector_t* this, camio_stream_t** strea
 {
     udp_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
 
-    int udp_fd = -1;
+    (void)priv;
 
+    int udp_fd = -1;
 
     camio_stream_t* stream = NEW_STREAM(udp);
     if(!stream){

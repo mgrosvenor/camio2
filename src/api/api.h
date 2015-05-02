@@ -40,8 +40,8 @@ void camio_connector_destroy(camio_connector_t* this);
 
 
 /**
- * This function tries to do a read for new data from the CamIO Stream called “this” and returns a read buffer chain pointer
- * called “buffer_chain_o”. The read call may or may not block. Use a selector to ensure that the stream is ready for
+ * This function tries to do a read for new data from the CamIO Stream called this and returns a read buffer chain pointer
+ * called buffer_chain_o. The read call may or may not block. Use a selector to ensure that the stream is ready for
  * reading. If the stream is empty, (e.g. end of file) or closed (e.g. disconnected) it is valid to return 0 bytes with an
  * ENOERROR. If buffer_offset is non-zero, the read will try to place data at offset bytes into each buffer. This may fail and
  * is only supported if the read_to_buff_off feature is supported. You can check for success by comparing
@@ -69,7 +69,7 @@ camio_error_t camio_read_acquire( camio_stream_t* this,  camio_rd_buffer_t** buf
  * - EINVALID: Your data got trashed, time to recover!
  * - EBADSEQ:  You cannot release this buffer without releasing previous buffers in the sequence too
  */
-camio_error_t camio_read_release(camio_stream_t* this, camio_rd_buffer_t* buffer_chain);
+camio_error_t camio_read_release(camio_stream_t* this, camio_rd_buffer_t** buffer_chain);
 
 
 
@@ -97,7 +97,7 @@ camio_error_t camio_write_acquire(camio_stream_t* this, camio_wr_buffer_t** buff
  * - ENOERROR: Completed successfully.
  * - TODO XXX: Add more here
  */
-camio_error_t camio_write_commit(camio_stream_t* this, camio_wr_buffer_t* buffer_chain, ch_word buffer_offset,
+camio_error_t camio_write_commit(camio_stream_t* this, camio_wr_buffer_t** buffer_chain, ch_word buffer_offset,
         ch_word dest_offset);
 
 
@@ -108,7 +108,7 @@ camio_error_t camio_write_commit(camio_stream_t* this, camio_wr_buffer_t* buffer
  * - ENOERROR: All good, please continue.
  * - EBADSEQ:  You cannot release this buffer without releasing previous buffers in the sequence too.
  */
-camio_error_t camio_write_release(camio_stream_t* this, camio_wr_buffer_t* buffers_chain);
+camio_error_t camio_write_release(camio_stream_t* this, camio_wr_buffer_t** buffers_chain);
 
 
 /**
