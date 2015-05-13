@@ -47,24 +47,27 @@ int main(int argc, char** argv)
     if(count != 1){
         //Shit, we should have got this!
     }
+ */
 
-
-    while(1){
+   //while(1){
 
         camio_rd_buffer_t* rd_buffer_chain;
-        while(camio_read_acquire(stream, &rd_buffer_chain, 0 , 0)){
+        ch_word chain_len = 1;
+        while(camio_read_acquire(stream, &rd_buffer_chain, &chain_len , 0, 0)){
             //Just spin waiting for a new read buffer
         }
 
+        printf("Got buffer with %lli bytes", rd_buffer_chain->data_len);
+
         //Do a copy here
 
-        camio_write_commit(stream, wr_buffer_chain, 0, 0 );
+        //camio_write_commit(stream, wr_buffer_chain, 0, 0 );
 
-        camio_read_release(stream, rd_buffer_chain);
-    }
+        //camio_read_release(stream, rd_buffer_chain);
+    //}
 
-    camio_write_release(stream,wr_buffer_chain);
-    */
+    //camio_write_release(stream,wr_buffer_chain);
+
 
 
     return 0;

@@ -131,28 +131,33 @@ static camio_error_t udp_read_acquire( camio_stream_t* this,  camio_rd_buffer_t*
     udp_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
 
     if(buffer_offset != 0){
+        DBG("Buff offset\n");
         return CAMIO_EINVALID; //Not (yet) supported
     }
 
     if(source_offset != 0){
+        DBG("Src offset\n");
         return CAMIO_EINVALID; //Not supported
     }
 
-    if( NULL == buffer_chain_o || NULL == *buffer_chain_o){
+    if( NULL == buffer_chain_o){
+        DBG("Buffer chain offset\n");
         return CAMIO_EINVALID;
     }
 
     if(chain_len_o == NULL){
+        DBG("Chain len\n");
         return CAMIO_EINVALID;
     }
 
     if( (*chain_len_o) != 1){
+        DBG("Chain len 2\n");
         return CAMIO_EINVALID; //Not (yet) supported
     }
 
-    DBG("Doing read acquire\n");
+    //DBG("Doing read acquire\n");
     ch_word buff_idx = priv->curr_rd_buff;
-    if(priv->rd_buffer_hdrs[buff_idx].valid){
+    if(priv->rd_buffer_hdrs[buff_idx].valid){ //TODO XXX BUG HERE - Assumes release is called sequentially. Should use find
         return CAMIO_ENOSLOTS; //Have run out of buffers!
     }
     ch_word bytes = read(priv->rd_fd,priv->rd_buffers[buff_idx], CAMIO_UDP_BUFFER_SIZE);
@@ -161,6 +166,7 @@ static camio_error_t udp_read_acquire( camio_stream_t* this,  camio_rd_buffer_t*
             return CAMIO_ETRYAGAIN;
         }
         else{
+            DBG("Check error\n");
             return CAMIO_ECHECKERRORNO;
         }
     }

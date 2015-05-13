@@ -176,7 +176,6 @@ static camio_error_t udp_connect(camio_connector_t* this, camio_stream_t** strea
         return CAMIO_EALLREADYCONNECTED; //Process is already connected
     }
 
-
     camio_stream_t* stream = NEW_STREAM(udp);
     if(!stream){
         *stream_o = NULL;
