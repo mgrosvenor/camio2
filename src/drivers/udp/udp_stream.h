@@ -11,10 +11,11 @@
 #ifndef SRC_DRIVERS_UDP_UDP_STREAM_H_
 #define SRC_DRIVERS_UDP_UDP_STREAM_H_
 
-#include "../../transports/stream.h"
+#include <src/transports/stream.h>
+#include <src/transports/connector.h>
 
 NEW_STREAM_DECLARE(udp);
 
-camio_error_t udp_stream_construct(camio_stream_t* this, int udp_fd);
+camio_error_t udp_stream_construct(camio_stream_t* this, camio_connector_t* connector, int rd_fd, int wr_fd);
 
 #endif /* SRC_DRIVERS_UDP_UDP_STREAM_H_ */

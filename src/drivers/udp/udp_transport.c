@@ -14,7 +14,7 @@
 #include "../../camio.h"
 #include "../../camio_debug.h"
 
-const char * const scheme = "udp";
+const char* const scheme = "udp";
 
 static camio_error_t construct_str(camio_uri_t* uri, camio_connector_t** connector_o)
 {

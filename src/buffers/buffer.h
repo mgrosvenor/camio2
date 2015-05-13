@@ -17,7 +17,7 @@
 #include <src/types/types.h>
 
 typedef enum camio_buffer_timestamp_e {
-    CAMIO_BUFFER_TST_NONE,          //No timestamp on this stream
+    CAMIO_BUFFER_TST_NONE = 0,      //No timestamp on this stream
     CAMIO_BUFFER_TST_S_1970,        //Timestamp is seconds since 1970
     CAMIO_BUFFER_TST_US_1970,       //Timestamp is microseconds since 1970
     CAMIO_BUFFER_TST_NS_1970,       //Timestamp is nanoseconds since 1970
@@ -34,7 +34,7 @@ typedef struct camio_buffer_internal_s {
     uint64_t __pool_id;                 //Undefined if there is no data
     uint64_t __buffer_id;               //Undefined if there is no data
 
-    bool __do_release;                  //Should release be called for this slot?
+    bool __do_auto_release;             //Should release be called automatically for this slot?
     camio_stream_t* __buffer_parent;    //Parent who generated this slot
 
     union {
@@ -87,7 +87,7 @@ typedef camio_buffer_t camio_wr_buffer_t; //get from a read (rd) buffer to a wri
 
 
 /**
- * Some macros to make life easier CONNECTOR_GET_PRIVATE helps us grab the private members out of the public connector_t and
+ * Some macros to make life easier BUFFER_GET_PRIVATE helps us grab the private members out of the public connector_t and
  * CONNECTOR_DECLARE help to make a custom allocator for each stream
  */
 #define BUFFER_GET_PRIVATE(THIS) ( (void*)((THIS) + 1))

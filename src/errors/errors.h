@@ -17,7 +17,7 @@ typedef enum camio_error_e {
     CAMIO_NOTIMPLEMENTED = -1,
     CAMIO_ENOERROR = 0,
     CAMIO_ETRYAGAIN,
-    CAMIO_ECHECKERROR,
+    CAMIO_ECHECKERRORNO,
     CAMIO_ENOSLOTS,
     CAMIO_EQFU,
     CAMIO_ECOPYOP,
@@ -44,6 +44,7 @@ typedef enum camio_error_e {
     CAMIO_SELECTORFU,
     CAMIO_EINDEXNOTFOUND,
     CAMIO_EEMPTY,
+    CAMIO_EALLREADYCONNECTED,
 } camio_error_t;
 
 #endif /* ERRORS_H_ */
