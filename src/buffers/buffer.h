@@ -31,8 +31,8 @@ typedef enum camio_buffer_timestamp_e {
 typedef struct camio_buffer_internal_s {
     ch_bool __in_use;                   //Is the buffer in use? If not, it can be reserved by someone
     ch_bool __read_only;                //For read buffers to protect against copying. Not bullet proof, but no harm
-    uint64_t __pool_id;                 //Undefined if there is no data
-    uint64_t __buffer_id;               //Undefined if there is no data
+    ch_word __pool_id;                 //Undefined if there is no data
+    ch_word __buffer_id;               //Undefined if there is no data
 
     bool __do_auto_release;             //Should release be called automatically for this slot?
     camio_stream_t* __buffer_parent;    //Parent who generated this slot

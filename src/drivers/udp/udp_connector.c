@@ -13,6 +13,8 @@
 #include "../../camio.h"
 #include "../../camio_debug.h"
 
+#include <src/buffers/buffer_malloc_linear.h>
+
 #include "udp_connector.h"
 #include "udp_stream.h"
 

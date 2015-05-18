@@ -24,7 +24,7 @@ INCLUDES="-Ideps -Isrc"
 CFLAGS="-D_XOPEN_SOURCE=700 -D_BSD_SOURCE -std=c11 -Werror -Wall -Wextra -pedantic -Wno-missing-field-initializers -ggdb"
 LINKFLAGS="-Ideps/chaste"
 SRC=src/camio.c
-TESTS="--begintests  tests/camio_udp_test.c --endtests"
+#TESTS="--begintests  tests/camio_udp_test.c --endtests"
 
 cake $SRC\
     --variant=release\
@@ -32,9 +32,13 @@ cake $SRC\
     --LINKFLAGS="$LINKFLAGS"\
     --static-library\
  
-SRC=tests/camio_udp_test.c
-cake $SRC\
+#SRC=tests/camio_udp_test.c
+#cake $SRC\
+#    --append-CFLAGS="$INCLUDES $CFLAGS"\
+#    --LINKFLAGS="$LINKFLAGS"\
+#    $TESTS
+ 
+cake tools/camio_cat.c \
     --append-CFLAGS="$INCLUDES $CFLAGS"\
-    --LINKFLAGS="$LINKFLAGS"\
-    $TESTS
+    --append-LINKFLAGS="$LINKFLAGS"
  
