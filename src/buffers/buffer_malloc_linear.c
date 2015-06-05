@@ -5,6 +5,7 @@
  *      Author: mgrosvenor
  */
 #include "buffer_malloc_linear.h"
+#include "../camio_debug.h"
 
 typedef struct buffer_malloc_linear_s {
     ch_word buffer_size;
@@ -18,6 +19,16 @@ typedef struct buffer_malloc_linear_s {
 
 } buffer_malloc_linear_t;
 
+
+void buffer_malloc_linear_DBG(buffer_malloc_linear_t* buff){
+    DBG("buffer_size=%li\n",buff->buffer_size);
+    DBG("buffer_count=%li\n",buff->buffer_count);
+    DBG("HDRS: ");
+    for(int i = 0; i < buff->buffer_count; i++){
+        DBG2("%i",buff->headers[i]._internal.__in_use);
+    }
+    DBG2("\n");
+}
 
 static void init_buffer_hdr(camio_stream_t* parent, camio_buffer_t* buffer_hdr, char* buffer_data, ch_word buffer_size,
         ch_word buffer_id, ch_bool readonly){
@@ -61,7 +72,7 @@ void buffer_malloc_linear_destroy(buffer_malloc_linear_t** lin_buff_io)
 }
 
 
-camio_error_t buffer_malloc_linear_new(camio_stream_t* parent, ch_word buffer_size, ch_word bufffer_count,
+camio_error_t buffer_malloc_linear_new(camio_stream_t* parent, ch_word buffer_size, ch_word buffer_count,
         ch_bool readonly, buffer_malloc_linear_t** lin_buff_o)
 {
     if(!lin_buff_o){
@@ -74,22 +85,23 @@ camio_error_t buffer_malloc_linear_new(camio_stream_t* parent, ch_word buffer_si
         return CAMIO_ENOMEM;
     }
 
-    result->buffers = calloc(bufffer_count, sizeof(char*));
+    result->buffers = calloc(buffer_count, sizeof(char*));
     if(!result->buffers){
         buffer_malloc_linear_destroy(&result);
         return CAMIO_ENOMEM;
     }
 
-    result->headers  = calloc(bufffer_count, sizeof(camio_buffer_t));
+    result->headers  = calloc(buffer_count, sizeof(camio_buffer_t));
     if(!result->headers){
         buffer_malloc_linear_destroy(&result);
         return CAMIO_ENOMEM;
     }
 
-    result->buffer_count = bufffer_count;
+    result->buffer_count = buffer_count;
+    result->buffer_size = buffer_size;
 
     //Alloc and init the actual memory buffers
-    for(ch_word i = 0; i < bufffer_count; i++){
+    for(ch_word i = 0; i < buffer_count; i++){
 
         result->buffers[i] = calloc(1, buffer_size);
         if(!result->buffers[i]){
@@ -102,6 +114,7 @@ camio_error_t buffer_malloc_linear_new(camio_stream_t* parent, ch_word buffer_si
 
     //Yay! We're done!!
     *lin_buff_o = result; //Finally we're done, pass out the successful allocation
+    //buffer_malloc_linear_DBG(*lin_buff_o);
     return CAMIO_ENOERROR;
 }
 
@@ -129,8 +142,9 @@ camio_error_t buffer_malloc_linear_acquire(buffer_malloc_linear_t* lin_buff, cam
     }
 
     lin_buff->headers[alloc_head_idx]._internal.__in_use = true;
-    lin_buff->buffer_count++;
+    lin_buff->alloc_count++;
     *buffer_o = &lin_buff->headers[alloc_head_idx];
+    //buffer_malloc_linear_DBG(lin_buff);
     return CAMIO_ENOERROR;
 }
 
@@ -146,6 +160,7 @@ camio_error_t buffer_malloc_linear_release(buffer_malloc_linear_t* lin_buff, cam
     lin_buff->headers[alloc_tail_idx]._internal.__in_use = false;
     lin_buff->alloc_count--;
     lin_buff->alloc_tail_idx = (alloc_tail_idx + 1) % lin_buff->buffer_count;
+   // buffer_malloc_linear_DBG(lin_buff);
     return CAMIO_ENOERROR;
 }
 

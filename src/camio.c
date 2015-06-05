@@ -41,7 +41,12 @@ camio_t* init_camio()
 
 
 
-
+/**
+ * Streams call this function to add themselves into the CamIO string parsing system and to register desires for global
+ * resources. The register transport function will assign a unique ID to a stream type that can be used for fast access to
+ * it in the future using the binary only interface.
+ * TODO XXX: This function should probably be split so that string based interface is not necessary.
+ */
 camio_error_t register_new_transport(ch_ccstr scheme, ch_word scheme_len, camio_construct_str_f construct_str,
     camio_construct_bin_f construct_bin, ch_word global_store_size )
 {
@@ -87,7 +92,7 @@ camio_error_t new_camio_transport_generic(ch_ccstr scheme, ch_word scheme_len, c
     }
 
 
-    //Now check that the scheme hasn't already been registered
+    //Now check that the scheme has been registered
     CH_VECTOR(CAMIO_STREAM_STATE_VEC)* stream_state = __camio_state_container.stream_state;
 
     camio_stream_state_t state = {

@@ -82,13 +82,17 @@ camio_error_t udp_stream_construct(camio_stream_t* this, camio_connector_t* conn
     camio_error_t error = CAMIO_ENOERROR;
     error = buffer_malloc_linear_new(this,CAMIO_UDP_BUFFER_SIZE,CAMIO_UDP_BUFFER_COUNT,true,&priv->rd_buff);
     if(error){
+        DBG("No memory for linear read buffer!\n");
         return CAMIO_ENOMEM;
     }
     error = buffer_malloc_linear_new(this,CAMIO_UDP_BUFFER_SIZE,CAMIO_UDP_BUFFER_COUNT,false,&priv->wr_buff);
     if(error){
+        DBG("No memory for linear write buffer!\n");
         return CAMIO_ENOMEM;
     }
 
+
+    DBG("Done constructing UDP stream with read_fd=%i and write_fd=%i\n", rd_fd, wr_fd);
     return CAMIO_ENOERROR;
 }
 
@@ -105,13 +109,15 @@ static camio_error_t udp_read_acquire( camio_stream_t* this,  camio_rd_buffer_t*
     }
     udp_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
 
+    //DBG("buffer_chain = %p &buffer_chain = %p\n", *buffer_chain_o, buffer_chain_o);
+
     if( NULL == buffer_chain_o){
         DBG("Buffer chain pointer null\n"); //WTF?
         return CAMIO_EINVALID;
     }
 
-    if( NULL == *buffer_chain_o){
-        DBG("Buffer chain null\n"); //WTF?
+    if( NULL != *buffer_chain_o){
+        DBG("Buffer chain not null\n"); //WTF?
         return CAMIO_EINVALID;
     }
 
@@ -141,6 +147,9 @@ static camio_error_t udp_read_acquire( camio_stream_t* this,  camio_rd_buffer_t*
 
     ch_word bytes = read(priv->rd_fd,(*buffer_chain_o)->buffer_start, CAMIO_UDP_BUFFER_SIZE);
     if(bytes < 0){
+        buffer_malloc_linear_release(priv->rd_buff,buffer_chain_o);
+        *buffer_chain_o = NULL;
+
         if(errno == EWOULDBLOCK || errno == EAGAIN){
             return CAMIO_ETRYAGAIN;
         }
@@ -151,7 +160,7 @@ static camio_error_t udp_read_acquire( camio_stream_t* this,  camio_rd_buffer_t*
     }
     (*buffer_chain_o)->data_len = bytes;
     *chain_len_o = 1; //Constant for the moment...
-
+    DBG("Got %lli bytes from UDP read\n", (*buffer_chain_o)->data_len );
 
     return CAMIO_ENOERROR;
 }
@@ -204,8 +213,8 @@ static camio_error_t udp_write_acquire(camio_stream_t* this, camio_wr_buffer_t**
         return CAMIO_EINVALID;
     }
 
-    if( NULL == *buffer_chain_o){
-        DBG("Buffer chain null\n"); //WTF?
+    if( NULL != *buffer_chain_o){
+        DBG("Buffer chain not null\n"); //WTF?
         return CAMIO_EINVALID;
     }
 
@@ -236,24 +245,28 @@ static camio_error_t udp_write_commit(camio_stream_t* this, camio_wr_buffer_t** 
         return CAMIO_EINVALID;
     }
     udp_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
-    (void)buffer_offset;
+    (void)buffer_offset; //Hmmm not sure how to use this....
     (void)dest_offset;
+
 
     camio_rd_buffer_t* chain_ptr = *buffer_chain;
     while(chain_ptr != NULL){
+        DBG("Writing %li bytes from %p to %i\n", chain_ptr->data_len,chain_ptr->data_start, priv->wr_fd);
         ch_word bytes = write(priv->wr_fd,chain_ptr->data_start,chain_ptr->data_len);
         if(bytes < 0){
             if(errno == EWOULDBLOCK || errno == EAGAIN){
                 return CAMIO_ETRYAGAIN;
             }
             else{
-                DBG("Check error\n");
+                DBG(" error %s\n",strerror(errno));
                 return CAMIO_ECHECKERRORNO;
             }
         }
         chain_ptr->data_len -= bytes;
         const char* data_start_new = (char*)chain_ptr->data_start + bytes;
         chain_ptr->data_start = (void*)data_start_new;
+
+        chain_ptr = chain_ptr->next;
     }
 
     return CAMIO_ENOERROR;

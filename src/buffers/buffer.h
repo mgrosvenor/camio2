@@ -35,7 +35,7 @@ typedef struct camio_buffer_internal_s {
     ch_word __buffer_id;               //Undefined if there is no data
 
     bool __do_auto_release;             //Should release be called automatically for this slot?
-    camio_stream_t* __buffer_parent;    //Parent who generated this slot
+    camio_stream_t* __buffer_parent;    //Parent who stream from who owned this slot.
 
     union {
         struct timespec ts_timespec;
@@ -45,6 +45,10 @@ typedef struct camio_buffer_internal_s {
         uint64_t        ts_micros;
         uint64_t        ts_fixed3232;
     } __ts; //Private, don't play with this directly!
+
+    camio_buffer_t* __next;   //Pointer to the next buffer in this queue, if null, there is no more.
+    camio_buffer_t* __last;   //Pointer to the last buffer in this queue, if null, there is no more.
+    ch_word __queue_len;      //How many items in this queue, typically just 1.
 
 } camio_buffer_internal_t;
 
@@ -75,9 +79,7 @@ typedef struct camio_buffer_s {
     uint64_t buffer_len;    //Undefined if there is no data. Buffer_len is always >= data_len + (buffer_start - data_start)
     void* buffer_start;     //Undefined if there is no data
 
-    camio_buffer_t* next;   //Pointer to the next buffer in this queue, if null, there is no more.
-
-    camio_buffer_internal_t _internal; //Internal state, not for access by users
+    camio_buffer_internal_t __internal; //Internal state, do not touch unless you are are stream implementor
 
 } camio_buffer_t;
 

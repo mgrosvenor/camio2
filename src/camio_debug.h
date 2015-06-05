@@ -15,11 +15,14 @@
 #include "types/types.h"
 
 #ifndef NDEBUG
-    ch_word camio_debug_out_(ch_word line_num, const char* filename, const char* format, ... );
+    ch_word camio_debug_out_(ch_bool info, ch_word line_num, const char* filename, const char* format, ... );
     #define DBG( /*format, args*/...)  camio_debug_helper(__VA_ARGS__, "")
-    #define camio_debug_helper(format, ...) camio_debug_out_(__LINE__, __FILE__, format, __VA_ARGS__ )
+    #define camio_debug_helper(format, ...) camio_debug_out_(true,__LINE__, __FILE__, format, __VA_ARGS__ )
+    #define DBG2( /*format, args*/...)  camio_debug_helper2(__VA_ARGS__, "")
+    #define camio_debug_helper2(format, ...) camio_debug_out_(false,__LINE__, __FILE__, format, __VA_ARGS__ )
 #else
     #define DBG( /*format, args*/...)
+    #define DBG2( /*format, args*/...)
 #endif
 
 

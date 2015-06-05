@@ -78,7 +78,7 @@ static camio_error_t udp_construct_str(camio_connector_t* this, camio_uri_t* uri
     // TODO XXX: Convert the URI into a bunch of opts here... need to and add a parser like chaste options.
 
     ch_cstr rd_address  = "localhost"; //TODO Should add proper resolution handler for domain names
-    ch_cstr wr_address  = "127.0.0.1"; //TODO Should add proper resolution handler for domain names
+    ch_cstr wr_address  = "localhost"; //TODO Should add proper resolution handler for domain names
     ch_cstr rd_prot     = "3000";
     ch_cstr wr_prot     = "4000";
 
@@ -97,10 +97,10 @@ static camio_error_t udp_construct_bin(camio_connector_t* this, va_list args)
 
     // TODO XXX: Convert the va_list into a bunch of opts here
 
-    ch_cstr rd_address  = "www.google.com"; //TODO Should add proper resolution handler for domain names
+    ch_cstr rd_address  = "localhost"; //TODO Should add proper resolution handler for domain names
     ch_cstr wr_address  = "localhost"; //TODO Should add proper resolution handler for domain names
-    ch_cstr rd_prot     = "dns";
-    ch_cstr wr_prot     = "dns";
+    ch_cstr rd_prot     = "3000";
+    ch_cstr wr_prot     = "4000";
 
     return udp_construct(this,rd_address,rd_prot,wr_address,wr_prot);
 
@@ -167,6 +167,8 @@ static camio_error_t resolve_bind_connect(char* address, char* prot, ch_bool do_
     //If we get here, s is populated with something meaningful
     *socket_fd_out = s;
 
+    DBG("Done %s to address %s with protocol %s\n", do_bind ? "binding" : "connecting", address, prot);
+
     return CAMIO_ENOERROR;
 }
 
@@ -194,6 +196,8 @@ static camio_error_t udp_connect(camio_connector_t* this, camio_stream_t** strea
     if(priv->wr_address && priv->wr_prot){
         resolve_bind_connect(priv->wr_address,priv->wr_prot,false, true, &priv->wr_fd);
     }
+
+    DBG("Done connecting, now constructing UDP stream...\n");
 
     return udp_stream_construct(stream, this, priv->rd_fd, priv->wr_fd);
 }

@@ -27,6 +27,7 @@
 #include <src/transports/stream.h>
 #include "../types/types.h"
 #include "../buffers/buffer.h"
+#include "../camio_debug.h"
 #include "api.h"
 
 inline camio_error_t camio_connect( camio_connector_t* this, camio_stream_t** stream_o )
@@ -44,6 +45,7 @@ inline void camio_connector_destroy(camio_connector_t* this)
 inline camio_error_t camio_read_acquire( camio_stream_t* this,  camio_rd_buffer_t** buffer_chain_o, ch_word* chain_len_o,
         ch_word buffer_offset, ch_word source_offset)
 {
+    //DBG("buffer_chain = %p &buffer_chain = %p\n", *buffer_chain_o, buffer_chain_o);
     return this->vtable.read_acquire(this, buffer_chain_o, chain_len_o, buffer_offset, source_offset);
 }
 

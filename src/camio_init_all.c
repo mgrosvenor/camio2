@@ -14,14 +14,21 @@
 // allows users to specific compiletime and runtime loading of modules.
 // The reason for the strange callback like interface is to make it possible to for dynamic initialization of new transports.
 // Even if a transport doesn't exist in the CamIO library, it can be added at runtime.
-// It also allows transport to be loaded as dynamically linked objects, keeping the CamIO runtime minimal.
+// It also allows transport to be loaded as dynamically linked objects, keeping the CamIO runtime minimal. CamIO is very much
+// trying to emulate an interface similar to the linux kernel, where modules are dynamically loadable, or compiled in.
 
+
+
+/**
+ * TODO XXX: THIS FUNCTION SHOUD TO BE AUTO GENERATED!
+ */
 camio_error_t camio_init_all_transports(){
 
 
 
     //netmap_init();
     udp_init();
+    //add more here
 
 
     return CAMIO_ENOERROR;

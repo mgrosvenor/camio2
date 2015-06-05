@@ -20,23 +20,60 @@
 typedef struct camio_s {
     ch_bool is_initialized;                             //Has the CamIO state been initialized?
     CH_VECTOR(CAMIO_STREAM_STATE_VEC)* stream_state;    //Container for all of the streams to be registered. For the moment
-                                                        //this is a vector, but it should be a hashmap later.
+                                                        //TODO XXX: this is a vector, but it should be a hashmap for faster
+                                                        //lookup times. It's not currently expected that transport lookup
+                                                        //will be a major bottleneck in system performance since the number
+                                                        //of transports will be relatively small (<1000) and the lookups to
+                                                        //mappings between string and binary representations will be
+                                                        //infrequent. Revisit if these assumptions change.
 } camio_t;
 
 extern camio_t __camio_state_container;
 
 #define USE_CAMIO camio_t __camio_state_container = { 0 }
 
+/**
+ * Initialize the CamIO per-process system state
+ */
 camio_t* init_camio();
 
+
+/**
+ * Transports call this function to register themselves into the CamIO system. The transport registers itself using a short,
+ * unique "scheme" name. For example, a UDP transport might use the scheme name "udp" and a text file transport might use
+ * "txt". Registration includes passing a description of the options that the stream will take, and a description of the
+ * offsets into the a stream specific options structure where those options can be found.
+ */
 camio_error_t register_new_transport(ch_ccstr scheme, ch_word scheme_len, camio_construct_str_f construct_str,
     camio_construct_bin_f construct_bin, ch_word global_store_size);
 
-camio_error_t new_camio_transport_str( ch_cstr uri, camio_transport_features_t* features, camio_connector_t** connector_o);
 
-camio_error_t new_camio_transport_bin(ch_ccstr scheme, camio_transport_features_t* features,
-    camio_connector_t** connector_o, ...);
+/**
+ * Construct and populate a transport specific parameters structure using a string URI representation of the transport. This
+ * is an easy and flexible way to get parameters into the transport. Especially directly from the command line. If successful,
+ * the pointer "params" will point to a populated parameter structure of size "params_size".
+ */
+camio_error_t camio_transport_params_new( ch_cstr uri, void** params, ch_word* params_size );
 
+
+/**
+ * Construct a new CamIO transport from the parameters structure as given.
+ * TODO XXX: Add features checking somewhere: camio_transport_features_t* features,
+ */
+camio_error_t camio_transport_constr(void** params, ch_word params_size, camio_connector_t** connector_o);
+
+
+/**
+ * Take a CamIO scheme name string and translate it into the scheme ID. This will be useful if you plan to manually construct
+ * a CamIO transport opts structure.
+ */
+camio_error_t camio_transport_get_id( ch_cstr scheme_name, ch_word* id_o);
+
+
+/**
+ * Some transports will need to coordinate if there are multiple instances of the same transport instantiated. For these
+ * transports, a global store is provided. Use this function to get a pointer to the global store given the scheme name.
+ */
 camio_error_t camio_transport_get_global(ch_ccstr scheme, void** global_store);
 
 
