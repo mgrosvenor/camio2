@@ -20,12 +20,9 @@
 
 
 
-typedef camio_error_t (*camio_construct_str_f)( camio_uri_t* uri, camio_connector_t** connector_o);
-typedef camio_error_t (*camio_construct_bin_f)( camio_connector_t** connector_o, va_list args);
+typedef camio_error_t (*camio_transport_construct_f)(void** params, ch_word params_size, camio_connector_t** connector_o);
 
-
-typedef camio_error_t (*camio_conn_construct_str_f)( camio_connector_t* this, camio_uri_t* uri);
-typedef camio_error_t (*camio_conn_construct_bin_f)( camio_connector_t* this, va_list args);
+typedef camio_error_t (*camio_conn_construct_f)(void** params, ch_word params_size, camio_connector_t** connector_o);
 
 
 /**
@@ -33,7 +30,6 @@ typedef camio_error_t (*camio_conn_construct_bin_f)( camio_connector_t* this, va
  */
 
 typedef struct camio_connector_interface_s{
-    camio_conn_construct_str_f construct_str;
     camio_conn_construct_bin_f construct_bin;
     camio_error_t (*connect)( camio_connector_t* this, camio_stream_t** stream_o );
     void (*destroy)(camio_connector_t* this);
@@ -49,9 +45,8 @@ typedef struct camio_connector_interface_s{
 typedef struct camio_connector_s {
 
     /**
-     * vtable that holds the function pointers, usually this would be a pointer, but saving 2x8bytes seems a little silly
-     * when it will cost a pointer dereference on the critical
-     * path.
+     * vtable that holds the function pointers, usually this would be a pointer, but saving a couple of bytes seems a little
+     * silly when it will cost a pointer dereference on the critical path. YMMMV.
      */
     camio_connector_interface_t vtable;
 

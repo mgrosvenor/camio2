@@ -14,6 +14,7 @@
 #include "../../deps/chaste/data_structs/vector/vector_typed_define_template.h"
 #include "stream_state_vec.h"
 
+//TODO XXX: Rename this to "transport state" to make the naming consistent.
 
 define_ch_vector(CAMIO_STREAM_STATE_VEC,camio_stream_state_t)
 
