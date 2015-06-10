@@ -13,7 +13,7 @@
 #include "../../deps/chaste/data_structs/vector/vector_typed_define_template.h"
 
 
-define_ch_vector(CAMIO_TRANSPORT_PARAMS_VEC,camio_transport_opt_t)
+define_ch_vector(CAMIO_TRANSPORT_PARAMS_VEC,camio_transport_param_t)
 
 //Don't bother to define this yet.
 //define_ch_vector_compare(CAMIO_TRANSPORT_PARAMS_VEC,camio_transport_opt_t)

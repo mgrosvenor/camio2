@@ -18,7 +18,7 @@ typedef enum {
     CAMIO_TRANSPORT_PARAMS_MODE_REQUIRED,
     CAMIO_TRANSPORT_PARAMS_MODE_OPTIONAL,
     //CAMIO_TRANSPORT_PARAMS_MODE_FALG -- is this necessary? Could be added later
-} camio_transport_opt_mode_e;
+} camio_transport_param_mode_e;
 
 typedef enum {
     CAMIO_TRANSPORT_PARAMS_TYPE_UINT64,
@@ -26,14 +26,14 @@ typedef enum {
     CAMIO_TRANSPORT_PARAMS_TYPE_DOUBLE,
     CAMIO_TRANSPORT_PARAMS_TYPE_BOOL,
     CAMIO_TRANSPORT_PARAMS_TYPE_STRING,
-} camio_transport_opt_type_e;
+} camio_transport_param_type_e;
 
 
 typedef struct {
-    camio_transport_opt_mode_e opt_mode;
+    camio_transport_param_mode_e opt_mode;
     ch_cstr param_name;
     ch_word param_struct_offset;
-    camio_transport_opt_type_e type;
+    camio_transport_param_type_e type;
     union {
         uint64_t uint64_t_val;
         int64_t int64_t_val;
@@ -41,11 +41,11 @@ typedef struct {
         bool bool_val;
         char* ch_cstr_val;
     } default_val;
-} camio_transport_opt_t;
+} camio_transport_param_t;
 
 
-declare_ch_vector(CAMIO_TRANSPORT_PARAMS_VEC,camio_transport_opt_t)
-declare_ch_vector_cmp(CAMIO_TRANSPORT_PARAMS_VEC,camio_transport_opt_t)
+declare_ch_vector(CAMIO_TRANSPORT_PARAMS_VEC,camio_transport_param_t)
+declare_ch_vector_cmp(CAMIO_TRANSPORT_PARAMS_VEC,camio_transport_param_t)
 
 #define declare_add_param(TYPE, CAMIO_TYPE) \
     void add_param_##TYPE(CH_VECTOR(CAMIO_TRANSPORT_PARAMS_VEC)* opts, ch_cstr param_name, ch_word param_struct_offset,\
@@ -65,7 +65,7 @@ declare_add_param(ch_cstr, CAMIO_TRANSPORT_PARAMS_TYPE_STRING);
 #define define_add_param(TYPE, CAMIO_TYPE) \
     declare_add_param(TYPE,CAMIO_TYPE)\
 {\
-    camio_transport_opt_t opt;\
+    camio_transport_param_t opt;\
     opt.opt_mode                    = has_default ? CAMIO_TRANSPORT_PARAMS_MODE_OPTIONAL : CAMIO_TRANSPORT_PARAMS_MODE_REQUIRED;\
     opt.param_name                    = param_name;\
     opt.param_struct_offset         = param_struct_offset;\

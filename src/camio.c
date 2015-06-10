@@ -16,6 +16,7 @@
 #include "camio_debug.h"
 #include "camio_init_all.h"
 #include <src/types/transport_state_vec.h>
+#include <src/types/transport_params_vec.h>
 #include <src/utils/uri_parser/uri_parser.h>
 #include <src/errors/camio_errors.h>
 
@@ -122,7 +123,14 @@ camio_error_t camio_transport_params_new( ch_cstr uri_str, void** params_o, ch_w
     //There is a valid scheme -> transport mapping. Now make a parameters structure and try to populate it
     char* params_struct = calloc(1, state.param_struct_size);
 
-
+    //iterate over the parameters list
+    CH_VECTOR(CAMIO_TRANSPORT_PARAMS_VEC)* params = state.params;
+    for( camio_transport_param_t* param = params->first;
+         param != params->end;
+         param = params->next(params,param) )
+    {
+        DBG("%s", param->param_name);
+    }
 
 
     //Output the things that we care about
