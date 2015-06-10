@@ -22,10 +22,22 @@ define_ch_vector(CAMIO_TRANSPORT_PARAMS_VEC,camio_transport_param_t)
 //}
 
 
-//TODO XXX!!! There is a confusion here between "parameter" and "option" should rename everything called "option" to
-//"parameter"
 //These applications of the macro expand out the actual option adder functions
 define_add_param(int64_t, CAMIO_TRANSPORT_PARAMS_TYPE_INT64)
 define_add_param(uint64_t, CAMIO_TRANSPORT_PARAMS_TYPE_UINT64)
 define_add_param(double, CAMIO_TRANSPORT_PARAMS_TYPE_DOUBLE)
-define_add_param(ch_cstr, CAMIO_TRANSPORT_PARAMS_TYPE_STRING)
+
+//Strings are treated a little bit differently
+declare_add_param_opt(ch_cstr,CAMIO_TRANSPORT_PARAMS_TYPE_LSTRING)
+{
+    camio_transport_param_t opt = {0};
+    opt.opt_mode                    = CAMIO_TRANSPORT_PARAMS_MODE_OPTIONAL;
+    opt.param_name                  = param_name;
+    opt.param_struct_offset         = param_struct_offset;
+    opt.type                        = CAMIO_TRANSPORT_PARAMS_TYPE_LSTRING;
+    len_string_t tmp = { default_val, strlen(default_val) };
+    opt.default_val.len_string_t_val = tmp;
+    opts->push_back(opts, opt);
+}
+
+define_add_param_req(ch_cstr,CAMIO_TRANSPORT_PARAMS_TYPE_LSTRING)

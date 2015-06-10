@@ -19,6 +19,8 @@
 #include <src/types/transport_params_vec.h>
 #include <src/utils/uri_parser/uri_parser.h>
 #include <src/errors/camio_errors.h>
+#include <deps/chaste/parsing/numeric_parser.h>
+#include <deps/chaste/parsing/bool_parser.h>
 
 
 
@@ -138,8 +140,7 @@ camio_error_t camio_transport_params_new( ch_cstr uri_str, void** params_o, ch_w
     //There is a valid scheme -> transport mapping. Now make a parameters structure and try to populate it
     char* params_struct = calloc(1, state->param_struct_size);
 
-
-    //iterate over the parameters list
+    //iterate over the parameters list, checking for parameters
     CH_VECTOR(CAMIO_TRANSPORT_PARAMS_VEC)* params = state->params;
     CH_LIST(KV)* uri_opts = uri->key_vals;
     DBG("Iterating over %i parameters...\n", params->count);
@@ -147,18 +148,73 @@ camio_error_t camio_transport_params_new( ch_cstr uri_str, void** params_o, ch_w
          param != params->end;
          param = params->next(params,param) )
     {
-        key_val kv = {
-           .key = param->param_name,
-           .key_len = strlen(param->param_name)
-        };
 
+        //Search for the key in the key/value uri options list.
+        key_val kv = { .key = param->param_name, .key_len = strlen(param->param_name) };
         CH_LIST_IT(KV) first = uri_opts->first(uri_opts);
         CH_LIST_IT(KV) end   = uri_opts->end(uri_opts);
         CH_LIST_IT(KV) found = uri_opts->find(uri_opts,&first, &end, kv);
+
+        //We found it! OK. try to parse it.
         if(found.value){
-            DBG("PARAM=%s VALUE=%.*s OFFSET=%lli\n", param->param_name, found.value->value_len, found.value->value, param->param_struct_offset);
+            ch_cstr value = found.value->value;
+            ch_word value_len = found.value->value_len;
+            DBG("PARAM=%s VALUE=%.*s OFFSET=%lli\n", param->param_name, value_len, value, param->param_struct_offset);
+            num_result_t num_result  = parse_number(value, value_len); //Just try to parse this as a number in case
+
+            //Now check that the type is right and assign it
+            switch(param->type){
+                case CAMIO_TRANSPORT_PARAMS_TYPE_UINT64:{
+                    void* params_struct_value = &params_struct[param->param_struct_offset];
+                    uint64_t* param_ptr = (uint64_t*)params_struct_value;
+                    if(num_result.type == CH_UINT64)        { *param_ptr = num_result.val_uint; }
+                    else{
+                        DBG("Expected a UINT64 but got %*.s ", value_len, value);
+                        return CAMIO_EINVALID; //TODO XXX make a better return value
+                    }
+                    break;
+                }
+                //Promote UINT64 up to INT64 if necessary
+                case CAMIO_TRANSPORT_PARAMS_TYPE_INT64:{
+                    void* params_struct_value = &params_struct[param->param_struct_offset];
+                    int64_t* param_ptr = (int64_t*)params_struct_value;
+                    if(num_result.type == CH_UINT64)        { *param_ptr = num_result.val_uint; }
+                    else if( num_result.type != CH_INT64)   { *param_ptr = num_result.val_int; }
+                    else{
+                        DBG("Expected a INT64 but got %*.s ", value_len, value);
+                        return CAMIO_EINVALID; //TODO XXX make a better return value
+                    }
+                    break;
+                }
+                //Promote UINT64 and INT64 up to DOUBLE if necessary
+                case CAMIO_TRANSPORT_PARAMS_TYPE_DOUBLE:{
+                    void* params_struct_value = &params_struct[param->param_struct_offset];
+                    double* param_ptr = (double*)params_struct_value;
+                    if(num_result.type == CH_UINT64)        { *param_ptr = num_result.val_uint; }
+                    else if( num_result.type != CH_INT64)   { *param_ptr = num_result.val_int; }
+                    else if( num_result.type != CH_DOUBLE)  { *param_ptr = num_result.val_dble; }
+                    else{
+                        DBG("Expected a DOUBLE but got %*.s ", value_len, value);
+                        return CAMIO_EINVALID; //TODO XXX make a better return value
+                    }
+                    break;
+                }
+                //Keep a copy of the string pointer and length
+                case CAMIO_TRANSPORT_PARAMS_TYPE_LSTRING:{
+                    void* params_struct_value = &params_struct[param->param_struct_offset];
+                    len_string_t* param_ptr = (len_string_t*)params_struct_value;
+                    param_ptr->str = value;
+                    param_ptr->str_len = value_len;
+                    break;
+                }
+                default:{
+                    DBG("EEEK! This is an internal error. Unknown type. Did you use the right CAMIO_TRANSPORT_PARAMS_XXX?");
+                    return CAMIO_EINVALID; //TODO XXX make a better return value
+                }
+            }
         }
         else{
+            //if()
             DBG("PARAM=%s NOT FOUND!\n", param->param_name);
             return CAMIO_EINVALID;
         }
@@ -174,7 +230,7 @@ camio_error_t camio_transport_params_new( ch_cstr uri_str, void** params_o, ch_w
 //        return CAMIO_NOTIMPLEMENTED;
 //    }
 
-    free_uri(&uri); //Don't forget to do this somewhere
+    //free_uri(&uri); //Don't forget to do this somewhere -- but be carefull, there may be strings lying around. Hmm.
 
 
     return CAMIO_ENOERROR;
