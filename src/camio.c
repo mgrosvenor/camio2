@@ -211,7 +211,8 @@ camio_error_t camio_transport_params_new( ch_cstr uri_str, void** params_o, ch_w
                 case CAMIO_TRANSPORT_PARAMS_TYPE_LSTRING:{
                     void* params_struct_value = &params_struct[param->param_struct_offset];
                     len_string_t* param_ptr = (len_string_t*)params_struct_value;
-                    strncpy(param_ptr->str, value, MIN(param_ptr->str_max,value_len));
+                    DBG("value=%.*s [%i]\n", value_len, value, value_len);
+                    strncpy(param_ptr->str, value, MIN(LSTRING_MAX,value_len));
                     param_ptr->str_len = value_len;
                     break;
                 }
@@ -228,6 +229,9 @@ camio_error_t camio_transport_params_new( ch_cstr uri_str, void** params_o, ch_w
                 DBG("PARAM=%s NOT FOUND!\n", param->param_name);
                 result = CAMIO_EINVALID; //TODO XXX make a better return value
                 goto exit_params;
+            }
+            else{
+                //TODO XXX fill in default initialization code here
             }
         }
     }

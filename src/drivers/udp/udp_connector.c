@@ -55,6 +55,21 @@ static camio_error_t udp_construct(camio_connector_t* this, void** params, ch_wo
     }
     udp_params_t* udp_params = (udp_params_t*)(*params);
     priv->params = udp_params;
+    DBG("rd_add=%i, rd_prot=%i, wr_addr=%i, wr_pro=%i\n",
+            udp_params->rd_address.str_len,
+            udp_params->rd_protocol.str_len,
+            udp_params->wr_address.str_len,
+            udp_params->wr_protocol.str_len
+            );
+
+
+    DBG("rd_add=%s, rd_prot=%s, wr_addr=%s, wr_pro=%s\n",
+            udp_params->rd_address.str,
+            udp_params->rd_protocol.str,
+            udp_params->wr_address.str,
+            udp_params->wr_protocol.str
+            );
+
 
     //OK we're done with this now.
     free(*params);
