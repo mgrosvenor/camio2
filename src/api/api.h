@@ -19,6 +19,7 @@
 //#include <src/streams/features.h>
 #include <src/buffers/buffer.h>
 #include <src/transports/features.h>
+#include <src/errors/camio_errors.h>
 
 
 /**

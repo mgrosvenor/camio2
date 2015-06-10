@@ -20,3 +20,12 @@ define_ch_vector(CAMIO_TRANSPORT_OPT_VEC,camio_transport_opt_t)
 //{
 //    return
 //}
+
+
+//TODO XXX!!! There is a confusion here between "parameter" and "option" should rename everything called "option" to
+//"parameter"
+//These applications of the macro expand out the actual option adder functions
+define_add_opt(int64_t, CAMIO_TRANSPORT_OPT_TYPE_INT64)
+define_add_opt(uint64_t, CAMIO_TRANSPORT_OPT_TYPE_UINT64)
+define_add_opt(double, CAMIO_TRANSPORT_OPT_TYPE_DOUBLE)
+define_add_opt(ch_cstr, CAMIO_TRANSPORT_OPT_TYPE_STRING)

@@ -17,6 +17,7 @@
 #include <src/types/stream_state_vec.h>
 #include <src/types/transport_opts_vec.h>
 
+
 //Container for all CamIO state
 typedef struct camio_s {
     ch_bool is_initialized;                             //Has the CamIO state been initialized?
@@ -39,33 +40,41 @@ extern camio_t __camio_state_container;
 camio_t* init_camio();
 
 
+
 /**
  * Transports call this function to register themselves into the CamIO system. The transport registers itself using a short,
  * unique "scheme" name. For example, a UDP transport might use the scheme name "udp" and a text file transport might use
  * "txt". Registration includes passing a description of the options that the stream will take, and a description of the
  * offsets into the a stream specific options structure where those options can be found.
  */
-camio_error_t register_new_transport(ch_ccstr scheme, ch_word scheme_len, ch_word global_store_size,
-    camio_construct_bin_f construct_bin, CH_VECTOR(CAMIO_TRANSPORT_OPT_VEC)* opts );
+camio_error_t register_new_transport(
+    ch_ccstr scheme,
+    ch_word scheme_len,
+    ch_cstr* hierarchical,
+    camio_construct_f construct,
+    ch_word param_struct_size,
+    CH_VECTOR(CAMIO_TRANSPORT_OPT_VEC)* params,
+    ch_word global_store_size
+);
 
 
 /**
  * Construct and populate a transport specific parameters structure using a string URI representation of the transport. This
  * is an easy and flexible way to get parameters into the transport. Especially directly from the command line. If successful,
- * the pointer "params" will point to a populated parameter structure of size "params_size".
+ * the pointer to "params" will point to a populated parameter structure of size "params_size" and the id_o parameter will
+ * contain the scheme ID.
  * TODO XXX: Add features checking somewhere: camio_transport_features_t* features. Not sure where the right place for this
  * is. I think this function might be the right place, so that features required by the app can be checked against the
- * transport description as supplied by the uri string.
+ * transport description as supplied by the uri string, but this means that the binary interface does not have it. Hmm.
  */
-camio_error_t camio_transport_params_new( ch_cstr uri, void** params_o, ch_word* params_size_o );
+camio_error_t camio_transport_params_new( ch_cstr uri, void** params_o, ch_word* params_size_o, ch_word* id_o );
 
 
 /**
- * Construct a new CamIO transport from the parameters structure as given.
- * TODO XXX: Add features checking somewhere: camio_transport_features_t* features. Not sure where the right place for this
- * is, probably at a higher layer, such as in the params_new function
+ * Construct a new CamIO transport with the given ID, from the parameters structure as given. Return a connector object for
+ * connecting to underlying data streams.
  */
-camio_error_t camio_transport_constr(void** params, ch_word params_size, camio_connector_t** connector_o);
+camio_error_t camio_transport_constr(ch_word id, void** params, ch_word params_size, camio_connector_t** connector_o);
 
 
 /**

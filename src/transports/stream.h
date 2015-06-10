@@ -26,14 +26,13 @@ typedef struct camio_stream_interface_s{
     void (*destroy)(camio_stream_t* this);
 
     //Read operations
-    camio_error_t (*read_acquire)( camio_stream_t* this,  camio_rd_buffer_t** buffer_chain_o,  ch_word* chain_len_o,
-            ch_word buffer_offset,ch_word source_offset);
-    camio_error_t (*read_release)(camio_stream_t* this, camio_rd_buffer_t** buffer_chain);
+    camio_error_t (*read_acquire)( camio_stream_t* this,  camio_rd_buffer_t** buffer_o, ch_word buffer_offset,
+            ch_word source_offset);
+    camio_error_t (*read_release)(camio_stream_t* this, camio_wr_buffer_t** buffer_o);
 
     //Write operations
-    camio_error_t (*write_acquire)(camio_stream_t* this, camio_wr_buffer_t** buffer_chain_o, ch_word* count_io);
-    camio_error_t (*write_commit)(camio_stream_t* this, camio_wr_buffer_t** buffer_chain, ch_word buffer_offset,
-                               ch_word dest_offset);
+    camio_error_t (*write_acquire)(camio_stream_t* this, camio_wr_buffer_t** buffer_o);
+    camio_error_t (*write_commit)(camio_stream_t* this, camio_wr_buffer_t** buffer_chain );
     camio_error_t (*write_release)(camio_stream_t* this, camio_wr_buffer_t** buffers_chain);
 
 

@@ -9,13 +9,13 @@
  * This parser is a bit simple, it only knows how to find queries that match this pattern exactly.
  *
  * TODO XXX: Some queries may like to use "escaping" and "\"escaping\"" and "\\\"escaping\\\"" (etc) especially
- * in the hierarchical part. This is not yet supported.
+ * in the hierarchical part. This is not yet supported, but it would be a good idea to add.
  */
 
 
 #include "uri_parser.h"
 #include "../../types/types.h"
-#include "../../errors/errors.h"
+#include "../../errors/camio_errors.h"
 #include "../../types/kvll.h"
 
 
@@ -37,7 +37,7 @@ int parse_uri(char* uri_str, camio_uri_t** result_o)
         char c = *uri_str;
         switch(state){
             case PARSE_SCHEME:{
-                //Chomp of whitespace at the head
+                //Chomp off whitespace at the head
                 if(c == ' ' || c == '\t' || c == '\r'){
                     continue;
                 }
@@ -75,7 +75,7 @@ int parse_uri(char* uri_str, camio_uri_t** result_o)
 
             }
             case PARSE_KEY_INIT:{
-                //Chomp of whitespace at the head
+                //Chomp off whitespace at the head
                 if(c == ' ' || c == '\t' || c == '\r'){
                     continue;
                 }
@@ -165,6 +165,6 @@ void free_uri(camio_uri_t** u)
     //Free up the memory associated with this item
     free(*u);
 
-    //Remove any dangline pointers
+    //Remove any dangling pointers
     *u = NULL;
 }

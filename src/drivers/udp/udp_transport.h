@@ -20,6 +20,14 @@ typedef struct udp_global_s{
 } udp_global_t;
 
 
+typedef struct {
+    ch_cstr hierarchical;
+    ch_cstr rd_address;
+    ch_cstr wr_address;
+    ch_cstr rd_protocol;
+    ch_cstr wr_protocol;
+} udp_params_t;
+
 void udp_init();
 
 #endif /* SRC_DRIVERS_UDP_UDP_TRANSPORT_H_ */

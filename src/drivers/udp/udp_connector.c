@@ -15,6 +15,7 @@
 
 #include <src/buffers/buffer_malloc_linear.h>
 
+#include "udp_transport.h"
 #include "udp_connector.h"
 #include "udp_stream.h"
 
@@ -29,9 +30,6 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netdb.h>
-
-
-
 
 #define CAMIO_UDP_MAX_ADDR_STR 1024
 #define CAMIO_UDP_MAX_PROT_STR 10
@@ -50,63 +48,28 @@ typedef struct udp_priv_s {
 } udp_connector_priv_t;
 
 
-
-
-static camio_error_t udp_construct(camio_connector_t* this, ch_cstr rd_address, ch_cstr rd_prot, ch_cstr wr_address,
-        ch_cstr wr_prot)
+static camio_error_t udp_construct(camio_connector_t* this, void** params, ch_word params_size)
 {
 
     udp_connector_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
+    //Basic sanity check that the params is the right one.
+    if(params_size != sizeof(udp_params_t)){
+        return CAMIO_EINVALID;
+    }
+    udp_params_t* udp_params = (udp_params_t*)(*params);
 
     //Do I really need to save this? I could do the connect here? Hmm. Not as neat, but will perform better
-    strncpy(priv->rd_address,rd_address,CAMIO_UDP_MAX_ADDR_STR);
-    strncpy(priv->wr_address,wr_address,CAMIO_UDP_MAX_ADDR_STR);
-    strncpy(priv->rd_prot,rd_prot,CAMIO_UDP_MAX_PROT_STR);
-    strncpy(priv->wr_prot,wr_prot,CAMIO_UDP_MAX_PROT_STR);
+    strncpy(priv->rd_address,udp_params->rd_address,CAMIO_UDP_MAX_ADDR_STR);
+    strncpy(priv->wr_address,udp_params->wr_address,CAMIO_UDP_MAX_ADDR_STR);
+    strncpy(priv->rd_prot,udp_params->rd_protocol,CAMIO_UDP_MAX_PROT_STR);
+    strncpy(priv->wr_prot,udp_params->wr_protocol,CAMIO_UDP_MAX_PROT_STR);
+
+    //OK we're done with this now.
+    free(*params);
+    *params = NULL;
 
     return CAMIO_ENOERROR;
-
 }
-
-
-static camio_error_t udp_construct_str(camio_connector_t* this, camio_uri_t* uri)
-{
-//    udp_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
-//    (void)priv;
-    (void)uri;
-
-    // TODO XXX: Convert the URI into a bunch of opts here... need to and add a parser like chaste options.
-
-    ch_cstr rd_address  = "localhost"; //TODO Should add proper resolution handler for domain names
-    ch_cstr wr_address  = "localhost"; //TODO Should add proper resolution handler for domain names
-    ch_cstr rd_prot     = "3000";
-    ch_cstr wr_prot     = "4000";
-
-    return udp_construct(this,rd_address,rd_prot,wr_address,wr_prot);
-
-}
-
-
-
-
-static camio_error_t udp_construct_bin(camio_connector_t* this, va_list args)
-{
-    //udp_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
-    //(void)priv;
-    (void)args;
-
-    // TODO XXX: Convert the va_list into a bunch of opts here
-
-    ch_cstr rd_address  = "localhost"; //TODO Should add proper resolution handler for domain names
-    ch_cstr wr_address  = "localhost"; //TODO Should add proper resolution handler for domain names
-    ch_cstr rd_prot     = "3000";
-    ch_cstr wr_prot     = "4000";
-
-    return udp_construct(this,rd_address,rd_prot,wr_address,wr_prot);
-
-}
-
-
 
 
 static void udp_destroy(camio_connector_t* this)

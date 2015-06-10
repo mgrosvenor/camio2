@@ -4,13 +4,13 @@
  * See LICENSE.txt for full details. 
  * 
  *  Created:   Jul 20, 2014
- *  File name: errors.h
+ *  File name: camio_errors.h
  *  Description:
  *  Error codes and error numbers that are global to CamIO
  */
 
-#ifndef ERRORS_H_
-#define ERRORS_H_
+#ifndef CAMIO_ERRORS_H_
+#define CAMIO_ERRORS_H_
 //TODO XXX: write a string translation table for displaying the errors nicely
 
 typedef enum camio_error_e {
@@ -51,4 +51,4 @@ typedef enum camio_error_e {
     CAMIO_EALLREADYCONNECTED,
 } camio_error_t;
 
-#endif /* ERRORS_H_ */
+#endif /* CAMIO_ERRORS_H_ */

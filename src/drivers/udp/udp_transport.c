@@ -9,28 +9,18 @@
  *  <INSERT DESCRIPTION HERE> 
  */
 
+#include <stddef.h>
+
 #include <src/drivers/udp/udp_connector.h>
 #include <src/drivers/udp/udp_transport.h>
 #include "../../camio.h"
 #include "../../camio_debug.h"
+#include <src/types/transport_opts_vec.h>
 
-const char* const scheme = "udp";
+static const char* const scheme = "udp";
 
-static camio_error_t construct_str(camio_uri_t* uri, camio_connector_t** connector_o)
-{
-    camio_connector_t* conn = NEW_CONNECTOR(udp);
-    if(!conn){
-        *connector_o = NULL;
-        return CAMIO_ENOMEM;
-    }
 
-    *connector_o = conn;
-    DBG("Connector address=%p (%p)\n",conn, *connector_o);
-
-    return conn->vtable.construct_str(conn,uri);
-}
-
-static camio_error_t construct_bin(camio_connector_t** connector_o, va_list args)
+static camio_error_t construct(void** params, ch_word params_size, camio_connector_t** connector_o)
 {
     camio_connector_t* conn = NEW_CONNECTOR(udp);
     if(!conn){
@@ -40,11 +30,25 @@ static camio_error_t construct_bin(camio_connector_t** connector_o, va_list args
 
     *connector_o = conn;
 
-    return conn->vtable.construct_bin(conn,args);
+    return conn->vtable.construct(conn,params, params_size);
 }
+
+
 
 
 void udp_init()
 {
-    register_new_transport(scheme,strlen(scheme),construct_str, construct_bin,0);
+    CH_VECTOR(CAMIO_TRANSPORT_OPT_VEC)* params = CH_VECTOR_NEW(CAMIO_TRANSPORT_OPT_VEC,256,NULL);
+    if(!params){
+        return; // No memory. Can't register this transport
+    }
+
+    add_param_required(params,"rd_address",udp_params_t,rd_address);
+    add_param_required(params,"rw_address",udp_params_t,wr_address);
+    add_param_required(params,"rd_protocol",udp_params_t,wr_address);
+    add_param_required(params,"rw_protocol",udp_params_t,wr_address);
+
+    char* temp; //TODO XXX BUG THIS IS BROKEN. PLACE HOLDER TO GET THINGS TO COMPILE
+
+    register_new_transport(scheme,strlen(scheme),&temp,construct,sizeof(udp_params_t),params,0);
 }

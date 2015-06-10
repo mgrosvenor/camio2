@@ -100,8 +100,8 @@ camio_error_t udp_stream_construct(camio_stream_t* this, camio_connector_t* conn
 
 
 
-static camio_error_t udp_read_acquire( camio_stream_t* this,  camio_rd_buffer_t** buffer_chain_o,  ch_word* chain_len_o,
-        ch_word buffer_offset, ch_word source_offset)
+static camio_error_t udp_read_acquire( camio_stream_t* this,  camio_rd_buffer_t** buffer_o, ch_word buffer_offset,
+        ch_word source_offset)
 {
     if( NULL == this){
         DBG("This null???\n"); //WTF?
@@ -111,25 +111,16 @@ static camio_error_t udp_read_acquire( camio_stream_t* this,  camio_rd_buffer_t*
 
     //DBG("buffer_chain = %p &buffer_chain = %p\n", *buffer_chain_o, buffer_chain_o);
 
-    if( NULL == buffer_chain_o){
+    if( NULL == buffer_o){
         DBG("Buffer chain pointer null\n"); //WTF?
         return CAMIO_EINVALID;
     }
 
-    if( NULL != *buffer_chain_o){
+    if( NULL != *buffer_o){
         DBG("Buffer chain not null\n"); //WTF?
         return CAMIO_EINVALID;
     }
 
-    if(NULL == chain_len_o){
-        DBG("Chain len\n"); //WTF?
-        return CAMIO_EINVALID;
-    }
-
-    if( (*chain_len_o) <= 0){ //WTF?
-        DBG("WTF? Requesting <= 0 buffers?\n");
-        return CAMIO_EINVALID; //Not (yet) supported
-    }
 
     if(source_offset != 0){
         DBG("Src offset\n");
@@ -142,13 +133,13 @@ static camio_error_t udp_read_acquire( camio_stream_t* this,  camio_rd_buffer_t*
     }
 
     //DBG("Doing read acquire\n");
-    camio_error_t err = buffer_malloc_linear_acquire(priv->rd_buff,buffer_chain_o);
+    camio_error_t err = buffer_malloc_linear_acquire(priv->rd_buff,buffer_o);
     if(err){ return err; }
 
-    ch_word bytes = read(priv->rd_fd,(*buffer_chain_o)->buffer_start, CAMIO_UDP_BUFFER_SIZE);
+    ch_word bytes = read(priv->rd_fd,(*buffer_o)->buffer_start, CAMIO_UDP_BUFFER_SIZE);
     if(bytes < 0){
-        buffer_malloc_linear_release(priv->rd_buff,buffer_chain_o);
-        *buffer_chain_o = NULL;
+        buffer_malloc_linear_release(priv->rd_buff,buffer_o);
+        *buffer_o = NULL;
 
         if(errno == EWOULDBLOCK || errno == EAGAIN){
             return CAMIO_ETRYAGAIN;
@@ -158,49 +149,41 @@ static camio_error_t udp_read_acquire( camio_stream_t* this,  camio_rd_buffer_t*
             return CAMIO_ECHECKERRORNO;
         }
     }
-    (*buffer_chain_o)->data_len = bytes;
-    *chain_len_o = 1; //Constant for the moment...
-    DBG("Got %lli bytes from UDP read\n", (*buffer_chain_o)->data_len );
+    (*buffer_o)->data_len = bytes;
+    DBG("Got %lli bytes from UDP read\n", (*buffer_o)->data_len );
 
     return CAMIO_ENOERROR;
 }
 
 
-static camio_error_t udp_read_release(camio_stream_t* this, camio_rd_buffer_t** buffer_chain)
+static camio_error_t udp_read_release(camio_stream_t* this, camio_rd_buffer_t** buffer)
 {
     if( NULL == this){
         DBG("This null???\n"); //WTF?
         return CAMIO_EINVALID;
     }
     udp_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
+    (void)priv;
 
-    if( NULL == buffer_chain){
+    if( NULL == buffer){
         DBG("Buffer chain pointer null\n"); //WTF?
         return CAMIO_EINVALID;
     }
 
-    if( NULL == *buffer_chain){
+    if( NULL == *buffer){
         DBG("Buffer chain null\n"); //WTF?
         return CAMIO_EINVALID;
     }
 
-    camio_rd_buffer_t* chain_ptr = *buffer_chain;
-    camio_rd_buffer_t* chain_ptr_prev = NULL;
-    while(chain_ptr != NULL){
-        camio_error_t err = buffer_malloc_linear_release(priv->rd_buff,&chain_ptr);
-        if(err){ return err; }
-        chain_ptr_prev      = *buffer_chain;
-        chain_ptr           = (*buffer_chain)->next;
-        chain_ptr->next     = NULL;
-    }
+    camio_error_t err = buffer_malloc_linear_release(priv->rd_buff,buffer);
+    if(err){ return err; }
 
-    *buffer_chain = NULL; //Remove dangling pointers!
-
+    *buffer = NULL; //Remove dangling pointers!
     return CAMIO_ENOERROR;
 }
 
 
-static camio_error_t udp_write_acquire(camio_stream_t* this, camio_wr_buffer_t** buffer_chain_o, ch_word* chain_len_io)
+static camio_error_t udp_write_acquire(camio_stream_t* this, camio_wr_buffer_t** buffer_o)
 {
     if( NULL == this){
         DBG("This null???\n"); //WTF?
@@ -208,45 +191,32 @@ static camio_error_t udp_write_acquire(camio_stream_t* this, camio_wr_buffer_t**
     }
     udp_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
 
-    if( NULL == buffer_chain_o){
+    if( NULL == buffer_o){
         DBG("Buffer chain pointer null\n"); //WTF?
         return CAMIO_EINVALID;
     }
 
-    if( NULL != *buffer_chain_o){
+    if( NULL != *buffer_o){
         DBG("Buffer chain not null\n"); //WTF?
         return CAMIO_EINVALID;
     }
 
-    if(NULL == chain_len_io){
-        DBG("Chain len\n"); //WTF?
-        return CAMIO_EINVALID;
-    }
-
-    if( (*chain_len_io) <= 0){ //WTF?
-        DBG("WTF? Requesting <= 0 buffers?\n");
-        return CAMIO_EINVALID; //Not (yet) supported
-    }
 
     DBG("Doing write acquire\n");
-    camio_error_t err = buffer_malloc_linear_acquire(priv->wr_buff,buffer_chain_o);
+    camio_error_t err = buffer_malloc_linear_acquire(priv->wr_buff,buffer_o);
     if(err){ return err; }
-    *chain_len_io = 1; //Constant for the moment...
 
     return CAMIO_ENOERROR;
 }
 
 
-static camio_error_t udp_write_commit(camio_stream_t* this, camio_wr_buffer_t** buffer_chain, ch_word buffer_offset,
-        ch_word dest_offset)
+static camio_error_t udp_write_commit(camio_stream_t* this, camio_wr_buffer_t** buffer_chain )
 {
     if( NULL == this){
         DBG("This null???\n"); //WTF?
         return CAMIO_EINVALID;
     }
     udp_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
-    (void)buffer_offset; //Hmmm not sure how to use this....
-    (void)dest_offset;
 
 
     camio_rd_buffer_t* chain_ptr = *buffer_chain;
@@ -266,7 +236,7 @@ static camio_error_t udp_write_commit(camio_stream_t* this, camio_wr_buffer_t** 
         const char* data_start_new = (char*)chain_ptr->data_start + bytes;
         chain_ptr->data_start = (void*)data_start_new;
 
-        chain_ptr = chain_ptr->next;
+        chain_ptr = chain_ptr->__internal.__next;
     }
 
     return CAMIO_ENOERROR;
@@ -280,6 +250,7 @@ static camio_error_t udp_write_release(camio_stream_t* this, camio_wr_buffer_t**
         return CAMIO_EINVALID;
     }
     udp_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
+    (void)priv;
 
     if( NULL == buffer_chain){
         DBG("Buffer chain pointer null\n"); //WTF?
@@ -291,17 +262,17 @@ static camio_error_t udp_write_release(camio_stream_t* this, camio_wr_buffer_t**
         return CAMIO_EINVALID;
     }
 
-    camio_rd_buffer_t* chain_ptr = *buffer_chain;
-    camio_rd_buffer_t* chain_ptr_prev = NULL;
-    while(chain_ptr != NULL){
-        camio_error_t err = buffer_malloc_linear_release(priv->wr_buff,&chain_ptr);
-        if(err){ return err; }
-        chain_ptr_prev      = *buffer_chain;
-        chain_ptr           = (*buffer_chain)->next;
-        chain_ptr->next     = NULL;
-    }
-
-    *buffer_chain = NULL; //Remove dangling pointers!
+//    camio_rd_buffer_t* chain_ptr = *buffer_chain;
+//    camio_rd_buffer_t* chain_ptr_prev = NULL;
+//    while(chain_ptr != NULL){
+//        camio_error_t err = buffer_malloc_linear_release(priv->wr_buff,&chain_ptr);
+//        if(err){ return err; }
+//        chain_ptr_prev      = *buffer_chain;
+//        chain_ptr           = (*buffer_chain)->next;
+//        chain_ptr->next     = NULL;
+//    }
+//
+//    *buffer_chain = NULL; //Remove dangling pointers!
 
     return CAMIO_ENOERROR;
 }

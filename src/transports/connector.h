@@ -19,10 +19,7 @@
 #include "../utils/uri_parser/uri_parser.h"
 
 
-
-typedef camio_error_t (*camio_transport_construct_f)(void** params, ch_word params_size, camio_connector_t** connector_o);
-
-typedef camio_error_t (*camio_conn_construct_f)(void** params, ch_word params_size, camio_connector_t** connector_o);
+typedef camio_error_t (*camio_conn_construct_f)(camio_connector_t* connector_o, void** params, ch_word params_size);
 
 
 /**
@@ -30,7 +27,7 @@ typedef camio_error_t (*camio_conn_construct_f)(void** params, ch_word params_si
  */
 
 typedef struct camio_connector_interface_s{
-    camio_conn_construct_bin_f construct_bin;
+    camio_conn_construct_f construct;
     camio_error_t (*connect)( camio_connector_t* this, camio_stream_t** stream_o );
     void (*destroy)(camio_connector_t* this);
 } camio_connector_interface_t;
@@ -46,7 +43,7 @@ typedef struct camio_connector_s {
 
     /**
      * vtable that holds the function pointers, usually this would be a pointer, but saving a couple of bytes seems a little
-     * silly when it will cost a pointer dereference on the critical path. YMMMV.
+     * silly when it will cost a pointer dereference on the critical path. YMMV.
      */
     camio_connector_interface_t vtable;
 
@@ -78,8 +75,7 @@ typedef struct camio_connector_s {
 
 #define NEW_CONNECTOR_DEFINE(NAME, PRIVATE_TYPE) \
     const static camio_connector_interface_t NAME##_connector_interface = {\
-            .construct_str = NAME##_construct_str,\
-            .construct_bin = NAME##_construct_bin,\
+            .construct = NAME##_construct,\
             .connect   = NAME##_connect,\
             .destroy   = NAME##_destroy,\
     };\

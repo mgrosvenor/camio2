@@ -25,7 +25,7 @@ void buffer_malloc_linear_DBG(buffer_malloc_linear_t* buff){
     DBG("buffer_count=%li\n",buff->buffer_count);
     DBG("HDRS: ");
     for(int i = 0; i < buff->buffer_count; i++){
-        DBG2("%i",buff->headers[i]._internal.__in_use);
+        DBG2("%i",buff->headers[i].__internal.__in_use);
     }
     DBG2("\n");
 }
@@ -34,12 +34,12 @@ static void init_buffer_hdr(camio_stream_t* parent, camio_buffer_t* buffer_hdr, 
         ch_word buffer_id, ch_bool readonly){
     buffer_hdr->buffer_len                     = buffer_size;
     buffer_hdr->buffer_start                   = buffer_data;
-    buffer_hdr->_internal.__buffer_id          = buffer_id;
-    buffer_hdr->_internal.__buffer_parent      = parent;
-    buffer_hdr->_internal.__do_auto_release    = false;
-    buffer_hdr->_internal.__in_use             = false;
-    buffer_hdr->_internal.__pool_id            = 0;
-    buffer_hdr->_internal.__read_only          = readonly;
+    buffer_hdr->__internal.__buffer_id         = buffer_id;
+    buffer_hdr->__internal.__buffer_parent     = parent;
+    buffer_hdr->__internal.__do_auto_release   = false;
+    buffer_hdr->__internal.__in_use            = false;
+    buffer_hdr->__internal.__pool_id           = 0;
+    buffer_hdr->__internal.__read_only         = readonly;
 }
 
 
@@ -131,17 +131,17 @@ camio_error_t buffer_malloc_linear_acquire(buffer_malloc_linear_t* lin_buff, cam
     }
 
     const ch_word alloc_head_idx = (alloc_tail_idx + alloc_count) % buffer_count;
-    if(lin_buff->headers[alloc_head_idx]._internal.__in_use){
+    if(lin_buff->headers[alloc_head_idx].__internal.__in_use){
         //Probably some internal logic flaw if this happens!
         return CAMIO_EBUFFINUSE;
     }
 
-    if(lin_buff->headers[alloc_head_idx]._internal.__buffer_id != alloc_head_idx){
+    if(lin_buff->headers[alloc_head_idx].__internal.__buffer_id != alloc_head_idx){
         //Probably some internal logic flaw if this happens!
         return CAMIO_EBUFFERROR;
     }
 
-    lin_buff->headers[alloc_head_idx]._internal.__in_use = true;
+    lin_buff->headers[alloc_head_idx].__internal.__in_use = true;
     lin_buff->alloc_count++;
     *buffer_o = &lin_buff->headers[alloc_head_idx];
     //buffer_malloc_linear_DBG(lin_buff);
@@ -153,11 +153,11 @@ camio_error_t buffer_malloc_linear_release(buffer_malloc_linear_t* lin_buff, cam
 {
     const ch_word alloc_tail_idx = lin_buff->alloc_tail_idx;
 
-    if((*buffer_o)->_internal.__buffer_id != alloc_tail_idx){
+    if((*buffer_o)->__internal.__buffer_id != alloc_tail_idx){
         //You can't free this buffer!
         return CAMIO_EWRONGBUFF;
     }
-    lin_buff->headers[alloc_tail_idx]._internal.__in_use = false;
+    lin_buff->headers[alloc_tail_idx].__internal.__in_use = false;
     lin_buff->alloc_count--;
     lin_buff->alloc_tail_idx = (alloc_tail_idx + 1) % lin_buff->buffer_count;
    // buffer_malloc_linear_DBG(lin_buff);

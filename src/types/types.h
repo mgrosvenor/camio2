@@ -20,7 +20,7 @@
 #include <stdio.h>
 
 #include <deps/chaste/types/types.h>
-#include <src/errors/errors.h>
+#include <src/errors/camio_errors.h>
 
 //Forward declaration, the real definition is found in streams/features.h
 struct camio_stream_s;

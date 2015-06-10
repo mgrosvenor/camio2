@@ -16,11 +16,11 @@
 
 //TODO XXX: Rename this to "transport state" to make the naming consistent.
 
-define_ch_vector(CAMIO_STREAM_STATE_VEC,camio_stream_state_t)
+define_ch_vector(CAMIO_STREAM_STATE_VEC,camio_transport_state_t)
 
 //Compare only the key in the key_value pair, as this is the useful thing
 //TODO XXX: Port this to using the chaste generic hash map ... when it exists
-define_ch_vector_compare(CAMIO_STREAM_STATE_VEC,camio_stream_state_t)
+define_ch_vector_compare(CAMIO_STREAM_STATE_VEC,camio_transport_state_t)
 {
 
     if(lhs->scheme_len < rhs->scheme_len){
