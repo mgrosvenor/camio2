@@ -38,17 +38,20 @@ static camio_error_t construct(void** params, ch_word params_size, camio_connect
 
 void udp_init()
 {
+
+    DBG("Initializing UDP...\n");
     CH_VECTOR(CAMIO_TRANSPORT_PARAMS_VEC)* params = CH_VECTOR_NEW(CAMIO_TRANSPORT_PARAMS_VEC,256,NULL);
     if(!params){
         return; // No memory. Can't register this transport
     }
 
     add_param_required(params,"rd_address",udp_params_t,rd_address);
-    add_param_required(params,"rw_address",udp_params_t,wr_address);
-    add_param_required(params,"rd_protocol",udp_params_t,wr_address);
-    add_param_required(params,"rw_protocol",udp_params_t,wr_address);
+    add_param_required(params,"wr_address",udp_params_t,wr_address);
+    add_param_required(params,"rd_protocol",udp_params_t,rd_protocol);
+    add_param_required(params,"wr_protocol",udp_params_t,wr_protocol);
 
     char* temp; //TODO XXX BUG THIS IS BROKEN. PLACE HOLDER TO GET THINGS TO COMPILE
 
     register_new_transport(scheme,strlen(scheme),&temp,construct,sizeof(udp_params_t),params,0);
+    DBG("Initializing UDP...Done\n");
 }

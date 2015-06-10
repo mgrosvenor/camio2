@@ -36,6 +36,8 @@ camio_t* init_camio()
     camio_init_all_transports();
 
     __camio_state_container.is_initialized = true;
+
+    DBG("Initializing CamIO 2.0...Done\n");
     return &__camio_state_container;
 }
 
@@ -59,23 +61,30 @@ camio_error_t register_new_transport(
 )
 {
 
+    DBG("got params=%p\n", params);
     //First check that the scheme hasn't already been registered
     CH_VECTOR(CAMIO_TRANSPORT_STATE_VEC)* trans_state = __camio_state_container.trans_state;
 
-    camio_transport_state_t state = {
+    camio_transport_state_t tmp = {
         .scheme             = scheme,
-        .scheme_len         = scheme_len,
-        .hierarchical       = hierarchical,
-        .param_struct_size  = param_struct_size,
-        .params             = params,
-        .construct          = construct,
-        .global_store_size  = global_store_size,
-        .global_store       = NULL
+        .scheme_len         = scheme_len
     };
 
-    camio_transport_state_t* found = trans_state->find(trans_state,trans_state->first,trans_state->end,state);
+    camio_transport_state_t* found = trans_state->find(trans_state,trans_state->first,trans_state->end,tmp);
 
     if(NULL == found){//Transport has not yet been registered
+
+        camio_transport_state_t state = {
+            .scheme             = scheme,
+            .scheme_len         = scheme_len,
+            .hierarchical       = hierarchical,
+            .param_struct_size  = param_struct_size,
+            .params             = params,
+            .construct          = construct,
+            .global_store_size  = global_store_size,
+            .global_store       = NULL
+        };
+
 
         //If the transport wants a global store, allocate it
         if(global_store_size > 0){
@@ -85,7 +94,12 @@ camio_error_t register_new_transport(
             }
         }
 
+        DBG("Pushing transport state back. Params=%p\n", state.params);
         trans_state->push_back(trans_state,state);
+
+    }
+    else{
+        return CAMIO_EINVALID;
     }
 
     return CAMIO_ENOERROR;
@@ -98,6 +112,7 @@ camio_error_t register_new_transport(
 
 camio_error_t camio_transport_params_new( ch_cstr uri_str, void** params_o, ch_word* params_size_o, ch_word* id_o )
 {
+    DBG("Making new params\n");
     if(!__camio_state_container.is_initialized){
         init_camio();
     }
@@ -105,38 +120,56 @@ camio_error_t camio_transport_params_new( ch_cstr uri_str, void** params_o, ch_w
     //Try to parse the URI. Does it make sense?
     camio_uri_t* uri;
     camio_error_t err = parse_uri(uri_str,&uri);
-    if(err){
-        return err;
-    }
+    if(err){ return err; }
+    DBG("Parsed URI\n");
+    DBG("Got Scheme :%.*s\n", uri->scheme_name_len, uri->scheme_name );
 
     //Parsing gives us a scheme. Now check that the scheme has been registered and find it if it has
     CH_VECTOR(CAMIO_TRANSPORT_STATE_VEC)* trans_state = __camio_state_container.trans_state;
-    camio_transport_state_t  state = { 0 };
-    state.scheme     = uri->scheme_name;
-    state.scheme_len = uri->scheme_name_len;
-    camio_transport_state_t* found = trans_state->find(trans_state,trans_state->first,trans_state->end,state);
-    if(NULL == found){//transport has not yet been registered
+    camio_transport_state_t  tmp = { 0 };
+    tmp.scheme     = uri->scheme_name;
+    tmp.scheme_len = uri->scheme_name_len;
+    camio_transport_state_t* state = trans_state->find(trans_state,trans_state->first,trans_state->end, tmp);
+    if(NULL == state){//transport has not yet been registered
         return CAMIO_NOTIMPLEMENTED;
     }
-
+    DBG("Got state scheme:%.*s\n", state->scheme_len, state->scheme);
 
     //There is a valid scheme -> transport mapping. Now make a parameters structure and try to populate it
-    char* params_struct = calloc(1, state.param_struct_size);
+    char* params_struct = calloc(1, state->param_struct_size);
+
 
     //iterate over the parameters list
-    CH_VECTOR(CAMIO_TRANSPORT_PARAMS_VEC)* params = state.params;
+    CH_VECTOR(CAMIO_TRANSPORT_PARAMS_VEC)* params = state->params;
+    CH_LIST(KV)* uri_opts = uri->key_vals;
+    DBG("Iterating over %ll parameters...\n", params->count);
     for( camio_transport_param_t* param = params->first;
          param != params->end;
          param = params->next(params,param) )
     {
-        DBG("%s", param->param_name);
+        DBG("PARAM: %s\n", param->param_name);
+        key_val kv = {
+           .key = param->param_name,
+           .key_len = strlen(param->param_name)
+        };
+
+        CH_LIST_IT(KV) first = uri_opts->first(uri_opts);
+        CH_LIST_IT(KV) last  = uri_opts->last(uri_opts);
+        CH_LIST_IT(KV) found = uri_opts->find(uri_opts,&first, &last, kv);
+        if(found.value){
+            DBG("PARAM=%s VALUE=%.*s\n", param->param_name, found.value->value_len, found.value->value);
+        }
+        else{
+            DBG("PARAM=%s NOT FOUND!\n", param->param_name);
+            return CAMIO_EINVALID;
+        }
     }
 
 
     //Output the things that we care about
     *params_o      = params_struct;
-    *params_size_o = state.param_struct_size;
-    *id_o = trans_state->get_idx(trans_state,found);
+    *params_size_o = state->param_struct_size;
+    *id_o = trans_state->get_idx(trans_state,state);
 //    //TODO XXX:Should check the features here!!
 //    if(features){
 //        return CAMIO_NOTIMPLEMENTED;
