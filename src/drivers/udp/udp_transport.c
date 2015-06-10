@@ -45,10 +45,11 @@ void udp_init()
         return; // No memory. Can't register this transport
     }
 
+
+    add_param_required(params,"wr_protocol",udp_params_t,wr_protocol);
+    add_param_required(params,"rd_protocol",udp_params_t,rd_protocol);
     add_param_required(params,"rd_address",udp_params_t,rd_address);
     add_param_required(params,"wr_address",udp_params_t,wr_address);
-    add_param_required(params,"rd_protocol",udp_params_t,rd_protocol);
-    add_param_required(params,"wr_protocol",udp_params_t,wr_protocol);
 
     char* temp; //TODO XXX BUG THIS IS BROKEN. PLACE HOLDER TO GET THINGS TO COMPILE
 

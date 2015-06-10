@@ -142,22 +142,21 @@ camio_error_t camio_transport_params_new( ch_cstr uri_str, void** params_o, ch_w
     //iterate over the parameters list
     CH_VECTOR(CAMIO_TRANSPORT_PARAMS_VEC)* params = state->params;
     CH_LIST(KV)* uri_opts = uri->key_vals;
-    DBG("Iterating over %ll parameters...\n", params->count);
+    DBG("Iterating over %i parameters...\n", params->count);
     for( camio_transport_param_t* param = params->first;
          param != params->end;
          param = params->next(params,param) )
     {
-        DBG("PARAM: %s\n", param->param_name);
         key_val kv = {
            .key = param->param_name,
            .key_len = strlen(param->param_name)
         };
 
         CH_LIST_IT(KV) first = uri_opts->first(uri_opts);
-        CH_LIST_IT(KV) last  = uri_opts->last(uri_opts);
-        CH_LIST_IT(KV) found = uri_opts->find(uri_opts,&first, &last, kv);
+        CH_LIST_IT(KV) end   = uri_opts->end(uri_opts);
+        CH_LIST_IT(KV) found = uri_opts->find(uri_opts,&first, &end, kv);
         if(found.value){
-            DBG("PARAM=%s VALUE=%.*s\n", param->param_name, found.value->value_len, found.value->value);
+            DBG("PARAM=%s VALUE=%.*s OFFSET=%lli\n", param->param_name, found.value->value_len, found.value->value, param->param_struct_offset);
         }
         else{
             DBG("PARAM=%s NOT FOUND!\n", param->param_name);

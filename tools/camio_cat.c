@@ -28,7 +28,7 @@ int main(int argc, char** argv)
     void* params;
     ch_word params_size;
     ch_word id;
-    camio_transport_params_new("udp:127.0.0.1?rd_address=localhost?rd_protocol=3000?wr_address=localhost?wr_protocol=4000",&params, &params_size, &id);
+    camio_transport_params_new("udp:127.0.0.1?rd_address=localhost?rd_protocol=3000?wr_protocol=4000?wr_address=localhost",&params, &params_size, &id);
 
     exit(1);
     //Use the parameters structure to construct a new connector object
