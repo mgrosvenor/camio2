@@ -15,7 +15,7 @@
 #include <src/drivers/udp/udp_transport.h>
 #include "../../camio.h"
 #include "../../camio_debug.h"
-#include <src/types/transport_opts_vec.h>
+#include <src/types/transport_params_vec.h>
 
 static const char* const scheme = "udp";
 
@@ -38,7 +38,7 @@ static camio_error_t construct(void** params, ch_word params_size, camio_connect
 
 void udp_init()
 {
-    CH_VECTOR(CAMIO_TRANSPORT_OPT_VEC)* params = CH_VECTOR_NEW(CAMIO_TRANSPORT_OPT_VEC,256,NULL);
+    CH_VECTOR(CAMIO_TRANSPORT_PARAMS_VEC)* params = CH_VECTOR_NEW(CAMIO_TRANSPORT_PARAMS_VEC,256,NULL);
     if(!params){
         return; // No memory. Can't register this transport
     }

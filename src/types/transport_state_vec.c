@@ -12,15 +12,15 @@
 
 #include "../types/types.h"
 #include "../../deps/chaste/data_structs/vector/vector_typed_define_template.h"
-#include "stream_state_vec.h"
+#include "transport_state_vec.h"
 
 //TODO XXX: Rename this to "transport state" to make the naming consistent.
 
-define_ch_vector(CAMIO_STREAM_STATE_VEC,camio_transport_state_t)
+define_ch_vector(CAMIO_TRANSPORT_STATE_VEC,camio_transport_state_t)
 
-//Compare only the key in the key_value pair, as this is the useful thing
+//Compare only the scheme name and length
 //TODO XXX: Port this to using the chaste generic hash map ... when it exists
-define_ch_vector_compare(CAMIO_STREAM_STATE_VEC,camio_transport_state_t)
+define_ch_vector_compare(CAMIO_TRANSPORT_STATE_VEC,camio_transport_state_t)
 {
 
     if(lhs->scheme_len < rhs->scheme_len){

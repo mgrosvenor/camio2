@@ -14,20 +14,20 @@
 
 #include <src/api/api.h>
 #include <stdint.h>
-#include <src/types/stream_state_vec.h>
-#include <src/types/transport_opts_vec.h>
+#include <src/types/transport_state_vec.h>
+#include <src/types/transport_params_vec.h>
 
 
 //Container for all CamIO state
 typedef struct camio_s {
-    ch_bool is_initialized;                             //Has the CamIO state been initialized?
-    CH_VECTOR(CAMIO_STREAM_STATE_VEC)* stream_state;    //Container for all of the streams to be registered. For the moment
-                                                        //TODO XXX: this is a vector, but it should be a hashmap for faster
-                                                        //lookup times. It's not currently expected that transport lookup
-                                                        //will be a major bottleneck in system performance since the number
-                                                        //of transports will be relatively small (<1000) and the lookups to
-                                                        //mappings between string and binary representations will be
-                                                        //infrequent. Revisit if these assumptions change.
+    ch_bool is_initialized;                            //Has the CamIO state been initialized?
+    CH_VECTOR(CAMIO_TRANSPORT_STATE_VEC)* trans_state; //Container for all of the transports to be registered. For the moment
+                                                       //TODO XXX: this is a vector, but it should be a hashmap for faster
+                                                       //lookup times. It's not currently expected that transport lookup
+                                                       //will be a major bottleneck in system performance since the number
+                                                       //of transports will be relatively small (<1000) and the lookups to
+                                                       //mappings between string and binary representations will be
+                                                       //infrequent. Revisit if these assumptions change.
 } camio_t;
 
 extern camio_t __camio_state_container;
@@ -53,7 +53,7 @@ camio_error_t register_new_transport(
     ch_cstr* hierarchical,
     camio_construct_f construct,
     ch_word param_struct_size,
-    CH_VECTOR(CAMIO_TRANSPORT_OPT_VEC)* params,
+    CH_VECTOR(CAMIO_TRANSPORT_PARAMS_VEC)* params,
     ch_word global_store_size
 );
 

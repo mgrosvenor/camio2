@@ -15,7 +15,7 @@
 #include "camio.h"
 #include "camio_debug.h"
 #include "camio_init_all.h"
-#include <src/types/stream_state_vec.h>
+#include <src/types/transport_state_vec.h>
 #include <src/utils/uri_parser/uri_parser.h>
 #include <src/errors/camio_errors.h>
 
@@ -26,11 +26,11 @@ camio_t* init_camio()
 {
     DBG("Initializing CamIO 2.0...\n");
 
-    //Set up the stream state list, this should really be a hashmap one day....
-    CH_VECTOR(CAMIO_STREAM_STATE_VEC)* stream_state =
-        CH_VECTOR_NEW(CAMIO_STREAM_STATE_VEC,1024,CH_VECTOR_CMP(CAMIO_STREAM_STATE_VEC));
+    //Set up the transport state list, this could be a hashmap one day....
+    CH_VECTOR(CAMIO_TRANSPORT_STATE_VEC)* trans_state =
+        CH_VECTOR_NEW(CAMIO_TRANSPORT_STATE_VEC,1024,CH_VECTOR_CMP(CAMIO_TRANSPORT_STATE_VEC));
 
-    __camio_state_container.stream_state = stream_state;
+    __camio_state_container.trans_state = trans_state;
 
     camio_init_all_transports();
 
@@ -53,27 +53,26 @@ camio_error_t register_new_transport(
     ch_cstr* hierarchical,
     camio_construct_f construct,
     ch_word param_struct_size,
-    CH_VECTOR(CAMIO_TRANSPORT_OPT_VEC)* params,
+    CH_VECTOR(CAMIO_TRANSPORT_PARAMS_VEC)* params,
     ch_word global_store_size
 )
 {
 
-    (void)hierarchical;
-    (void)param_struct_size;
-    (void)params;
-
     //First check that the scheme hasn't already been registered
-    CH_VECTOR(CAMIO_STREAM_STATE_VEC)* stream_state = __camio_state_container.stream_state;
+    CH_VECTOR(CAMIO_TRANSPORT_STATE_VEC)* trans_state = __camio_state_container.trans_state;
 
     camio_transport_state_t state = {
         .scheme             = scheme,
         .scheme_len         = scheme_len,
+        .hierarchical       = hierarchical,
+        .param_struct_size  = param_struct_size,
+        .params             = params,
         .construct          = construct,
         .global_store_size  = global_store_size,
         .global_store       = NULL
     };
 
-    camio_transport_state_t* found = stream_state->find(stream_state,stream_state->first,stream_state->end,state);
+    camio_transport_state_t* found = trans_state->find(trans_state,trans_state->first,trans_state->end,state);
 
     if(NULL == found){//Transport has not yet been registered
 
@@ -85,7 +84,7 @@ camio_error_t register_new_transport(
             }
         }
 
-        stream_state->push_back(stream_state,state);
+        trans_state->push_back(trans_state,state);
     }
 
     return CAMIO_ENOERROR;
@@ -95,47 +94,78 @@ camio_error_t register_new_transport(
 
 
 
-camio_error_t new_camio_transport_generic(ch_ccstr scheme, ch_word scheme_len, camio_transport_features_t* features,
-    camio_transport_state_t** found)
+
+camio_error_t camio_transport_params_new( ch_cstr uri_str, void** params_o, ch_word* params_size_o, ch_word* id_o )
 {
     if(!__camio_state_container.is_initialized){
         init_camio();
     }
 
+    //Try to parse the URI. Does it make sense?
+    camio_uri_t* uri;
+    camio_error_t err = parse_uri(uri_str,&uri);
+    if(err){
+        return err;
+    }
 
-    //Now check that the scheme has been registered
-    CH_VECTOR(CAMIO_STREAM_STATE_VEC)* stream_state = __camio_state_container.stream_state;
-
-    camio_transport_state_t state = {
-        .scheme             = scheme,
-        .scheme_len         = scheme_len,
-        .construct          = NULL,
-        .global_store_size  = 0,
-        .global_store       = NULL
-    };
-
-    *found = stream_state->find(stream_state,stream_state->first,stream_state->end,state);
-
-    if(NULL == found){//stream has not yet been registered
+    //Parsing gives us a scheme. Now check that the scheme has been registered and find it if it has
+    CH_VECTOR(CAMIO_TRANSPORT_STATE_VEC)* trans_state = __camio_state_container.trans_state;
+    camio_transport_state_t  state = { 0 };
+    state.scheme     = uri->scheme_name;
+    state.scheme_len = uri->scheme_name_len;
+    camio_transport_state_t* found = trans_state->find(trans_state,trans_state->first,trans_state->end,state);
+    if(NULL == found){//transport has not yet been registered
         return CAMIO_NOTIMPLEMENTED;
     }
 
-    //TODO XXX:Should check the features here!!
-    if(features){
-        return CAMIO_NOTIMPLEMENTED;
-    }
+
+    //There is a valid scheme -> transport mapping. Now make a parameters structure and try to populate it
+    char* params_struct = calloc(1, state.param_struct_size);
+
+
+
+
+    //Output the things that we care about
+    *params_o      = params_struct;
+    *params_size_o = state.param_struct_size;
+    *id_o = trans_state->get_idx(trans_state,found);
+//    //TODO XXX:Should check the features here!!
+//    if(features){
+//        return CAMIO_NOTIMPLEMENTED;
+//    }
+
+    free_uri(&uri); //Don't forget to do this somewhere
+
 
     return CAMIO_ENOERROR;
+}
 
 
+
+camio_error_t camio_transport_constr(ch_word id, void** params, ch_word params_size, camio_connector_t** connector_o)
+{
+    (void)id;
+    (void)params;
+    (void)params_size;
+    (void)connector_o;
+    return 0;
+}
+
+
+
+camio_error_t camio_transport_get_id( ch_cstr scheme_name, ch_word* id_o)
+{
+    (void)scheme_name;
+    (void)id_o;
+    return 0;
 }
 
 
 camio_error_t camio_transport_get_global(ch_ccstr scheme, void** global_store)
 {
 
-    //Find the stream
-    CH_VECTOR(CAMIO_STREAM_STATE_VEC)* stream_state = __camio_state_container.stream_state;
+    //Find the transport
+    CH_VECTOR(CAMIO_TRANSPORT_STATE_VEC)* trans_state = __camio_state_container.trans_state;
 
     camio_transport_state_t state = {
         .scheme             = scheme,
@@ -146,9 +176,9 @@ camio_error_t camio_transport_get_global(ch_ccstr scheme, void** global_store)
     };
 
 
-    camio_transport_state_t* found = stream_state->find(stream_state,stream_state->first,stream_state->end,state);
+    camio_transport_state_t* found = trans_state->find(trans_state,trans_state->first,trans_state->end,state);
 
-    if(NULL == found){//stream has not yet been registered
+    if(NULL == found){//transport has not yet been registered
         return CAMIO_EINDEXNOTFOUND;
     }
 
@@ -158,24 +188,5 @@ camio_error_t camio_transport_get_global(ch_ccstr scheme, void** global_store)
 
 }
 
-
-
-camio_error_t camio_transport_params_new( ch_cstr uri, void** params_o, ch_word* params_size_o, ch_word* id_o )
-{
-    (void)uri;
-    (void)params_o;
-    (void)params_size_o;
-    (void)id_o;
-    return 0;
-}
-
-camio_error_t camio_transport_constr(ch_word id, void** params, ch_word params_size, camio_connector_t** connector_o)
-{
-    (void)id;
-    (void)params;
-    (void)params_size;
-    (void)connector_o;
-    return 0;
-}
 
 
