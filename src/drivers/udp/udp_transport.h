@@ -12,7 +12,7 @@
 #define SRC_DRIVERS_UDP_UDP_TRANSPORT_H_
 
 #include <src/drivers/udp/udp_connector.h>
-
+#include <src/types/len_string.h>
 
 typedef struct udp_global_s{
     ch_bool is_init;
@@ -21,11 +21,11 @@ typedef struct udp_global_s{
 
 
 typedef struct {
-    ch_cstr hierarchical;
-    ch_cstr rd_address;
-    ch_cstr wr_address;
-    ch_cstr rd_protocol;
-    ch_cstr wr_protocol;
+    len_string_t hierarchical;
+    len_string_t rd_address;
+    len_string_t wr_address;
+    len_string_t rd_protocol;
+    len_string_t wr_protocol;
 } udp_params_t;
 
 void udp_init();

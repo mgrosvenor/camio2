@@ -35,7 +35,12 @@ declare_add_param_opt(ch_cstr,CAMIO_TRANSPORT_PARAMS_TYPE_LSTRING)
     opt.param_name                  = param_name;
     opt.param_struct_offset         = param_struct_offset;
     opt.type                        = CAMIO_TRANSPORT_PARAMS_TYPE_LSTRING;
-    len_string_t tmp = { default_val, strlen(default_val) };
+    len_string_t tmp = {
+            .str = {0},
+            .str_max = LSTRING_MAX,
+            .str_len = strlen(default_val),
+    };
+    strncpy(tmp.str,default_val, tmp.str_max);
     opt.default_val.len_string_t_val = tmp;
     opts->push_back(opts, opt);
 }

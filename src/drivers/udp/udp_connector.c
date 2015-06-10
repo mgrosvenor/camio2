@@ -36,10 +36,7 @@
 typedef struct udp_priv_s {
 
     //Parameters used when a connection happens
-    char rd_address[CAMIO_UDP_MAX_ADDR_STR];
-    char wr_address[CAMIO_UDP_MAX_ADDR_STR];
-    char rd_prot[CAMIO_UDP_MAX_PROT_STR];
-    char wr_prot[CAMIO_UDP_MAX_PROT_STR];
+    udp_params_t* params;
 
     //Local state for each socket
     int rd_fd;
@@ -57,12 +54,7 @@ static camio_error_t udp_construct(camio_connector_t* this, void** params, ch_wo
         return CAMIO_EINVALID;
     }
     udp_params_t* udp_params = (udp_params_t*)(*params);
-
-    //Do I really need to save this? I could do the connect here? Hmm. Not as neat, but will perform better
-    strncpy(priv->rd_address,udp_params->rd_address,CAMIO_UDP_MAX_ADDR_STR);
-    strncpy(priv->wr_address,udp_params->wr_address,CAMIO_UDP_MAX_ADDR_STR);
-    strncpy(priv->rd_prot,udp_params->rd_protocol,CAMIO_UDP_MAX_PROT_STR);
-    strncpy(priv->wr_prot,udp_params->wr_protocol,CAMIO_UDP_MAX_PROT_STR);
+    priv->params = udp_params;
 
     //OK we're done with this now.
     free(*params);
@@ -75,6 +67,7 @@ static camio_error_t udp_construct(camio_connector_t* this, void** params, ch_wo
 static void udp_destroy(camio_connector_t* this)
 {
     udp_connector_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
+    if(priv->params) { free(priv->params); }
     free(priv);
 }
 
@@ -152,12 +145,12 @@ static camio_error_t udp_connect(camio_connector_t* this, camio_stream_t** strea
     DBG("Stream address=%p (%p)\n",stream, *stream_o);
 
     //Parse up the address and port/protocol
-    if(priv->rd_address && priv->rd_prot){
-        resolve_bind_connect(priv->rd_address,priv->rd_prot,true,false, &priv->rd_fd);
+    if(priv->params->rd_address.str && priv->params->rd_protocol.str){
+        resolve_bind_connect(priv->params->rd_address.str,priv->params->rd_protocol.str,true,false, &priv->rd_fd);
     }
 
-    if(priv->wr_address && priv->wr_prot){
-        resolve_bind_connect(priv->wr_address,priv->wr_prot,false, true, &priv->wr_fd);
+    if(priv->params->wr_address.str && priv->params->wr_protocol.str){
+        resolve_bind_connect(priv->params->wr_address.str,priv->params->wr_protocol.str,false, true, &priv->wr_fd);
     }
 
     DBG("Done connecting, now constructing UDP stream...\n");

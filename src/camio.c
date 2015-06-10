@@ -21,7 +21,7 @@
 #include <src/errors/camio_errors.h>
 #include <deps/chaste/parsing/numeric_parser.h>
 #include <deps/chaste/parsing/bool_parser.h>
-
+#include <deps/chaste/utils/util.h>
 
 
 
@@ -118,11 +118,14 @@ camio_error_t camio_transport_params_new( ch_cstr uri_str, void** params_o, ch_w
     if(!__camio_state_container.is_initialized){
         init_camio();
     }
+    camio_error_t result = CAMIO_ENOERROR;
 
     //Try to parse the URI. Does it make sense?
     camio_uri_t* uri;
-    camio_error_t err = parse_uri(uri_str,&uri);
-    if(err){ return err; }
+    result = parse_uri(uri_str,&uri);
+    if(result != CAMIO_ENOERROR){
+        goto exit_uri;
+    }
     DBG("Parsed URI\n");
     DBG("Got Scheme :%.*s\n", uri->scheme_name_len, uri->scheme_name );
 
@@ -133,7 +136,8 @@ camio_error_t camio_transport_params_new( ch_cstr uri_str, void** params_o, ch_w
     tmp.scheme_len = uri->scheme_name_len;
     camio_transport_state_t* state = trans_state->find(trans_state,trans_state->first,trans_state->end, tmp);
     if(NULL == state){//transport has not yet been registered
-        return CAMIO_NOTIMPLEMENTED;
+        result = CAMIO_NOTIMPLEMENTED;
+        goto exit_uri;
     }
     DBG("Got state scheme:%.*s\n", state->scheme_len, state->scheme);
 
@@ -170,7 +174,9 @@ camio_error_t camio_transport_params_new( ch_cstr uri_str, void** params_o, ch_w
                     if(num_result.type == CH_UINT64)        { *param_ptr = num_result.val_uint; }
                     else{
                         DBG("Expected a UINT64 but got %*.s ", value_len, value);
-                        return CAMIO_EINVALID; //TODO XXX make a better return value
+                        result = CAMIO_EINVALID; //TODO XXX make a better return value
+                        goto exit_params;
+
                     }
                     break;
                 }
@@ -182,7 +188,8 @@ camio_error_t camio_transport_params_new( ch_cstr uri_str, void** params_o, ch_w
                     else if( num_result.type != CH_INT64)   { *param_ptr = num_result.val_int; }
                     else{
                         DBG("Expected a INT64 but got %*.s ", value_len, value);
-                        return CAMIO_EINVALID; //TODO XXX make a better return value
+                        result = CAMIO_EINVALID; //TODO XXX make a better return value
+                        goto exit_params;
                     }
                     break;
                 }
@@ -195,7 +202,8 @@ camio_error_t camio_transport_params_new( ch_cstr uri_str, void** params_o, ch_w
                     else if( num_result.type != CH_DOUBLE)  { *param_ptr = num_result.val_dble; }
                     else{
                         DBG("Expected a DOUBLE but got %*.s ", value_len, value);
-                        return CAMIO_EINVALID; //TODO XXX make a better return value
+                        result = CAMIO_EINVALID; //TODO XXX make a better return value
+                        goto exit_params;
                     }
                     break;
                 }
@@ -203,57 +211,84 @@ camio_error_t camio_transport_params_new( ch_cstr uri_str, void** params_o, ch_w
                 case CAMIO_TRANSPORT_PARAMS_TYPE_LSTRING:{
                     void* params_struct_value = &params_struct[param->param_struct_offset];
                     len_string_t* param_ptr = (len_string_t*)params_struct_value;
-                    param_ptr->str = value;
+                    strncpy(param_ptr->str, value, MIN(param_ptr->str_max,value_len));
                     param_ptr->str_len = value_len;
                     break;
                 }
                 default:{
                     DBG("EEEK! This is an internal error. Unknown type. Did you use the right CAMIO_TRANSPORT_PARAMS_XXX?");
-                    return CAMIO_EINVALID; //TODO XXX make a better return value
+                    result = CAMIO_EINVALID; //TODO XXX make a better return value
+                    goto exit_params;
+
                 }
             }
         }
         else{
-            //if()
-            DBG("PARAM=%s NOT FOUND!\n", param->param_name);
-            return CAMIO_EINVALID;
+            if(param->opt_mode == CAMIO_TRANSPORT_PARAMS_MODE_REQUIRED){
+                DBG("PARAM=%s NOT FOUND!\n", param->param_name);
+                result = CAMIO_EINVALID; //TODO XXX make a better return value
+                goto exit_params;
+            }
         }
     }
+
+
+    //    //TODO check the features here??
+    //    if(features){
+    //        return CAMIO_NOTIMPLEMENTED;
+    //    }
 
 
     //Output the things that we care about
     *params_o      = params_struct;
     *params_size_o = state->param_struct_size;
     *id_o = trans_state->get_idx(trans_state,state);
-//    //TODO XXX:Should check the features here!!
-//    if(features){
-//        return CAMIO_NOTIMPLEMENTED;
-//    }
-
-    //free_uri(&uri); //Don't forget to do this somewhere -- but be carefull, there may be strings lying around. Hmm.
-
-
     return CAMIO_ENOERROR;
+
+
+exit_params:
+    free(params_struct);
+
+exit_uri:
+    free_uri(&uri);
+
+    //Stick some "sane" values in here
+    *params_o      = NULL;
+    *params_size_o = 0;
+    *id_o = -1;
+
+    return result;
 }
 
 
 
 camio_error_t camio_transport_constr(ch_word id, void** params, ch_word params_size, camio_connector_t** connector_o)
 {
-    (void)id;
-    (void)params;
-    (void)params_size;
-    (void)connector_o;
-    return 0;
+    CH_VECTOR(CAMIO_TRANSPORT_STATE_VEC)* trans_state = __camio_state_container.trans_state;
+    camio_transport_state_t* state = trans_state->off(trans_state,id);
+    if(state == NULL){
+        return CAMIO_EINDEXNOTFOUND;
+    }
+
+    return state->construct(params,params_size,connector_o);
 }
 
 
 
 camio_error_t camio_transport_get_id( ch_cstr scheme_name, ch_word* id_o)
 {
-    (void)scheme_name;
-    (void)id_o;
-    return 0;
+    CH_VECTOR(CAMIO_TRANSPORT_STATE_VEC)* trans_state = __camio_state_container.trans_state;
+    camio_transport_state_t  tmp = { 0 };
+    tmp.scheme     = scheme_name;
+    tmp.scheme_len = strlen(scheme_name);
+    camio_transport_state_t* state = trans_state->find(trans_state,trans_state->first,trans_state->end, tmp);
+    if(NULL == state){//transport has not yet been registered
+        return CAMIO_NOTIMPLEMENTED;
+    }
+    DBG("Got state scheme:%.*s\n", state->scheme_len, state->scheme);
+
+    *id_o = trans_state->get_idx(trans_state,state);
+    return CAMIO_ENOERROR;
 }
 
 
@@ -270,7 +305,6 @@ camio_error_t camio_transport_get_global(ch_ccstr scheme, void** global_store)
         .global_store_size  = 0,
         .global_store       = NULL
     };
-
 
     camio_transport_state_t* found = trans_state->find(trans_state,trans_state->first,trans_state->end,state);
 

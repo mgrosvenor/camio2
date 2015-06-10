@@ -12,7 +12,8 @@
 #define TRANSPORT_PARAMS_VEC_H_
 
 #include "types.h"
-#include "../../deps/chaste/data_structs/vector/vector_typed_declare_template.h"
+#include <deps/chaste/data_structs/vector/vector_typed_declare_template.h>
+#include <src/types/len_string.h>
 
 typedef enum {
     CAMIO_TRANSPORT_PARAMS_MODE_REQUIRED,
@@ -27,10 +28,7 @@ typedef enum {
     CAMIO_TRANSPORT_PARAMS_TYPE_LSTRING,
 } camio_transport_param_type_e;
 
-typedef struct {
-    ch_cstr str;
-    ch_word str_len;
-} len_string_t;
+
 
 typedef struct {
     camio_transport_param_mode_e opt_mode;
@@ -108,7 +106,7 @@ declare_add_param_req(TYPE,CAMIO_TYPE)\
                 uint64_t    : add_param_uint64_t_opt \
                 int64_t     : add_param_int64_t_opt \
                 double      : add_param_double_opt \
-                ch_cstr     : add_param_ch_cstr_opt \
+                len_string_t: add_param_ch_cstr_opt \
         )(params_vec, param_name, offsetof(param_struct, param_struct_member), true, default_val)
 
 
@@ -118,7 +116,7 @@ declare_add_param_req(TYPE,CAMIO_TYPE)\
                 uint64_t    : add_param_uint64_t_req, \
                 int64_t     : add_param_int64_t_req, \
                 double      : add_param_double_req, \
-                ch_cstr     : add_param_ch_cstr_req \
+                len_string_t: add_param_ch_cstr_req \
         )(params_vec, param_name, offsetof(param_struct_type, param_struct_member_name))
 
 
