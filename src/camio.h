@@ -50,7 +50,7 @@ camio_t* init_camio();
 camio_error_t register_new_transport(
     ch_ccstr scheme,
     ch_word scheme_len,
-    ch_cstr* hierarchical,
+    ch_word param_struct_hier_offset,
     camio_construct_f construct,
     ch_word param_struct_size,
     CH_VECTOR(CAMIO_TRANSPORT_PARAMS_VEC)* params,

@@ -27,7 +27,7 @@ typedef struct camio_transport_state_s {
 
     camio_construct_f construct;                    // Construct the transport from the parameters given
 
-    ch_cstr* hierarchical;                          //Where should the hierarchical part be kept?
+    ch_word param_struct_hier_offset;               //Where should the hierarchical part be kept in the param struct
 
     ch_word param_struct_size;                      //How big is the transport's parameters structure
     CH_VECTOR(CAMIO_TRANSPORT_PARAMS_VEC)* params;  //Details of each parameter that the transport (optionally) takes

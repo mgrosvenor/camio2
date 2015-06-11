@@ -55,7 +55,7 @@ camio_t* init_camio()
 camio_error_t register_new_transport(
     ch_ccstr scheme,
     ch_word scheme_len,
-    ch_cstr* hierarchical,
+    ch_word param_struct_hier_offset,
     camio_construct_f construct,
     ch_word param_struct_size,
     CH_VECTOR(CAMIO_TRANSPORT_PARAMS_VEC)* params,
@@ -77,14 +77,14 @@ camio_error_t register_new_transport(
     if(NULL == found){//Transport has not yet been registered
 
         camio_transport_state_t state = {
-            .scheme             = scheme,
-            .scheme_len         = scheme_len,
-            .hierarchical       = hierarchical,
-            .param_struct_size  = param_struct_size,
-            .params             = params,
-            .construct          = construct,
-            .global_store_size  = global_store_size,
-            .global_store       = NULL
+            .scheme                     = scheme,
+            .scheme_len                 = scheme_len,
+            .param_struct_hier_offset   = param_struct_hier_offset,
+            .param_struct_size          = param_struct_size,
+            .params                     = params,
+            .construct                  = construct,
+            .global_store_size          = global_store_size,
+            .global_store               = NULL
         };
 
 
@@ -141,6 +141,12 @@ camio_error_t camio_transport_params_new( ch_cstr uri_str, void** params_o, ch_w
 
     //There is a valid scheme -> transport mapping. Now make a parameters structure and try to populate it
     char* params_struct = calloc(1, state->param_struct_size);
+    void* params_struct_value = &params_struct[state->param_struct_hier_offset];
+    len_string_t* param_ptr = (len_string_t*)params_struct_value;
+    DBG("hierarch @ %i =%.*s [%i]\n", state->param_struct_hier_offset, uri->hierarchical_len, uri->hierarchical, uri->hierarchical_len);
+    strncpy(param_ptr->str, uri->hierarchical, MIN(LSTRING_MAX,uri->hierarchical_len));
+    param_ptr->str_len = uri->hierarchical_len;
+
 
     //iterate over the parameters list, checking for parameters
     CH_VECTOR(CAMIO_TRANSPORT_PARAMS_VEC)* params = state->params;
@@ -162,8 +168,8 @@ camio_error_t camio_transport_params_new( ch_cstr uri_str, void** params_o, ch_w
         ch_cstr value           = NULL;
         ch_word value_len       = 0;
         if(found.value){
-            ch_cstr value = found.value->value;
-            ch_word value_len = found.value->value_len;
+            value = found.value->value;
+            value_len = found.value->value_len;
             DBG("PARAM FOUND PARAM=%s VALUE=%.*s OFFSET=%lli\n", param->param_name, value_len, value, param->param_struct_offset);
             num_result  = parse_number(value, value_len); //Just try to parse this as a number in case
         }
@@ -189,9 +195,18 @@ camio_error_t camio_transport_params_new( ch_cstr uri_str, void** params_o, ch_w
             //String are special
             case CAMIO_TRANSPORT_PARAMS_TYPE_LSTRING:{
                 len_string_t* param_ptr = (len_string_t*)params_struct_value;
-                DBG("value=%.*s [%i]\n", value_len, value, value_len);
-                strncpy(param_ptr->str, value, MIN(LSTRING_MAX,value_len));
-                param_ptr->str_len = value_len;
+                if(found.value){ //We got a value, let's try to assign it
+                    DBG("value=%.*s [%i]\n", value_len, value, value_len);
+                    strncpy(param_ptr->str, value, MIN(LSTRING_MAX,value_len));
+                    param_ptr->str_len = value_len;
+                }
+                else{//It must now be true that found.value==NULL && param->mode==CAMIO_TRANSPORT_PARAMS_MODE_OPTIONAL
+                    len_string_t* param_ptr = (len_string_t*)params_struct_value;
+                    DBG("value=%.*s [%i]\n", param->default_val.len_string_t_val.str_len,
+                            param->default_val.len_string_t_val.str, param->default_val.len_string_t_val.str_len);
+                    *param_ptr = param->default_val.len_string_t_val;
+                }
+                param->found = true; //Woo hoo!
                 break;
             }
 

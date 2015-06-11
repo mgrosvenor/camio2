@@ -51,29 +51,82 @@ static camio_error_t udp_construct(camio_connector_t* this, void** params, ch_wo
     udp_connector_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
     //Basic sanity check that the params is the right one.
     if(params_size != sizeof(udp_params_t)){
-        return CAMIO_EINVALID;
+        DBG("Bad paramters structure passed\n");
+        return CAMIO_EINVALID; //TODO XXX : Need better error values
     }
     udp_params_t* udp_params = (udp_params_t*)(*params);
-    priv->params = udp_params;
-    DBG("rd_add=%i, rd_prot=%i, wr_addr=%i, wr_pro=%i\n",
-            udp_params->rd_address.str_len,
-            udp_params->rd_protocol.str_len,
-            udp_params->wr_address.str_len,
-            udp_params->wr_protocol.str_len
-            );
-
-
-    DBG("rd_add=%s, rd_prot=%s, wr_addr=%s, wr_pro=%s\n",
+    DBG("Constructing UDP with parameters: hier=%s, rd_add=%s, rd_prot=%s, wr_addr=%s, wr_pro=%s\n",
+            udp_params->hierarchical.str,
             udp_params->rd_address.str,
             udp_params->rd_protocol.str,
             udp_params->wr_address.str,
             udp_params->wr_protocol.str
-            );
+    );
+
+    if( udp_params->rd_address.str_len  &&
+        udp_params->rd_protocol.str_len &&
+        udp_params->wr_address.str_len  &&
+        udp_params->wr_protocol.str_len &&
+        udp_params->hierarchical.str_len ){
+        DBG("A hierarchical part was supplied, but is not needed because options were supplied too.\n");
+        return CAMIO_EINVALID; //TODO XXX : Need better error values
+    }
 
 
-    //OK we're done with this now.
-    free(*params);
-    *params = NULL;
+    if( udp_params->rd_address.str_len  == 0 ||
+        udp_params->rd_protocol.str_len == 0 ||
+        udp_params->wr_address.str_len  == 0 ||
+        udp_params->wr_protocol.str_len == 0 ){ //We're missing info that we need. See if we can get it
+
+        //We do require a hierarchical part!
+        if(udp_params->hierarchical.str_len == 0){
+            DBG("Expecting a hierarchical part in the UDP URI, but none was given. e.g udp:localhost:2000\n");
+            return CAMIO_EINVALID; //TODO XXX : Need better error values
+        }
+
+        //OK. we've got one, go looking for a protocol mark
+        const char* protocol_mark   = strchr(udp_params->hierarchical.str, ':');
+        const ch_word protocol_len = udp_params->hierarchical.str_len - (protocol_mark - udp_params->hierarchical.str + 1);
+        ch_word address_len  = 0;
+        if(protocol_mark){
+            address_len = protocol_mark - udp_params->hierarchical.str ;
+        }
+        else{
+            address_len = udp_params->hierarchical.str_len;
+        }
+        DBG("Protocol len = %i address len = %i\n", protocol_len, address_len);
+
+        //Copy the addresses if we need them
+        if(udp_params->rd_address.str_len == 0){
+            strncpy(udp_params->rd_address.str, udp_params->hierarchical.str, address_len );
+            udp_params->rd_address.str_len = address_len;
+        }
+
+        //Copy the addresses if we need them
+        if(udp_params->wr_address.str_len == 0){
+            strncpy(udp_params->wr_address.str, udp_params->hierarchical.str, address_len );
+            udp_params->wr_address.str_len = address_len;
+        }
+
+        //Copy the protocols if we have them
+        if( (udp_params->rd_protocol.str_len == 0 || udp_params->wr_protocol.str_len == 0) && protocol_mark == NULL){
+            DBG("Expecting a protocol mark in the UDP URI, but none was given. e.g udp:localhost:2000\n");
+            return CAMIO_EINVALID; //TODO XXX : Need better error values
+        }
+
+        if(udp_params->rd_protocol.str_len == 0){
+            strncpy(udp_params->rd_protocol.str, protocol_mark + 1, protocol_len );
+            udp_params->rd_protocol.str_len = address_len;
+        }
+
+        if(udp_params->wr_protocol.str_len == 0){
+            strncpy(udp_params->wr_protocol.str, protocol_mark + 1, protocol_len );
+            udp_params->wr_protocol.str_len = address_len;
+        }
+    }
+
+    priv->params = udp_params;
+
 
     return CAMIO_ENOERROR;
 }

@@ -103,13 +103,13 @@ declare_add_param_req(TYPE,CAMIO_TYPE)\
 
 //Using the new C11 generic allows me to provide a single, overloaded, typesafe interface to adding options
 //This one adds an "optional" option, which means that it must include a default value, and users may or may not populate it.
-#define add_param_optional(params_vec, param_name, param_struct, param_struct_memeber, default_val)\
-        _Generic( (((type *)0)->member),\
-                uint64_t    : add_param_uint64_t_opt \
-                int64_t     : add_param_int64_t_opt \
-                double      : add_param_double_opt \
+#define add_param_optional(params_vec, param_name, param_struct_type, param_struct_member_name, default_val)\
+        _Generic( (((param_struct_type *)0)->param_struct_member_name),\
+                uint64_t    : add_param_uint64_t_opt, \
+                int64_t     : add_param_int64_t_opt, \
+                double      : add_param_double_opt, \
                 len_string_t: add_param_ch_cstr_opt \
-        )(params_vec, param_name, offsetof(param_struct, param_struct_member), true, default_val)
+        )(params_vec, param_name, offsetof(param_struct_type, param_struct_member_name), default_val)
 
 
 //This one adds a "required" option, which means that it users must populate it, so no default is required

@@ -28,11 +28,20 @@ int main(int argc, char** argv)
     void* params;
     ch_word params_size;
     ch_word id;
-    camio_transport_params_new("udp:127.0.0.1?rd_address=127.0.0.1?rd_protocol=3000?wr_protocol=4000?wr_address=127.0.0.1",&params, &params_size, &id);
+    camio_error_t err = camio_transport_params_new("udp:localhost:2000?wr_protocol=4000",&params, &params_size, &id);
+    if(err){
+        DBG("Could not convert parameters into structure\n");
+        exit(1);
+    }
     DBG("Got parameter at %p with size %i and id=%i\n", params, params_size, id);
 
     //Use the parameters structure to construct a new connector object
-    camio_transport_constr(id,&params,params_size,&connector);
+    err = camio_transport_constr(id,&params,params_size,&connector);
+    if(err){
+        DBG("Could not construct connector\n");
+        exit(1);
+    }
+
 
     DBG("## Got new connector at address %p\n", connector);
     camio_stream_t* stream = NULL;
@@ -45,7 +54,7 @@ int main(int argc, char** argv)
 
         camio_rd_buffer_t* rd_buffer = NULL;
         DBG("buffer_chain = %p &buffer_chain = %p\n", rd_buffer, &rd_buffer);
-        camio_error_t err = 0;
+        err = CAMIO_ENOERROR;
         while( (err = camio_read_acquire(stream, &rd_buffer, 0, 0)) == CAMIO_ETRYAGAIN){
             //Just spin waiting for a new read buffer -- need to make a selector for this....
             //DBG("buffer_chain2 = %p &buffer_chain = %p\n", rd_buffer_chain, &rd_buffer_chain);

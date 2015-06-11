@@ -46,13 +46,13 @@ void udp_init()
     }
 
 
-    add_param_required(params,"wr_protocol",udp_params_t,wr_protocol);
-    add_param_required(params,"rd_protocol",udp_params_t,rd_protocol);
-    add_param_required(params,"rd_address",udp_params_t,rd_address);
-    add_param_required(params,"wr_address",udp_params_t,wr_address);
+    add_param_optional(params,"rd_address",udp_params_t,rd_address,"");
+    add_param_optional(params,"rd_protocol",udp_params_t,rd_protocol, "");
+    add_param_optional(params,"wr_address",udp_params_t,wr_address, "");
+    add_param_optional(params,"wr_protocol",udp_params_t,wr_protocol, "");
+    const ch_word hier_offset = offsetof(udp_params_t,hierarchical);
+    DBG("Hierarchical offset=%i...Done\n", hier_offset);
 
-    char* temp; //TODO XXX BUG THIS IS BROKEN. PLACE HOLDER TO GET THINGS TO COMPILE
-
-    register_new_transport(scheme,strlen(scheme),&temp,construct,sizeof(udp_params_t),params,0);
+    register_new_transport(scheme,strlen(scheme),hier_offset,construct,sizeof(udp_params_t),params,0);
     DBG("Initializing UDP...Done\n");
 }
