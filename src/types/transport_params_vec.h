@@ -31,17 +31,19 @@ typedef enum {
 
 
 typedef struct {
-    camio_transport_param_mode_e opt_mode;
-    ch_cstr param_name;
-    ch_word param_struct_offset;
-    camio_transport_param_type_e type;
-    union {
+    camio_transport_param_mode_e opt_mode;  //Is this an optional or required parameter
+    ch_cstr param_name;                     //What is the text name given in the URI for it?
+    ch_word param_struct_offset;            //How deep in the parameter structure is this found?
+    camio_transport_param_type_e type;      //What type of variable is it, current int, uint, double and string are supported
+    ch_bool found;                          //Has the parser found an instance of this parameter? There should be only 1
+    union {                                 //For optional parameters, we need a default value somewhere
         uint64_t uint64_t_val;
         int64_t int64_t_val;
         double double_val;
         bool bool_val;
         len_string_t len_string_t_val;
     } default_val;
+
 } camio_transport_param_t;
 
 

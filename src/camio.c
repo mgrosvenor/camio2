@@ -110,8 +110,6 @@ camio_error_t register_new_transport(
 
 
 
-
-
 camio_error_t camio_transport_params_new( ch_cstr uri_str, void** params_o, ch_word* params_size_o, ch_word* id_o )
 {
     DBG("Making new params\n");
@@ -150,98 +148,117 @@ camio_error_t camio_transport_params_new( ch_cstr uri_str, void** params_o, ch_w
     DBG("Iterating over %i parameters...\n", params->count);
     for( camio_transport_param_t* param = params->first;
          param != params->end;
-         param = params->next(params,param) )
-    {
+         param = params->next(params,param) ){
 
-        //Search for the key in the key/value uri options list.
+        //Search for the parameter name (ie key) in the key/value uri options list. This should answer the question,
+        //"Was the parameter with a given name present in the URI supplied".
         key_val kv = { .key = param->param_name, .key_len = strlen(param->param_name) };
         CH_LIST_IT(KV) first = uri_opts->first(uri_opts);
         CH_LIST_IT(KV) end   = uri_opts->end(uri_opts);
         CH_LIST_IT(KV) found = uri_opts->find(uri_opts,&first, &end, kv);
 
-        //We found it! OK. try to parse it.
+        //We found it! OK. try to num parse it just in case its a number. If not, this will have no effect.
+        num_result_t num_result = {0};
+        ch_cstr value           = NULL;
+        ch_word value_len       = 0;
         if(found.value){
             ch_cstr value = found.value->value;
             ch_word value_len = found.value->value_len;
-            DBG("PARAM=%s VALUE=%.*s OFFSET=%lli\n", param->param_name, value_len, value, param->param_struct_offset);
-            num_result_t num_result  = parse_number(value, value_len); //Just try to parse this as a number in case
+            DBG("PARAM FOUND PARAM=%s VALUE=%.*s OFFSET=%lli\n", param->param_name, value_len, value, param->param_struct_offset);
+            num_result  = parse_number(value, value_len); //Just try to parse this as a number in case
+        }
 
-            //Now check that the type is right and assign it
-            switch(param->type){
-                case CAMIO_TRANSPORT_PARAMS_TYPE_UINT64:{
-                    void* params_struct_value = &params_struct[param->param_struct_offset];
-                    uint64_t* param_ptr = (uint64_t*)params_struct_value;
-                    if(num_result.type == CH_UINT64)        { *param_ptr = num_result.val_uint; }
-                    else{
+        //Some sanity checking...
+        if(found.value && param->found){ //Oh shit, we already did this before! Can only assign once!
+            DBG("Parameter with name %s already found. You can only assign once!\n", param->param_name);
+            result = CAMIO_EINVALID; //TODO XXX make a better return value
+            goto exit_params;
+        }
+
+        if(!found.value && param->opt_mode == CAMIO_TRANSPORT_PARAMS_MODE_REQUIRED){ //Oh shit this was required!
+            DBG("Parameter with name %s is required but not supplied!\n", param->param_name);
+            result = CAMIO_EINVALID; //TODO XXX make a better return value
+            goto exit_params;
+        }
+
+        //Assuming there is either an option int the URI, or a default value, where will we place the result?
+        void* params_struct_value = &params_struct[param->param_struct_offset];
+
+        //What is the type of the option that the parameter expects?
+        switch(param->type){
+            //String are special
+            case CAMIO_TRANSPORT_PARAMS_TYPE_LSTRING:{
+                len_string_t* param_ptr = (len_string_t*)params_struct_value;
+                DBG("value=%.*s [%i]\n", value_len, value, value_len);
+                strncpy(param_ptr->str, value, MIN(LSTRING_MAX,value_len));
+                param_ptr->str_len = value_len;
+                break;
+            }
+
+            case CAMIO_TRANSPORT_PARAMS_TYPE_UINT64:{
+                uint64_t* param_ptr = (uint64_t*)params_struct_value;
+                if(found.value){ //We got a value, let's try to assign it
+                    if(num_result.type == CH_UINT64) {  *param_ptr = (uint64_t)num_result.val_uint; }
+                    else{ //Shit, the value has the wrong type!
                         DBG("Expected a UINT64 but got %*.s ", value_len, value);
                         result = CAMIO_EINVALID; //TODO XXX make a better return value
                         goto exit_params;
-
                     }
-                    break;
                 }
-                //Promote UINT64 up to INT64 if necessary
-                case CAMIO_TRANSPORT_PARAMS_TYPE_INT64:{
-                    void* params_struct_value = &params_struct[param->param_struct_offset];
-                    int64_t* param_ptr = (int64_t*)params_struct_value;
-                    if(num_result.type == CH_UINT64)        { *param_ptr = num_result.val_uint; }
-                    else if( num_result.type != CH_INT64)   { *param_ptr = num_result.val_int; }
+                else{//It must now be true that found.value==NULL && param->mode==CAMIO_TRANSPORT_PARAMS_MODE_OPTIONAL
+                    *param_ptr = param->default_val.uint64_t_val;
+                }
+                param->found = true; //Woo hoo!
+                break;
+            }
+
+            //Promote UINT64 up to INT64 if necessary
+            case CAMIO_TRANSPORT_PARAMS_TYPE_INT64:{
+                int64_t* param_ptr = (int64_t*)params_struct_value;
+                if(found.value){ //We got a value, let's try to assign it
+                    if(      num_result.type == CH_UINT64)  { *param_ptr = (int64_t)num_result.val_uint; }
+                    else if( num_result.type == CH_INT64)   { *param_ptr = (int64_t)num_result.val_int;  }
                     else{
                         DBG("Expected a INT64 but got %*.s ", value_len, value);
                         result = CAMIO_EINVALID; //TODO XXX make a better return value
                         goto exit_params;
                     }
-                    break;
                 }
-                //Promote UINT64 and INT64 up to DOUBLE if necessary
-                case CAMIO_TRANSPORT_PARAMS_TYPE_DOUBLE:{
-                    void* params_struct_value = &params_struct[param->param_struct_offset];
-                    double* param_ptr = (double*)params_struct_value;
-                    if(num_result.type == CH_UINT64)        { *param_ptr = num_result.val_uint; }
-                    else if( num_result.type != CH_INT64)   { *param_ptr = num_result.val_int; }
-                    else if( num_result.type != CH_DOUBLE)  { *param_ptr = num_result.val_dble; }
+                else{//It must now be true that found.value==NULL && param->mode=CAMIO_TRANSPORT_PARAMS_MODE_OPTIONAL
+                    *param_ptr = param->default_val.int64_t_val;
+                }
+                param->found = true; //Woo hoo!
+                break;
+            }
+
+            //Promote UINT64 and INT64 up to DOUBLE if necessary
+            case CAMIO_TRANSPORT_PARAMS_TYPE_DOUBLE:{
+                double* param_ptr = (double*)params_struct_value;
+                if(found.value){ //We got a value, let's try to assign it
+                    if(      num_result.type == CH_UINT64)  { *param_ptr = (double)num_result.val_uint; }
+                    else if( num_result.type == CH_INT64)   { *param_ptr = (double)num_result.val_int;  }
+                    else if( num_result.type == CH_DOUBLE)  { *param_ptr = (double)num_result.val_dble; }
                     else{
                         DBG("Expected a DOUBLE but got %*.s ", value_len, value);
                         result = CAMIO_EINVALID; //TODO XXX make a better return value
                         goto exit_params;
                     }
-                    break;
                 }
-                //Keep a copy of the string pointer and length
-                case CAMIO_TRANSPORT_PARAMS_TYPE_LSTRING:{
-                    void* params_struct_value = &params_struct[param->param_struct_offset];
-                    len_string_t* param_ptr = (len_string_t*)params_struct_value;
-                    DBG("value=%.*s [%i]\n", value_len, value, value_len);
-                    strncpy(param_ptr->str, value, MIN(LSTRING_MAX,value_len));
-                    param_ptr->str_len = value_len;
-                    break;
+                else{//It must now be true that found.value==NULL && param->mode=CAMIO_TRANSPORT_PARAMS_MODE_OPTIONAL
+                    *param_ptr = param->default_val.double_val;
                 }
-                default:{
-                    DBG("EEEK! This is an internal error. Unknown type. Did you use the right CAMIO_TRANSPORT_PARAMS_XXX?");
-                    result = CAMIO_EINVALID; //TODO XXX make a better return value
-                    goto exit_params;
+                param->found = true; //Woo hoo!
+                break;
 
-                }
             }
-        }
-        else{
-            if(param->opt_mode == CAMIO_TRANSPORT_PARAMS_MODE_REQUIRED){
-                DBG("PARAM=%s NOT FOUND!\n", param->param_name);
+
+            default:{
+                DBG("EEEK! Unknown type. Did you use the right CAMIO_TRANSPORT_PARAMS_XXX?");
                 result = CAMIO_EINVALID; //TODO XXX make a better return value
                 goto exit_params;
             }
-            else{
-                //TODO XXX fill in default initialization code here
-            }
         }
     }
-
-
-    //    //TODO check the features here??
-    //    if(features){
-    //        return CAMIO_NOTIMPLEMENTED;
-    //    }
-
 
     //Output the things that we care about
     *params_o      = params_struct;
