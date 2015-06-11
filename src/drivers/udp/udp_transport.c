@@ -46,10 +46,10 @@ void udp_init()
     }
 
 
-    add_param_optional(params,"rd_address",udp_params_t,rd_address,"");
-    add_param_optional(params,"rd_protocol",udp_params_t,rd_protocol, "");
-    add_param_optional(params,"wr_address",udp_params_t,wr_address, "");
-    add_param_optional(params,"wr_protocol",udp_params_t,wr_protocol, "");
+    add_param_optional(params,"ra",udp_params_t,rd_address,"");
+    add_param_optional(params,"rp",udp_params_t,rd_protocol, "");
+    add_param_optional(params,"wa",udp_params_t,wr_address, "");
+    add_param_optional(params,"wp",udp_params_t,wr_protocol, "");
     const ch_word hier_offset = offsetof(udp_params_t,hierarchical);
     DBG("Hierarchical offset=%i...Done\n", hier_offset);
 

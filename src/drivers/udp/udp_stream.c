@@ -150,6 +150,7 @@ static camio_error_t udp_read_acquire( camio_stream_t* this,  camio_rd_buffer_t*
         }
     }
     (*buffer_o)->data_len = bytes;
+    (*buffer_o)->data_start = (*buffer_o)->buffer_start;
     DBG("Got %lli bytes from UDP read\n", (*buffer_o)->data_len );
 
     return CAMIO_ENOERROR;
@@ -201,7 +202,6 @@ static camio_error_t udp_write_acquire(camio_stream_t* this, camio_wr_buffer_t**
         return CAMIO_EINVALID;
     }
 
-
     DBG("Doing write acquire\n");
     camio_error_t err = buffer_malloc_linear_acquire(priv->wr_buff,buffer_o);
     if(err){ return err; }
@@ -213,11 +213,12 @@ static camio_error_t udp_write_acquire(camio_stream_t* this, camio_wr_buffer_t**
 static camio_error_t udp_write_commit(camio_stream_t* this, camio_wr_buffer_t** buffer_chain )
 {
     if( NULL == this){
-        DBG("This null???\n"); //WTF?
+        DBG("This is null???\n"); //WTF?
         return CAMIO_EINVALID;
     }
     udp_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
 
+    DBG("Got a buffer chain head with %li bytes in a %li byte buffer starting at %p\n", (*buffer_chain)->data_len, (*buffer_chain)->buffer_len, (*buffer_chain)->data_start);
 
     camio_rd_buffer_t* chain_ptr = *buffer_chain;
     while(chain_ptr != NULL){
