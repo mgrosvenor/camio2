@@ -22,9 +22,7 @@ int main(int argc, char** argv)
     (void)argc; //We don't use these for the test ... yet
     (void)argv;
 
-    camio_connector_t* connector = NULL;
-
-    //Make and populate a parameters structure
+     //Make and populate a parameters structure
     void* params;
     ch_word params_size;
     ch_word id;
@@ -33,6 +31,7 @@ int main(int argc, char** argv)
     DBG("Got parameter at %p with size %i and id=%i\n", params, params_size, id);
 
     //Use the parameters structure to construct a new connector object
+    camio_connector_t* connector = NULL;
     err = camio_transport_constr(id,&params,params_size,&connector);
     if(err){ DBG("Could not construct connector\n"); exit(1); }
     DBG("## Got new connector at address %p\n", connector);
@@ -44,7 +43,7 @@ int main(int argc, char** argv)
     }
     DBG("## Got new stream at address %p\n", stream);
 
-    //Read and write a bytes to and from the stream
+   //Read and write a bytes to and from the stream
    while(1){
         camio_rd_buffer_t* rd_buffer = NULL;
         DBG("rd_buffer = %p &rd_buffer = %p\n", rd_buffer, &rd_buffer);
