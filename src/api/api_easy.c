@@ -41,7 +41,7 @@ camio_error_t camio_stream_new(char* uri, camio_stream_t** stream)
    }
    //DBG("## Got new stream at address %p\n", stream);
 
-   camio_connector_destroy(connector); //Clean up our mess
+   //camio_connector_destroy(connector); //Clean up our mess
 
    return CAMIO_ENOERROR;
 }

@@ -9,61 +9,52 @@
  *  Test the features of the CamIO API regardless of the stream used
  */
 
-#include "../src/camio.h"
 #include <stdio.h>
 #include <src/api/api_easy.h>
 #include <src/camio_debug.h>
 
 USE_CAMIO;
 
-
-
-
 int main(int argc, char** argv)
 {
 
-    (void)argc; //We don't use these for the test ... yet
+    //We don't use these for the test ... yet
+    (void)argc;
     (void)argv;
 
+    //Create and connect to a new stream
     camio_stream_t* stream = NULL;
     camio_error_t err = camio_stream_new("udp:localhost:2000?wp=4000", &stream);
-    if(err){
-        DBG("Could not connect to stream\n");
-        return CAMIO_EINVALID; //TODO XXX put a better error here
-    }
+    if(err){ DBG("Could not connect to stream\n"); return CAMIO_EINVALID; /*TODO XXX put a better error here*/ }
 
+    //Get a buffer for writing stuff
+    camio_rd_buffer_t* wr_buffer = NULL;
+    err = camio_write_acquire(stream, &wr_buffer);
+    if(err){ DBG("Could not connect to stream\n"); return CAMIO_EINVALID; /*TODO XXX put a better error here*/ }
 
-   //Read and write a bytes to and from the stream
-   while(1){
-        camio_rd_buffer_t* rd_buffer = NULL;
-        DBG("rd_buffer = %p &rd_buffer = %p\n", rd_buffer, &rd_buffer);
-        err = CAMIO_ENOERROR;
+   //Read and write bytes to and from the stream - just do loopback for now
+    camio_rd_buffer_t* rd_buffer = NULL;
+    while(1){
         while( (err = camio_read_acquire(stream, &rd_buffer, 0, 0)) == CAMIO_ETRYAGAIN){
-            //Just spin waiting for a new read buffer -- need to make a selector for this....
+            //Just spin waiting for a new read buffer -- TODO XXX need to make a selector for this....
         }
         if(err){ DBG("Got a read error %i\n", err); return -1; }
 
-        DBG("Got buffer with %lli bytes @buffer=%p, @data=%p\n",rd_buffer->data_len, rd_buffer->buffer_start, rd_buffer->data_start);
-
-        //We got data, ok now acquire a write buffer to put stuff into it
-        camio_rd_buffer_t* wr_buffer = NULL;
-        while(camio_write_acquire(stream, &wr_buffer)){
-            //Just spin waiting for a new write buffer -- need to make a selector for this....
-        }
-        DBG("Got write buffer with %lli bytes starting at %p\n", wr_buffer->buffer_len, wr_buffer->buffer_start);
-
-        //TODO XXX this is temporary until the actual copy function is implemented
-        DBG("Copying %lli bytes from %p to %p\n",rd_buffer->data_len,rd_buffer->buffer_start, wr_buffer->buffer_start);
-        memcpy(wr_buffer->buffer_start,rd_buffer->data_start,rd_buffer->data_len);
-        wr_buffer->data_start = wr_buffer->buffer_start;
-        wr_buffer->data_len = rd_buffer->data_len;
-        DBG("Done copying %lli bytes from %p to %p\n",rd_buffer->data_len,rd_buffer->buffer_start, wr_buffer->buffer_start);
+        //Got some new data on the read stream, copy it over to the write stream
+        err = camio_copy_rw(&wr_buffer,&rd_buffer,0,rd_buffer->data_len);
+        if(err){ DBG("Got a copy error %i\n", err); return -1; }
 
         //Data copied, let's commit it and send it off
-        camio_write_commit(stream, &wr_buffer );
-        camio_write_release(stream,&wr_buffer);
-        camio_read_release(stream, &rd_buffer);
+        err = camio_write_commit(stream, &wr_buffer );
+        if(err){ DBG("Got a commit error %i\n", err); return -1; }
+
+        //And we're done with that buffer
+        err = camio_read_release(stream, &rd_buffer);
+        if(err){ DBG("Got a read release error %i\n", err); return -1; }
     }
+
+    //Done with the write buffer too
+    camio_write_release(stream,&wr_buffer);
 
     return 0;
 }
