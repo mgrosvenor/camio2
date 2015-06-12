@@ -45,7 +45,6 @@ void udp_init()
         return; // No memory. Can't register this transport
     }
 
-
     add_param_optional(params,"ra",udp_params_t,rd_address,"");
     add_param_optional(params,"rp",udp_params_t,rd_protocol, "");
     add_param_optional(params,"wa",udp_params_t,wr_address, "");

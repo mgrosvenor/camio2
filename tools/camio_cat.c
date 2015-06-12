@@ -11,10 +11,13 @@
 
 #include "../src/camio.h"
 #include <stdio.h>
-
+#include <src/api/api_easy.h>
 #include <src/camio_debug.h>
 
 USE_CAMIO;
+
+
+
 
 int main(int argc, char** argv)
 {
@@ -22,26 +25,13 @@ int main(int argc, char** argv)
     (void)argc; //We don't use these for the test ... yet
     (void)argv;
 
-     //Make and populate a parameters structure
-    void* params;
-    ch_word params_size;
-    ch_word id;
-    camio_error_t err = camio_transport_params_new("udp:localhost:2000?wp=4000",&params, &params_size, &id);
-    if(err){  DBG("Could not convert parameters into structure\n"); exit(1); }
-    DBG("Got parameter at %p with size %i and id=%i\n", params, params_size, id);
-
-    //Use the parameters structure to construct a new connector object
-    camio_connector_t* connector = NULL;
-    err = camio_transport_constr(id,&params,params_size,&connector);
-    if(err){ DBG("Could not construct connector\n"); exit(1); }
-    DBG("## Got new connector at address %p\n", connector);
-
-    //Use the connector to connect to a stream
     camio_stream_t* stream = NULL;
-    while(camio_connect(connector,&stream)){
-        //Just spin waiting for a connection -- need to make a selector for this....
+    camio_error_t err = camio_stream_new("udp:localhost:2000?wp=4000", &stream);
+    if(err){
+        DBG("Could not connect to stream\n");
+        return CAMIO_EINVALID; //TODO XXX put a better error here
     }
-    DBG("## Got new stream at address %p\n", stream);
+
 
    //Read and write a bytes to and from the stream
    while(1){
