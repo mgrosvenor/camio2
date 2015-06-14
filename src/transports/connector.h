@@ -14,9 +14,9 @@
 
 #include <src/transports/features.h>
 #include <stdlib.h>
-#include "../types/types.h"
-#include "../selectors/selectable.h"
-#include "../utils/uri_parser/uri_parser.h"
+#include <src/types/types.h>
+#include <src/selectors/selectable.h>
+#include <src/utils/uri_parser/uri_parser.h>
 
 
 typedef camio_error_t (*camio_conn_construct_f)(camio_connector_t* connector_o, void** params, ch_word params_size);

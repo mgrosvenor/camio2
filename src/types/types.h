@@ -47,4 +47,9 @@ typedef struct camio_buffer_s camio_buffer_t;
 struct camio_selectable_s;
 typedef struct camio_selectable_s camio_selectable_t;
 
+//Forward declaration, the real definition is found in selectors/selector.h
+struct camio_selector_s;
+typedef struct camio_selector_s camio_selector_t;
+
+
 #endif /* SRC_TYPES_TYPES_H_ */

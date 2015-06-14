@@ -15,11 +15,11 @@
 #define API_H_
 
 #include <src/types/types.h>
-//#include <src/streams/stream_types.h>
-//#include <src/streams/features.h>
+#include <src/errors/camio_errors.h>
+
 #include <src/buffers/buffer.h>
 #include <src/transports/features.h>
-#include <src/errors/camio_errors.h>
+#include <src/selectors/selector.h>
 
 
 /**
@@ -35,11 +35,11 @@
  */
 camio_error_t camio_connect( camio_connector_t* this, camio_stream_t** stream_o );
 
+
 /**
  * Free resources associated with this connector, but not with any of the streams it has created.
  */
 void camio_connector_destroy(camio_connector_t* this);
-
 
 
 /**
@@ -59,6 +59,7 @@ void camio_connector_destroy(camio_connector_t* this);
  */
 camio_error_t camio_read_acquire( camio_stream_t* this,  camio_rd_buffer_t** buffer_o, ch_word buffer_offset,
         ch_word source_offset);
+
 
 /**
  * Relinquish resources associated with the given read buffer. Streams with the async_arrv feature enabled support
@@ -87,6 +88,7 @@ camio_error_t camio_read_release(camio_stream_t* this, camio_rd_buffer_t** buffe
  */
 camio_error_t camio_write_acquire(camio_stream_t* this, camio_wr_buffer_t** buffer_o);
 
+
 /**
  * Ignore the contents of a a read buffer. Some streams can provide performance improvements from the knowledge that data is
  * being ignored. This may reduce the need for unnecessary copies. It is good practice to use this whenever read data is not
@@ -114,7 +116,7 @@ camio_error_t camio_copy_rw(camio_wr_buffer_t** wr_buffer, camio_rd_buffer_t** r
  * feature is supported by the stream. If buffer_offset is non-zero, the write will try to write data at offset bytes into
  * the stream. This may fail and is only supported if the write_from_buff feature is supported by the stream.
  */
-camio_error_t set_opts(camio_wr_buffer_t** wr_buffer,  ch_word buffer_offset, ch_word dest_offset);
+camio_error_t camio_set_opts(camio_wr_buffer_t** wr_buffer,  ch_word buffer_offset, ch_word dest_offset);
 
 
 /**
@@ -155,21 +157,43 @@ camio_error_t camio_write_release(camio_stream_t* this, camio_wr_buffer_t** buff
 void camio_stream_destroy(camio_stream_t* this);
 
 
-//
-///**
-// * Create a new CamIO transport of type "type" with the properties requested and otherwise binary arguments, return its
-// * connector. The type and order of these arguments is stream specific. The camio_connector_o is only valid id ENOERROR is
-// * returned.
-// * Returns:
-// * - ENOERROR:  All good. Nothing to see here.
-// * - ENOSTREAM: The stream type is unrecognized
-// * - EBADOPT:   The arguments have an error or are unsupported
-// * - EBADPROP:  The stream supplied in did not match the properties requested.
-// */
-//camio_error_t new_camio_transport( camio_connector_t** connector_o, camio_transport_type_t type,
-//        camio_transport_features_t* features,  void* parameters, ch_word parameters_size);
-//
+/**
+ * Insert an object into a selector. Include a mode. For selectors that do not support the mode of operation requested, an
+ * error will be returned. Modes can be OR'd together for example ( CAMIO_SELECTOR_MODE_WRITE | AMIO_SELECTOR_MODE_READ).
+ * Return values:
+ * - ENOERROR: All good, please continue.
+ * - ENOREAD: This selectable does not support reading
+ * - ENOWRITE: This selectable does not support writing
+ * - ENOCONNECT: This selectable does not support connecting
+ * - TODO XXX: More errors here
+ */
+camio_error_t camio_selector_insert(camio_selector_t* this, camio_selectable_t* selectable, camio_selector_mode_e modes);
 
 
+/**
+ * Remove an object from a selector. Include a mode.
+ * Return values:
+ * - ENOERROR: All good, please continue.
+ * - TODO XXX: More errors here
+ */
+camio_error_t camio_selector_remove(camio_selector_t* this, camio_selectable_t* selectable);
+
+
+/**
+ * Perform the select operation. Find if any of the supplied streams are ready for reading, writing or connecting. The first
+ * stream that matches one of these will fire. A camio_selector is trigger based. It has no memory. Once an event has been
+ * delivered once, it will not be delivered again until there is a change in the state of the stream or connector.
+ * Return values:
+ * - ENOERROR: All good, please continue.
+ * - TODO XXX: More errors here
+ */
+camio_error_t camio_selector_select(camio_selector_t* this, struct timespec timeout, camio_selectable_t** selectable_o,
+        camio_selector_mode_e* modes_o);
+
+
+/**
+ * Free resources associated with this selector
+ */
+void camio_selector_destroy(camio_selector_t* this);
 
 #endif /* API_H_ */

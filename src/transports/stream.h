@@ -13,10 +13,12 @@
 #ifndef STREAM_H_
 #define STREAM_H_
 
-#include "../types/types.h"
-#include "../buffers/buffer.h"
+#include <src/types/types.h>
+#include <src/selectors/selectable.h>
+#include <src/buffers/buffer.h>
+
 #include "features.h"
-#include "../selectors/selectable.h"
+
 
 /**
  * Every CamIO stream must implement this interface, see function prototypes in api.h
