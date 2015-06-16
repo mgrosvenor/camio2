@@ -43,13 +43,13 @@ typedef struct camio_connector_interface_s camio_connector_interface_t;
 struct camio_buffer_s;
 typedef struct camio_buffer_s camio_buffer_t;
 
-//Forward declaration, the real definition is found in selectors/selectable.h
-struct camio_selectable_s;
-typedef struct camio_selectable_s camio_selectable_t;
+//Forward declaration, the real definition is found in muxors/muxable.h
+struct camio_muxable_s;
+typedef struct camio_muxable_s camio_muxable_t;
 
-//Forward declaration, the real definition is found in selectors/selector.h
-struct camio_selector_s;
-typedef struct camio_selector_s camio_selector_t;
+//Forward declaration, the real definition is found in muxors/muxor.h
+struct camio_mux_s;
+typedef struct camio_mux_s camio_mux_t;
 
 
 #endif /* SRC_TYPES_TYPES_H_ */

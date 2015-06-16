@@ -15,7 +15,7 @@
 #include <src/transports/features.h>
 #include <stdlib.h>
 #include <src/types/types.h>
-#include <src/selectors/selectable.h>
+#include <src/multiplexers/muxable.h>
 #include <src/utils/uri_parser/uri_parser.h>
 
 
@@ -51,7 +51,7 @@ typedef struct camio_connector_s {
      * Return the the selectable structure for adding into a selector. Not valid until the connector constructor has been
      * called.
      */
-    camio_selectable_t selectable;
+    camio_muxable_t muxable;
 
     /**
      * Return the features supported by this transport. Not valid until the connector constructor has been called.

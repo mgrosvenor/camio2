@@ -19,7 +19,7 @@
 
 #include <src/buffers/buffer.h>
 #include <src/transports/features.h>
-#include <src/selectors/selector.h>
+#include <src/multiplexers/mux.h>
 
 
 /**
@@ -167,7 +167,7 @@ void camio_stream_destroy(camio_stream_t* this);
  * - ENOCONNECT: This selectable does not support connecting
  * - TODO XXX: More errors here
  */
-camio_error_t camio_selector_insert(camio_selector_t* this, camio_selectable_t* selectable, camio_selector_mode_e modes);
+camio_error_t camio_mux_insert(camio_mux_t* this, camio_muxable_t* muxable);
 
 
 /**
@@ -176,7 +176,7 @@ camio_error_t camio_selector_insert(camio_selector_t* this, camio_selectable_t* 
  * - ENOERROR: All good, please continue.
  * - TODO XXX: More errors here
  */
-camio_error_t camio_selector_remove(camio_selector_t* this, camio_selectable_t* selectable);
+camio_error_t camio_mux_remove(camio_mux_t* this, camio_muxable_t* muxable);
 
 
 /**
@@ -187,13 +187,12 @@ camio_error_t camio_selector_remove(camio_selector_t* this, camio_selectable_t* 
  * - ENOERROR: All good, please continue.
  * - TODO XXX: More errors here
  */
-camio_error_t camio_selector_select(camio_selector_t* this, struct timespec timeout, camio_selectable_t** selectable_o,
-        camio_selector_mode_e* modes_o);
+camio_error_t camio_mux_select(camio_mux_t* this, struct timespec timeout, camio_muxable_t** muxable_o);
 
 
 /**
  * Free resources associated with this selector
  */
-void camio_selector_destroy(camio_selector_t* this);
+void camio_mux_destroy(camio_mux_t* this);
 
 #endif /* API_H_ */

@@ -91,5 +91,15 @@ camio_error_t camio_transport_get_id( ch_cstr scheme_name, ch_word* id_o);
 camio_error_t camio_transport_get_global(ch_ccstr scheme, void** global_store);
 
 
+/**
+ * Construct a new CamIO selector to multiplex different transports together. Provide a hint as to the optimization criterion
+ * that should be applied. TODO, this should probably be generalized much the same as above so that selectors can dynamically
+ * register themselves. Will do another time.
+ */
+typedef enum {
+    CAMIO_MUX_HINT_PERFORMANCE, //Prefer higher performance, this may involve spinning the CPU
+    CAMIO_MUX_HINT_ENERGY,      //Prefer lower energy use, this may involve sleeping the application
+} camio_mux_hint_e;
+camio_error_t camio_mux_new( camio_mux_hint_e hint, camio_mux_t** mux_o);
 
 #endif /* CAMIO_H_ */

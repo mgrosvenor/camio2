@@ -22,6 +22,7 @@
 #include <deps/chaste/parsing/numeric_parser.h>
 #include <deps/chaste/parsing/bool_parser.h>
 #include <deps/chaste/utils/util.h>
+#include <src/multiplexers/muxable.h>
 
 
 

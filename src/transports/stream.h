@@ -14,7 +14,7 @@
 #define STREAM_H_
 
 #include <src/types/types.h>
-#include <src/selectors/selectable.h>
+#include <src/multiplexers/muxable.h>
 #include <src/buffers/buffer.h>
 
 #include "features.h"
@@ -61,9 +61,10 @@ typedef struct camio_stream_s {
 
 
     /**
-     * Holds the selectable structure for adding into a selector
+     * Holds the multiplexable structures for adding into a multiplexor
      */
-    camio_selectable_t selectable;
+    camio_muxable_t rd_muxable; //For reading
+    camio_muxable_t wr_muxable; //For writing
 
 
 } camio_stream_t;

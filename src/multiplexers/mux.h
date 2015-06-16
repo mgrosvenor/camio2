@@ -1,0 +1,72 @@
+/*
+ * CamIO - The Cambridge Input/Output API 
+ * Copyright (c) 2015, All rights reserved.
+ * See LICENSE.txt for full details. 
+ * 
+ *  Created:    Jun 14, 2015
+ *  File name:  mux.h
+ *  Description:
+ *  Every stream and connector implements a "mux" interface. This interface allows the stream or connector to be put
+ *  into a "mux object" for runtime nonblocking multiplexing of transports
+ */
+#ifndef MUX_H_
+#define MUX_H_
+
+#include <src/types/types.h>
+#include "muxable.h"
+
+
+/**
+ * Every CamIO mux must implement this interface. See mux.h and api.h for more details.
+ */
+typedef struct camio_mux_interface_s{
+    camio_error_t (*insert)(camio_mux_t* this, camio_muxable_t* muxable, camio_mux_mode_e modes);
+    camio_error_t (*remove)(camio_mux_t* this, camio_muxable_t* muxable);
+    camio_error_t (*select)(camio_mux_t* this, struct timespec timeout, camio_muxable_t** muxable_o,
+            camio_mux_mode_e* modes_o);
+    void (*destroy)(camio_mux_t* this);
+} camio_mux_interface_t;
+
+
+/**
+ * This is a basic CamIO mux structure. All muxs must implement this. Transports will use the macros provided
+ * to overload this structure with and include a private data structures.
+ */
+
+typedef struct camio_mux_s {
+    /**
+     * vtable that holds the function pointers, usually this would be a pointer, but saving a couple of bytes seems a little
+     * silly when it will cost a pointer dereference on the critical path. YMMV.
+     */
+    camio_mux_interface_t vtable;
+
+} camio_mux_t;
+
+
+
+/**
+ * Some macros to make life easier MUX_GET_PRIVATE helps us grab the private members out of the public mux_t
+ */
+#define MUX_GET_PRIVATE(THIS) ( (void*)(THIS + 1))
+
+#define NEW_MUX(name)\
+        new_##name##_mux()
+
+#define NEW_MUX_DECLARE(NAME)\
+        camio_mux_t* new_##NAME##_mux()
+
+#define NEW_MUX_DEFINE(NAME, PRIVATE_TYPE) \
+    const static camio_mux_interface_t NAME##_mux_interface = {\
+            .ready = NAME##_ready,\
+    };\
+    \
+    NEW_MUX_DECLARE(NAME)\
+    {\
+        camio_mux_t* result = (camio_mux_t*)calloc(1,sizeof(camio_mux_t) + sizeof(PRIVATE_TYPE));\
+        if(!result) return NULL;\
+        result->vtable = NAME##_mux_interface;\
+        return result;\
+    }
+
+
+#endif /* MUX_H_ */
