@@ -22,8 +22,9 @@
 #include <deps/chaste/parsing/numeric_parser.h>
 #include <deps/chaste/parsing/bool_parser.h>
 #include <deps/chaste/utils/util.h>
-#include <src/multiplexers/muxable.h>
 
+#include <src/multiplexers/muxable.h>
+#include <src/multiplexers/spin_mux.h>
 
 
 camio_t* init_camio()
@@ -351,9 +352,28 @@ camio_error_t camio_transport_get_global(ch_ccstr scheme, void** global_store)
 
     *global_store = found->global_store;
     return CAMIO_ENOERROR;
-
-
 }
 
+
+
+camio_error_t camio_mux_new( camio_mux_hint_e hint, camio_mux_t** mux_o)
+{
+    camio_mux_t* result = NULL;
+    switch(hint){
+        case CAMIO_MUX_HINT_PERFORMANCE:{
+            result = NEW_MUX(spin);
+            if(! *mux_o){
+                return CAMIO_ENOMEM;
+            }
+            break;
+        }
+        default:
+            return CAMIO_EINVALID;//TODO XXX better error code
+    }
+
+    result->vtable.construct(result);
+    *mux_o = result;
+    return CAMIO_ENOERROR;
+}
 
 

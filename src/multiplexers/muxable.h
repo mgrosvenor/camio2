@@ -55,7 +55,7 @@ typedef struct camio_muxable_s {
     } parent;
 
     /**
-     * Let the muxor know what sort of event's you are looking for.
+     * Let the mux know what sort of event's we are looking for.
      */
     camio_mux_mode_e mode;
 } camio_muxable_t;
@@ -73,7 +73,7 @@ typedef struct camio_muxable_s {
 #define NEW_MUXABLE_DECLARE(NAME)\
         camio_muxable_t* new_##NAME##_muxable()
 
-#define NEW_MUXABLE_DEFINE(NAME, PRIVATE_TYPE) \
+#define NEW_MUXABLE_DEFINE(NAME, PRIVATE_TYPE, MODE) \
     const static camio_muxable_interface_t NAME##_muxable_interface = {\
             .ready = NAME##_ready,\
     };\
@@ -83,6 +83,7 @@ typedef struct camio_muxable_s {
         camio_muxable_t* result = (camio_muxable_t*)calloc(1,sizeof(camio_muxable_t) + sizeof(PRIVATE_TYPE));\
         if(!result) return NULL;\
         result->vtable = NAME##_muxable_interface;\
+        result->mode   = MODE;\
         return result;\
     }
 

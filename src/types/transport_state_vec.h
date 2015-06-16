@@ -12,12 +12,11 @@
 #ifndef SRC_TYPES_STREAM_STATE_VEC_H_
 #define SRC_TYPES_STREAM_STATE_VEC_H_
 
-
+#include "types.h"
 #include <src/transports/connector.h>
 #include <src/types/transport_params_vec.h>
-#include "types.h"
-#include "../../deps/chaste/data_structs/vector/vector_typed_declare_template.h"
-#include "../utils/uri_parser/uri_parser.h"
+#include <deps/chaste/data_structs/vector/vector_typed_declare_template.h>
+#include <src/utils/uri_parser/uri_parser.h>
 
 typedef camio_error_t (*camio_construct_f)(void** params, ch_word params_size, camio_connector_t** connector_o);
 
@@ -38,7 +37,6 @@ typedef struct camio_transport_state_s {
 } camio_transport_state_t;
 
 
-//Declare a linked list of key_value items
 declare_ch_vector(CAMIO_TRANSPORT_STATE_VEC,camio_transport_state_t)
 declare_ch_vector_cmp(CAMIO_TRANSPORT_STATE_VEC,camio_transport_state_t)
 
