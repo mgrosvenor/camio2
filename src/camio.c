@@ -362,7 +362,7 @@ camio_error_t camio_mux_new( camio_mux_hint_e hint, camio_mux_t** mux_o)
     switch(hint){
         case CAMIO_MUX_HINT_PERFORMANCE:{
             result = NEW_MUX(spin);
-            if(! *mux_o){
+            if(!result){
                 return CAMIO_ENOMEM;
             }
             break;

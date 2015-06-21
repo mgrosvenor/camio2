@@ -23,7 +23,7 @@ typedef struct camio_mux_interface_s{
     camio_error_t (*construct)(camio_mux_t* this);
     camio_error_t (*insert)(camio_mux_t* this, camio_muxable_t* muxable);
     camio_error_t (*remove)(camio_mux_t* this, camio_muxable_t* muxable);
-    camio_error_t (*select)(camio_mux_t* this, struct timespec timeout, camio_muxable_t** muxable_o);
+    camio_error_t (*select)(camio_mux_t* this, /*struct timespec timeout,*/ camio_muxable_t** muxable_o);
     void (*destroy)(camio_mux_t* this);
 } camio_mux_interface_t;
 

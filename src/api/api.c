@@ -51,12 +51,10 @@ camio_error_t camio_read_acquire( camio_stream_t* this,  camio_rd_buffer_t** buf
 }
 
 
-
 camio_error_t camio_read_release(camio_stream_t* this, camio_rd_buffer_t** buffer)
 {
     return this->vtable.read_release(this, buffer);
 }
-
 
 
 camio_error_t camio_write_acquire(camio_stream_t* this, camio_wr_buffer_t** buffer_o)
@@ -65,19 +63,16 @@ camio_error_t camio_write_acquire(camio_stream_t* this, camio_wr_buffer_t** buff
 }
 
 
-
 camio_error_t camio_write_commit(camio_stream_t* this, camio_wr_buffer_t** buffer_chain )
 {
     return this->vtable.write_commit(this, buffer_chain);
 }
 
 
-
 camio_error_t camio_write_release(camio_stream_t* this, camio_wr_buffer_t** buffers_chain)
 {
     return this->vtable.write_release(this, buffers_chain);
 }
-
 
 
 void camio_stream_destroy(camio_stream_t* this)
@@ -87,12 +82,6 @@ void camio_stream_destroy(camio_stream_t* this)
 
 
 
-/**
- * Copy contents of read buffer into write buffer. This may or may not involve an actual data copy depending on the stream
- * bindings currently in use. The function may succeed in in one of two ways:
- *  - EBYTESCOPPIED:    Completed successfully, bytes were copied
- *  - ENOBYTESCOPPIED:  Completed successfully, no bytes were copied.
- */
 camio_error_t camio_copy_rw(camio_wr_buffer_t** wr_buffer, camio_rd_buffer_t** rd_buffer, ch_word offset, ch_word copy_len)
 {
     (void)offset;
@@ -107,12 +96,7 @@ camio_error_t camio_copy_rw(camio_wr_buffer_t** wr_buffer, camio_rd_buffer_t** r
     return CAMIO_ENOERROR;
 }
 
-/**
- * Set options on a write buffer. If the dest_offset is non-zero, the write will try to collect data starting
- * at offset bytes from the beginning of the destination. This may fail and is only supported if the write_to_dst_off
- * feature is supported by the stream. If buffer_offset is non-zero, the write will try to write data at offset bytes into
- * the stream. This may fail and is only supported if the write_from_buff feature is supported by the stream.
- */
+
 camio_error_t camio_set_opts(camio_wr_buffer_t** wr_buffer,  ch_word buffer_offset, ch_word dest_offset)
 {
     (void)wr_buffer;
@@ -121,14 +105,7 @@ camio_error_t camio_set_opts(camio_wr_buffer_t** wr_buffer,  ch_word buffer_offs
     return CAMIO_NOTIMPLEMENTED;
 }
 
-/**
- * A single buffer object is a buffer chain of length 1. If you require batching performance, you can append additional write
- * buffers to form a longer chain. Some streams may have ordering requirements on appending chains and many streams will have
- * limits on the length of chains that are permitted.
- * * Returns:
- * - ENOERROR: Completed successfully.
- * - TODO XXX: Add more here
- */
+
 camio_error_t camio_chain(camio_wr_buffer_t** buffer_chain_head, camio_wr_buffer_t** buffer )
 {
     (void)buffer_chain_head;
@@ -136,6 +113,29 @@ camio_error_t camio_chain(camio_wr_buffer_t** buffer_chain_head, camio_wr_buffer
     return CAMIO_NOTIMPLEMENTED;
 }
 
+
+camio_error_t camio_mux_insert(camio_mux_t* this, camio_muxable_t* muxable)
+{
+    return this->vtable.insert(this,muxable);
+}
+
+
+camio_error_t camio_mux_remove(camio_mux_t* this, camio_muxable_t* muxable)
+{
+    return this->vtable.remove(this,muxable);
+}
+
+
+camio_error_t camio_mux_select(camio_mux_t* this, /*struct timespec timeout,*/ camio_muxable_t** muxable_o)
+{
+    return this->vtable.select(this, /*timeout,*/ muxable_o);
+}
+
+
+void camio_mux_destroy(camio_mux_t* this)
+{
+    this->vtable.destroy(this);
+}
 
 
 

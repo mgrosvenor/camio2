@@ -187,7 +187,7 @@ camio_error_t camio_mux_remove(camio_mux_t* this, camio_muxable_t* muxable);
  * - ENOERROR: All good, please continue.
  * - TODO XXX: More errors here
  */
-camio_error_t camio_mux_select(camio_mux_t* this, struct timespec timeout, camio_muxable_t** muxable_o);
+camio_error_t camio_mux_select(camio_mux_t* this, /*struct timespec timeout,*/ camio_muxable_t** muxable_o);
 
 
 /**

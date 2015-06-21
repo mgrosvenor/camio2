@@ -139,9 +139,9 @@ static camio_error_t udp_connect_peek(udp_connector_priv_t* priv)
 static camio_error_t udp_connector_ready(camio_muxable_t* this)
 {
     udp_connector_priv_t* priv = CONNECTOR_GET_PRIVATE(this->parent.connector);
-    if(priv->is_connected){
-        return CAMIO_ENOTREADY;//Only allow one connection
-    }
+//    if(priv->is_connected){
+//        return CAMIO_ENOTREADY;//Only allow one connection
+//    }
 
     if(priv->rd_fd > -1 || priv->wr_fd > -1){
         return CAMIO_EREADY;
@@ -280,11 +280,18 @@ static camio_error_t udp_construct(camio_connector_t* this, void** params, ch_wo
 
 static void udp_destroy(camio_connector_t* this)
 {
+    DBG("Destorying udp connector\n");
     udp_connector_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
-    if(priv->rd_fd)  { close(priv->rd_fd); }
-    if(priv->wr_fd)  { close(priv->wr_fd); }
+
+// Don't free these! The stream relies on them!!
+//    if(priv->rd_fd)  { close(priv->rd_fd); }
+//    if(priv->wr_fd)  { close(priv->wr_fd); }
+//    DBG("Freed FD's\n");
+
     if(priv->params) { free(priv->params); }
-    free(priv);
+    DBG("Freed params\n");
+    free(this);
+    DBG("Freed connector structure\n");
 }
 
 NEW_CONNECTOR_DEFINE(udp, udp_connector_priv_t)
