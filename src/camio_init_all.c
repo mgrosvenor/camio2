@@ -7,6 +7,7 @@
 
 //#include <src/drivers/netmap/netmap_transport.h>
 #include <src/drivers/udp/udp_transport.h>
+#include <src/drivers/tcp/tcp_transport.h>
 #include "camio_debug.h"
 #include "camio_init_all.h"
 
@@ -29,6 +30,7 @@ camio_error_t camio_init_all_transports(){
     DBG("Initializing transports...\n");
     //netmap_init();
     udp_init();
+    tcp_init();
     //add more here
 
     DBG("Initializing transports...Done\n");
