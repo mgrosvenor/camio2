@@ -36,21 +36,24 @@ int main(int argc, char** argv)
 
    //Read and write bytes to and from the stream - just do loopback for now
     camio_rd_buffer_t* rd_buffer = NULL;
+    camio_rd_buffer_t* wr_buffer = NULL;
+    camio_muxable_t* which       = NULL;
     while(1){
-        camio_read_request(stream,0,0); //Tell the stream that we want some data
+        //Tell the stream that we want some data
+        camio_read_request(stream,0,0);
 
-        camio_muxable_t* which = NULL;
-        camio_mux_select(mux,&which); //Block waiting for a stream to be ready
+        //Block waiting for a stream to be ready
+        camio_mux_select(mux,&which);
 
+        //Acquire a pointer to the new data
         err = camio_read_acquire(which->parent.stream, &rd_buffer);
         if(err){ DBG("Got a read error %i\n", err); return -1; }
 
         //Get a buffer for writing stuff
-        camio_rd_buffer_t* wr_buffer = NULL;
         err = camio_write_acquire(stream, &wr_buffer);
         if(err){ DBG("Could not connect to stream\n"); return CAMIO_EINVALID; /*TODO XXX put a better error here*/ }
 
-        //Got some new data on the read stream, copy it over to the write stream
+        //Copy data over from the read buffer to the write buffer
         err = camio_copy_rw(&wr_buffer,&rd_buffer,0,rd_buffer->data_len);
         if(err){ DBG("Got a copy error %i\n", err); return -1; }
 
@@ -58,10 +61,10 @@ int main(int argc, char** argv)
         err = camio_write_commit(stream, &wr_buffer );
         if(err){ DBG("Got a commit error %i\n", err); return -1; }
 
-        //Done with the write buffer
+        //Done with the write buffer, release it
         camio_write_release(stream,&wr_buffer);
 
-        //And we're done with that buffer
+        //And we're done with the read buffer too, release it as well
         err = camio_read_release(stream, &rd_buffer);
         if(err){ DBG("Got a read release error %i\n", err); return -1; }
     }
