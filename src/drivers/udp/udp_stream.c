@@ -303,17 +303,20 @@ static camio_error_t udp_write_release(camio_stream_t* this, camio_wr_buffer_t**
         return CAMIO_EINVALID;
     }
 
-//    camio_rd_buffer_t* chain_ptr = *buffer_chain;
-//    camio_rd_buffer_t* chain_ptr_prev = NULL;
-//    while(chain_ptr != NULL){
-//        camio_error_t err = buffer_malloc_linear_release(priv->wr_buff,&chain_ptr);
-//        if(err){ return err; }
-//        chain_ptr_prev      = *buffer_chain;
-//        chain_ptr           = (*buffer_chain)->next;
-//        chain_ptr->next     = NULL;
-//    }
-//
-//    *buffer_chain = NULL; //Remove dangling pointers!
+    camio_rd_buffer_t* chain_ptr = *buffer_chain;
+    camio_rd_buffer_t* chain_ptr_prev = NULL;
+    while(chain_ptr != NULL){
+        camio_error_t err = buffer_malloc_linear_release(priv->wr_buff_pool,&chain_ptr);
+        if(err){
+            DBG("Could not release buffer??\n");
+            return err;
+        }
+        chain_ptr_prev               = *buffer_chain;
+        chain_ptr                    = (*buffer_chain)->__internal.__next;
+        chain_ptr->__internal.__next = NULL;
+    }
+
+    *buffer_chain = NULL; //Remove dangling pointers!
 
     return CAMIO_ENOERROR;
 }
