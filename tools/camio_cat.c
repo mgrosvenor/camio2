@@ -69,8 +69,5 @@ int main(int argc, char** argv)
         if(err){ DBG("Got a read release error %i\n", err); return -1; }
     }
 
-    //Done with the write buffer too
-
-
     return 0;
 }
