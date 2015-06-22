@@ -58,6 +58,11 @@ typedef struct camio_muxable_s {
      * Let the mux know what sort of event's we are looking for.
      */
     camio_mux_mode_e mode;
+
+    /**
+     * Store an ID here for a simple way to know which stream this is. This is kind of a hack.
+     */
+    ch_word id;
 } camio_muxable_t;
 
 

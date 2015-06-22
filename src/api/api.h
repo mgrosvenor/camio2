@@ -180,7 +180,7 @@ void camio_stream_destroy(camio_stream_t* this);
  * - ENOCONNECT: This selectable does not support connecting
  * - TODO XXX: More errors here
  */
-camio_error_t camio_mux_insert(camio_mux_t* this, camio_muxable_t* muxable);
+camio_error_t camio_mux_insert(camio_mux_t* this, camio_muxable_t* muxable, ch_word id);
 
 
 /**

@@ -33,11 +33,12 @@ camio_error_t spin_construct(camio_mux_t* this){
 }
 
 
-camio_error_t spin_insert(camio_mux_t* this, camio_muxable_t* muxable)
+camio_error_t spin_insert(camio_mux_t* this, camio_muxable_t* muxable, ch_word id)
 {
     DBG("Inserting %p into mux\n");
     mux_spin_priv_t* priv = MUX_GET_PRIVATE(this);
     CH_VECTOR(CAMIO_MUXABLE_VEC)* muxables = priv->muxables;
+    muxable->id = id;
     muxables->push_back(muxables, *muxable);
     return CAMIO_ENOERROR;
 }

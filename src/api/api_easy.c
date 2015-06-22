@@ -34,31 +34,32 @@ camio_error_t camio_stream_new(char* uri, camio_stream_t** stream)
    }
    //DBG("## Got new connector at address %p\n", connector);
 
-   //Create a new multiplexer object
-   camio_mux_t* mux = NULL;
-   err = camio_mux_new(CAMIO_MUX_HINT_PERFORMANCE,&mux);
-   if(err){
-       DBG("Could not create multiplexer\n");
-       return CAMIO_EINVALID;
-   }
+// This code is not really necessary, it's a lot of setup to just spin
+//   //Create a new multiplexer object
+//   camio_mux_t* mux = NULL;
+//   err = camio_mux_new(CAMIO_MUX_HINT_PERFORMANCE,&mux);
+//   if(err){
+//       DBG("Could not create multiplexer\n");
+//       return CAMIO_EINVALID;
+//   }
+//
+//   err = camio_mux_insert(mux,&connector->muxable, 0);
+//   if(err){
+//       DBG("Could not insert connector into multiplexer\n");
+//       return CAMIO_EINVALID;
+//   }
+//
+//   camio_muxable_t* muxable = NULL;
+//   err = camio_mux_select(mux,&muxable); //Block waiting for connector to connect
+//   if(err){
+//       DBG("Could not select in multiplexer\n");
+//       return err;
+//   }
+//
+//   //If not true, we have a problem!
+//   assert(muxable->parent.connector == connector);
 
-   err = camio_mux_insert(mux,&connector->muxable);
-   if(err){
-       DBG("Could not insert connector into multiplexer\n");
-       return CAMIO_EINVALID;
-   }
-
-   camio_muxable_t* muxable = NULL;
-   err = camio_mux_select(mux,&muxable); //Block waiting for connector to connect
-   if(err){
-       DBG("Could not select in multiplexer\n");
-       return err;
-   }
-
-   //If not true, we have a problem!
-   assert(muxable->parent.connector == connector);
-
-   err = camio_connect(connector,stream);
+   while( (err = camio_connect(connector,stream)) == CAMIO_ETRYAGAIN ){}
    if(err){
        DBG("Could not connect to stream\n");
        return CAMIO_EINVALID; //TODO XXX put a better error here
@@ -68,7 +69,7 @@ camio_error_t camio_stream_new(char* uri, camio_stream_t** stream)
    DBG("## Got new stream at address %p\n", stream);
 
    //Clean up our mess
-   camio_mux_destroy(mux);
+   //camio_mux_destroy(mux);
    camio_connector_destroy(connector);
    return CAMIO_ENOERROR;
 }

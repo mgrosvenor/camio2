@@ -117,9 +117,9 @@ camio_error_t camio_chain(camio_wr_buffer_t** buffer_chain_head, camio_wr_buffer
 }
 
 
-camio_error_t camio_mux_insert(camio_mux_t* this, camio_muxable_t* muxable)
+camio_error_t camio_mux_insert(camio_mux_t* this, camio_muxable_t* muxable, ch_word id)
 {
-    return this->vtable.insert(this,muxable);
+    return this->vtable.insert(this,muxable,id);
 }
 
 

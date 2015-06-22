@@ -32,7 +32,7 @@ int main(int argc, char** argv)
     if(err){ DBG("Could not connect to stream\n"); return CAMIO_EINVALID; /*TODO XXX put a better error here*/ }
 
     //Put the read stream into the mux
-    camio_mux_insert(mux,&stream->rd_muxable);
+    camio_mux_insert(mux,&stream->rd_muxable,0);
 
    //Read and write bytes to and from the stream - just do loopback for now
     camio_rd_buffer_t* rd_buffer = NULL;
