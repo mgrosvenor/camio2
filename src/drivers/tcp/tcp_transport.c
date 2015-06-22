@@ -45,10 +45,7 @@ void tcp_init()
         return; // No memory. Can't register this transport
     }
 
-    add_param_optional(params,"ra",tcp_params_t,rd_address,"");
-    add_param_optional(params,"rp",tcp_params_t,rd_protocol, "");
-    add_param_optional(params,"wa",tcp_params_t,wr_address, "");
-    add_param_optional(params,"wp",tcp_params_t,wr_protocol, "");
+    add_param_optional(params,"listen",tcp_params_t,listen, 0);
     const ch_word hier_offset = offsetof(tcp_params_t,hierarchical);
     DBG("Hierarchical offset=%i...Done\n", hier_offset);
 

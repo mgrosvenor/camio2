@@ -16,6 +16,6 @@
 
 NEW_STREAM_DECLARE(tcp);
 
-camio_error_t tcp_stream_construct(camio_stream_t* this, camio_connector_t* connector, int rd_fd, int wr_fd);
+camio_error_t tcp_stream_construct(camio_stream_t* this, camio_connector_t* connector, int fd);
 
 #endif /* SRC_DRIVERS_TCP_TCP_STREAM_H_ */

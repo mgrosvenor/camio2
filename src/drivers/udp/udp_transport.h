@@ -16,7 +16,7 @@
 
 typedef struct udp_global_s{
     ch_bool is_init;
-    int udp_fd;
+    //int udp_fd;
 } udp_global_t;
 
 

@@ -389,7 +389,7 @@ static void tcp_destroy(camio_stream_t* this)
 
 }
 
-camio_error_t tcp_stream_construct(camio_stream_t* this, camio_connector_t* connector, int rd_fd, int wr_fd)
+camio_error_t tcp_stream_construct(camio_stream_t* this, camio_connector_t* connector, int fd)
 {
     //Basic sanity checks -- TODO XXX: Should these be made into (compile time optional?) asserts for runtime performance?
     if( NULL == this){
@@ -399,8 +399,8 @@ camio_error_t tcp_stream_construct(camio_stream_t* this, camio_connector_t* conn
     tcp_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
 
     priv->connector = *connector; //Keep a copy of the connector state
-    priv->rd_fd = rd_fd;
-    priv->wr_fd = wr_fd;
+    priv->rd_fd = fd;
+    priv->wr_fd = fd;
 
     //Make sure the file descriptors are in non-blocking mode
     int flags = fcntl(priv->rd_fd, F_GETFL, 0);
@@ -431,7 +431,7 @@ camio_error_t tcp_stream_construct(camio_stream_t* this, camio_connector_t* conn
     this->wr_muxable.fd                = priv->wr_fd;
 
 
-    DBG("Done constructing TCP stream with read_fd=%i and write_fd=%i\n", rd_fd, wr_fd);
+    DBG("Done constructing TCP stream with read_fd=%i and write_fd=%i\n", fd, fd);
     return CAMIO_ENOERROR;
 }
 

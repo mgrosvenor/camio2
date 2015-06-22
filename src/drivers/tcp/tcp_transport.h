@@ -16,16 +16,12 @@
 
 typedef struct tcp_global_s{
     ch_bool is_init;
-    int tcp_fd;
 } tcp_global_t;
 
 
 typedef struct {
     len_string_t hierarchical;
-    len_string_t rd_address;
-    len_string_t wr_address;
-    len_string_t rd_protocol;
-    len_string_t wr_protocol;
+    int64_t listen;
 } tcp_params_t;
 
 void tcp_init();

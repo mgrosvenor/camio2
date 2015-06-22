@@ -31,6 +31,9 @@
 #include <sys/socket.h>
 #include <netdb.h>
 
+/**************************************************************************************************************************
+ * PER STREAM STATE
+ **************************************************************************************************************************/
 #define CAMIO_UDP_MAX_ADDR_STR 1024
 #define CAMIO_UDP_MAX_PROT_STR 10
 typedef struct udp_priv_s {
@@ -40,13 +43,19 @@ typedef struct udp_priv_s {
 
     //Local state for each socket
     int rd_fd;
-    int wr_fd;
+    int wr_fd; //Hmmm. It's bad to have these duplicated here. These should be removed.
 
     //Has connect be called?
     bool is_connected;
 
 } udp_connector_priv_t;
 
+
+
+
+/**************************************************************************************************************************
+ * Connect functions
+ **************************************************************************************************************************/
 
 static camio_error_t resolve_bind_connect(char* address, char* prot, ch_bool do_bind, ch_bool do_connect,
         int* socket_fd_out)
@@ -126,7 +135,7 @@ static camio_error_t udp_connect_peek(udp_connector_priv_t* priv)
     if(priv->params->wr_address.str && priv->params->wr_protocol.str){
         if(resolve_bind_connect(priv->params->wr_address.str,priv->params->wr_protocol.str,false, true, &priv->wr_fd)){
             if(priv->rd_fd){ //Tear down the whole world.
-                close(priv->rd_fd);
+                close(priv->rd_fd > -1);
                 priv->rd_fd = -1;
             }
             return CAMIO_EINVALID; //We cannot connect something went wrong. //TODO XXX better error code
@@ -180,6 +189,13 @@ static camio_error_t udp_connect(camio_connector_t* this, camio_stream_t** strea
     return CAMIO_ENOERROR;
 }
 
+
+
+
+
+/**************************************************************************************************************************
+ * Setup and teardown
+ **************************************************************************************************************************/
 
 static camio_error_t udp_construct(camio_connector_t* this, void** params, ch_word params_size)
 {
@@ -252,12 +268,12 @@ static camio_error_t udp_construct(camio_connector_t* this, void** params, ch_wo
 
         if(udp_params->rd_protocol.str_len == 0){
             strncpy(udp_params->rd_protocol.str, protocol_mark + 1, protocol_len );
-            udp_params->rd_protocol.str_len = address_len;
+            udp_params->rd_protocol.str_len = protocol_len;
         }
 
         if(udp_params->wr_protocol.str_len == 0){
             strncpy(udp_params->wr_protocol.str, protocol_mark + 1, protocol_len );
-            udp_params->wr_protocol.str_len = address_len;
+            udp_params->wr_protocol.str_len = protocol_len;
         }
     }
 
