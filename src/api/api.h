@@ -43,22 +43,35 @@ void camio_connector_destroy(camio_connector_t* this);
 
 
 /**
- * This function tries to do a read for new data from the CamIO Stream called 'this' and returns a read buffer pointer called
- * buffer_o. The read call may or may not block. You should use a selector to ensure that the stream is ready for reading. If
- * the stream is empty, (e.g. end of file) or closed (e.g. disconnected) it is valid to return an empty buffer with ENOERROR.
- * If buffer_offset is non-zero, the read will try to place data at offset bytes into each buffer. This may fail and
- * is only supported if the read_to_buff_off feature is supported. You can check for success by comparing
- * buffer_o->data_start and buffer_o->buffer_start pointers. If the source offset is non-zero, the read will try to retrieve
- * data from offset bytes from the beginning of the source. This may fail and is only supported if the read_from_src_off
- * feature is supported by the stream.
+ * This function registers a read for new data from the CamIO Stream called 'this' with the buffer offset and source offset
+ * parameters. When data is available, it will be returned by a read_acquire call. You should check for data availability
+ * using a camio_multiplexer. If buffer_offset is non-zero, the read will try to place data at offset bytes into each buffer.
+ * This may fail and is only supported if the read_to_buff_off feature is supported. If the source offset is non-zero, the
+ * read will try to retrieve data from offset bytes from the beginning of the source. This may fail and is only supported if
+ * the read_from_src_off feature is supported by the stream. read_register may be called multiple times, but some streams
+ * will only support a limited number (e.g 1) of outstanding requests.
+ * Return values:
+ * - ENOERROR:  Completed successfully, read request has been registered
+ * - ETOOMANY:  Too many read requests registered. This one has been ignored
+ * - TODO XXX: Fill in more here
+ *
+ * TODO XXX: Another way to build this interface would be to register the buffer pointer here as well. I feel that it is less
+ * elegant as the meaning of the API is now obscured, but it could be faster. Hmmm.. Defer to a later decision point
+ */
+camio_error_t camio_read_register( camio_stream_t* this,  ch_word buffer_offset, ch_word source_offset);
+
+
+/**
+ * This function returns a read buffer pointer called buffer_o. The read call may or may not block. You should use a
+ * multiplexer to ensure that the stream is ready for reading. If the stream is empty, (e.g. end of file) or closed
+ * (e.g. disconnected) it is valid to return an empty buffer with ENOERROR. If buffer_offset is non-zero.
  * Return values:
  * - ENOERROR:  Completed successfully, buffer_o contains a valid structure.
  * - ETRYAGAIN: There was no data available at this time, but there might be some more later.
  * - ENOBUFFS:  The stream could not allocate more buffers for the read. Free some buffers by releasing an outstanding read
  *              or write transaction.
  */
-camio_error_t camio_read_acquire( camio_stream_t* this,  camio_rd_buffer_t** buffer_o, ch_word buffer_offset,
-        ch_word source_offset);
+camio_error_t camio_read_acquire( camio_stream_t* this,  camio_rd_buffer_t** buffer_o);
 
 
 /**

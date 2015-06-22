@@ -35,7 +35,7 @@ int main(int argc, char** argv)
    //Read and write bytes to and from the stream - just do loopback for now
     camio_rd_buffer_t* rd_buffer = NULL;
     while(1){
-        while( (err = camio_read_acquire(stream, &rd_buffer, 0, 0)) == CAMIO_ETRYAGAIN){
+        while( (err = camio_read_acquire(stream, &rd_buffer)) == CAMIO_ETRYAGAIN){
             //Just spin waiting for a new read buffer -- TODO XXX need to make a selector for this....
         }
         if(err){ DBG("Got a read error %i\n", err); return -1; }

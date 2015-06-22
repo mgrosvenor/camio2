@@ -28,16 +28,14 @@ typedef struct camio_stream_interface_s{
     void (*destroy)(camio_stream_t* this);
 
     //Read operations
-    camio_error_t (*read_acquire)( camio_stream_t* this,  camio_rd_buffer_t** buffer_o, ch_word buffer_offset,
-            ch_word source_offset);
-    camio_error_t (*read_release)(camio_stream_t* this, camio_wr_buffer_t** buffer_o);
+    camio_error_t (*read_register)(camio_stream_t* this, ch_word buffer_offset, ch_word source_offset);
+    camio_error_t (*read_acquire)( camio_stream_t* this, camio_rd_buffer_t** buffer_o);
+    camio_error_t (*read_release)( camio_stream_t* this, camio_wr_buffer_t** buffer_o);
 
     //Write operations
     camio_error_t (*write_acquire)(camio_stream_t* this, camio_wr_buffer_t** buffer_o);
-    camio_error_t (*write_commit)(camio_stream_t* this, camio_wr_buffer_t** buffer_chain );
+    camio_error_t (*write_commit)( camio_stream_t* this, camio_wr_buffer_t** buffer_chain );
     camio_error_t (*write_release)(camio_stream_t* this, camio_wr_buffer_t** buffers_chain);
-
-
 
 } camio_stream_interface_t;
 
@@ -80,6 +78,7 @@ typedef struct camio_stream_s {
 
 #define NEW_STREAM_DEFINE(NAME, PRIVATE_TYPE) \
     const static camio_stream_interface_t NAME##_stream_interface = {\
+            .read_register  = NAME##_read_register,\
             .read_acquire   = NAME##_read_acquire,\
             .read_release   = NAME##_read_release,\
             .write_acquire  = NAME##_write_acquire,\
