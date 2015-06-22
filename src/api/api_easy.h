@@ -12,6 +12,7 @@
 #define API_EASY_H_
 
 #include <src/camio.h>
+#include <src/transports/stream.h>
 
 /**
  * A nice wrapper around transport creation and connection. Creates a transport and uses the connector to produce a stream.

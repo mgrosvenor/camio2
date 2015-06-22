@@ -18,11 +18,13 @@
 #include "../../camio_debug.h"
 
 #include "udp_stream.h"
-#include "udp_buffer.h"
 
 #include <fcntl.h>
 #include <errno.h>
 
+/**************************************************************************************************************************
+ * PER STREAM STATE
+ **************************************************************************************************************************/
 #define CAMIO_UDP_BUFFER_SIZE (64 * 1024 * 1024)
 //Current (simple) UDP recv only does one buffer at a time, this could change with vectored I/O in the future.
 #define CAMIO_UDP_BUFFER_COUNT (1)
@@ -46,6 +48,12 @@ typedef struct udp_stream_priv_s {
 
 } udp_stream_priv_t;
 
+
+
+
+/**************************************************************************************************************************
+ * READ FUNCTIONS
+ **************************************************************************************************************************/
 
 //See if there is something to read
 static camio_error_t udp_read_peek( camio_stream_t* this)
@@ -108,7 +116,7 @@ static camio_error_t udp_read_ready(camio_muxable_t* this)
     }
 
     //Check if there is data already waiting to be dispatched
-    if(priv->rd_buff_pool){
+    if(priv->rd_buffer){
         DBG("There is data already waiting!\n");
         return CAMIO_EREADY;
     }
@@ -120,13 +128,20 @@ static camio_error_t udp_read_ready(camio_muxable_t* this)
         return CAMIO_EREADY;
     }
 
+    if(err == CAMIO_ETRYAGAIN){
+        //DBG("This is no new data waiting!\n");
+        return CAMIO_ENOTREADY;
+    }
+
+    DBG("Something bad happened!\n");
     return err;
 
 
 }
 
-static camio_error_t udp_read_register( camio_stream_t* this, ch_word buffer_offset, ch_word source_offset)
+static camio_error_t udp_read_request( camio_stream_t* this, ch_word buffer_offset, ch_word source_offset)
 {
+    DBG("Doing UDP read register...!\n");
     //Basic sanity checks -- TODO XXX: Should these be made into (compile time optional?) asserts for runtime performance?
     if( NULL == this){
         DBG("This null???\n"); //WTF?
@@ -152,6 +167,7 @@ static camio_error_t udp_read_register( camio_stream_t* this, ch_word buffer_off
     priv->rd_buff_offset = buffer_offset;
     priv->read_registered = true;
 
+    DBG("Doing UDP read register...Done!..Successful\n");
     return CAMIO_ENOERROR;
 
 }
@@ -215,11 +231,19 @@ static camio_error_t udp_read_release(camio_stream_t* this, camio_rd_buffer_t** 
     camio_error_t err = buffer_malloc_linear_release(priv->rd_buff_pool,buffer);
     if(err){ return err; }
 
-    *buffer = NULL; //Remove dangling pointers!
+    *buffer               = NULL; //Remove dangling pointers!
+    priv->rd_buffer       = NULL; //Remove local reference to the buffer
     priv->read_registered = false; //unregister the outstanding read. And now we're done.
+
     return CAMIO_ENOERROR;
 }
 
+
+
+
+/**************************************************************************************************************************
+ * WRITE FUNCTIONS
+ **************************************************************************************************************************/
 
 static camio_error_t udp_write_acquire(camio_stream_t* this, camio_wr_buffer_t** buffer_o)
 {
@@ -257,7 +281,8 @@ static camio_error_t udp_write_commit(camio_stream_t* this, camio_wr_buffer_t** 
     }
     udp_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
 
-    DBG("Got a buffer chain head with %li bytes in a %li byte buffer starting at %p\n", (*buffer_chain)->data_len, (*buffer_chain)->buffer_len, (*buffer_chain)->data_start);
+    DBG("Got a buffer chain head with %li bytes in a %li byte buffer starting at %p\n",
+            (*buffer_chain)->data_len, (*buffer_chain)->buffer_len, (*buffer_chain)->data_start);
 
     camio_rd_buffer_t* chain_ptr = *buffer_chain;
     while(chain_ptr != NULL){
@@ -306,14 +331,17 @@ static camio_error_t udp_write_release(camio_stream_t* this, camio_wr_buffer_t**
     camio_rd_buffer_t* chain_ptr = *buffer_chain;
     camio_rd_buffer_t* chain_ptr_prev = NULL;
     while(chain_ptr != NULL){
+        DBG("Removing data buffer %p staring at %p\n", chain_ptr, chain_ptr->buffer_start);
         camio_error_t err = buffer_malloc_linear_release(priv->wr_buff_pool,&chain_ptr);
         if(err){
             DBG("Could not release buffer??\n");
             return err;
         }
-        chain_ptr_prev               = *buffer_chain;
+
+        //Step to the next buffer, and unlink the last
+        chain_ptr_prev               = chain_ptr;
         chain_ptr                    = (*buffer_chain)->__internal.__next;
-        chain_ptr->__internal.__next = NULL;
+        chain_ptr_prev->__internal.__next = NULL;
     }
 
     *buffer_chain = NULL; //Remove dangling pointers!
@@ -321,6 +349,13 @@ static camio_error_t udp_write_release(camio_stream_t* this, camio_wr_buffer_t**
     return CAMIO_ENOERROR;
 }
 
+
+
+
+
+/**************************************************************************************************************************
+ * SETUP/CLEANUP FUNCTIONS
+ **************************************************************************************************************************/
 
 static void udp_destroy(camio_stream_t* this)
 {

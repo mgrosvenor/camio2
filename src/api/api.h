@@ -58,7 +58,7 @@ void camio_connector_destroy(camio_connector_t* this);
  * TODO XXX: Another way to build this interface would be to register the buffer pointer here as well. I feel that it is less
  * elegant as the meaning of the API is now obscured, but it could be faster. Hmmm.. Defer to a later decision point
  */
-camio_error_t camio_read_register( camio_stream_t* this,  ch_word buffer_offset, ch_word source_offset);
+camio_error_t camio_read_request( camio_stream_t* this,  ch_word buffer_offset, ch_word source_offset);
 
 
 /**
