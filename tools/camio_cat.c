@@ -28,7 +28,7 @@ int main(int argc, char** argv)
 
     //Create and connect to a new stream
     camio_stream_t* stream = NULL;
-    err = camio_stream_new("udp:localhost:2000?wp=4000", &stream);
+    err = camio_stream_new("tcp:localhost:2000?listen=1", &stream);
     if(err){ DBG("Could not connect to stream\n"); return CAMIO_EINVALID; /*TODO XXX put a better error here*/ }
 
     //Put the read stream into the mux
@@ -48,6 +48,10 @@ int main(int argc, char** argv)
         //Acquire a pointer to the new data
         err = camio_read_acquire(which->parent.stream, &rd_buffer);
         if(err){ DBG("Got a read error %i\n", err); return -1; }
+
+        if(rd_buffer->data_len == 0){
+            break; //The connection is dead!
+        }
 
         //Get a buffer for writing stuff
         err = camio_write_acquire(stream, &wr_buffer);

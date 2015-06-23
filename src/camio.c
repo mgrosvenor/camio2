@@ -65,7 +65,7 @@ camio_error_t register_new_transport(
 )
 {
 
-    DBG("got params=%p\n", params);
+    //DBG("got params=%p\n", params);
     //First check that the scheme hasn't already been registered
     CH_VECTOR(CAMIO_TRANSPORT_STATE_VEC)* trans_state = __camio_state_container.trans_state;
 
@@ -98,7 +98,7 @@ camio_error_t register_new_transport(
             }
         }
 
-        DBG("Pushing transport state back. Params=%p\n", state.params);
+        DBG("Adding new scheme name=%s. Transport count =%i/%i\n", state.scheme, trans_state->count, trans_state->size);
         trans_state->push_back(trans_state,state);
 
     }
@@ -114,7 +114,7 @@ camio_error_t register_new_transport(
 
 camio_error_t camio_transport_params_new( ch_cstr uri_str, void** params_o, ch_word* params_size_o, ch_word* id_o )
 {
-    DBG("Making new params\n");
+    //DBG("Making new params\n");
     if(!__camio_state_container.is_initialized){
         init_camio();
     }
@@ -155,7 +155,7 @@ camio_error_t camio_transport_params_new( ch_cstr uri_str, void** params_o, ch_w
     CH_LIST(KV)* uri_opts = uri->key_vals;
     DBG("Iterating over %i parameters...\n", params->count);
     for( camio_transport_param_t* param = params->first;
-         param != params->end;
+         param != params->end && uri_opts;
          param = params->next(params,param) ){
 
         //Search for the parameter name (ie key) in the key/value uri options list. This should answer the question,
@@ -172,8 +172,9 @@ camio_error_t camio_transport_params_new( ch_cstr uri_str, void** params_o, ch_w
         if(found.value){
             value = found.value->value;
             value_len = found.value->value_len;
-            DBG("PARAM FOUND PARAM=%s VALUE=%.*s OFFSET=%lli\n", param->param_name, value_len, value, param->param_struct_offset);
-            num_result  = parse_number(value, value_len); //Just try to parse this as a number in case
+            DBG("param found param=%s value=%.*s offset=%lli. Parsing as a number now.\n", param->param_name, value_len, value, param->param_struct_offset);
+            num_result  = parse_number(value, 0); //Just try to parse this as a number in casenum_result.type
+            DBG("num_result.type=%i\n", num_result.type);
         }
 
         //Some sanity checking...
@@ -217,7 +218,7 @@ camio_error_t camio_transport_params_new( ch_cstr uri_str, void** params_o, ch_w
                 if(found.value){ //We got a value, let's try to assign it
                     if(num_result.type == CH_UINT64) {  *param_ptr = (uint64_t)num_result.val_uint; }
                     else{ //Shit, the value has the wrong type!
-                        DBG("Expected a UINT64 but got %*.s ", value_len, value);
+                        DBG("Expected a UINT64 but got \"%.*s\" ", value_len, value);
                         result = CAMIO_EINVALID; //TODO XXX make a better return value
                         goto exit_params;
                     }
@@ -236,7 +237,7 @@ camio_error_t camio_transport_params_new( ch_cstr uri_str, void** params_o, ch_w
                     if(      num_result.type == CH_UINT64)  { *param_ptr = (int64_t)num_result.val_uint; }
                     else if( num_result.type == CH_INT64)   { *param_ptr = (int64_t)num_result.val_int;  }
                     else{
-                        DBG("Expected a INT64 but got %*.s ", value_len, value);
+                        DBG("Expected an INT64 but got \"%.*s\" ", value_len, value);
                         result = CAMIO_EINVALID; //TODO XXX make a better return value
                         goto exit_params;
                     }
@@ -256,7 +257,7 @@ camio_error_t camio_transport_params_new( ch_cstr uri_str, void** params_o, ch_w
                     else if( num_result.type == CH_INT64)   { *param_ptr = (double)num_result.val_int;  }
                     else if( num_result.type == CH_DOUBLE)  { *param_ptr = (double)num_result.val_dble; }
                     else{
-                        DBG("Expected a DOUBLE but got %*.s ", value_len, value);
+                        DBG("Expected a DOUBLE but got\" %.*s\" ", value_len, value);
                         result = CAMIO_EINVALID; //TODO XXX make a better return value
                         goto exit_params;
                     }
@@ -278,9 +279,9 @@ camio_error_t camio_transport_params_new( ch_cstr uri_str, void** params_o, ch_w
     }
 
     //Output the things that we care about
-    *params_o      = params_struct;
-    *params_size_o = state->param_struct_size;
-    *id_o = trans_state->get_idx(trans_state,state);
+    *params_o       = params_struct;
+    *params_size_o  = state->param_struct_size;
+    *id_o           = trans_state->get_idx(trans_state,state);
     return CAMIO_ENOERROR;
 
 
@@ -305,6 +306,7 @@ camio_error_t camio_transport_constr(ch_word id, void** params, ch_word params_s
     CH_VECTOR(CAMIO_TRANSPORT_STATE_VEC)* trans_state = __camio_state_container.trans_state;
     camio_transport_state_t* state = trans_state->off(trans_state,id);
     if(state == NULL){
+        DBG("Could not find transport at ID=%i\n",id);
         return CAMIO_EINDEXNOTFOUND;
     }
 

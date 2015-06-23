@@ -32,9 +32,8 @@
 typedef struct tcp_stream_priv_s {
     camio_connector_t connector;
 
-    //These are the actual underlying file descriptors that we're going to work with. Defualt is -1
-    int rd_fd;
-    int wr_fd;
+    //The actual underlying file descriptor that we're going to work with. Default is -1
+    int fd;
 
     //Buffer pools for data -- This is really a place holder for vectored I/O in the future
     buffer_malloc_linear_t* rd_buff_pool;
@@ -72,7 +71,7 @@ static camio_error_t tcp_read_peek( camio_stream_t* this)
     priv->rd_buff_offset = MIN(CAMIO_TCP_BUFFER_SIZE, priv->rd_buff_offset); //Make sure we don't overflow the buffer
     char* read_buffer = (char*)priv->rd_buffer->buffer_start + priv->rd_buff_offset; //Do the offset that we need
     const ch_word read_size = CAMIO_TCP_BUFFER_SIZE - priv->rd_buff_offset; //Also make sure we don't overflow
-    ch_word bytes = read(priv->rd_fd, read_buffer, read_size);
+    ch_word bytes = read(priv->fd, read_buffer, read_size);
     if(bytes < 0){ //Shit, got an error. Maybe there just isn't any data?
         buffer_malloc_linear_release(priv->rd_buff_pool,&priv->rd_buffer); //TODO, could remove this step and reuse buffer..
         priv->rd_buffer = NULL;
@@ -286,8 +285,8 @@ static camio_error_t tcp_write_commit(camio_stream_t* this, camio_wr_buffer_t** 
 
     camio_rd_buffer_t* chain_ptr = *buffer_chain;
     while(chain_ptr != NULL){
-        DBG("Writing %li bytes from %p to %i\n", chain_ptr->data_len,chain_ptr->data_start, priv->wr_fd);
-        ch_word bytes = write(priv->wr_fd,chain_ptr->data_start,chain_ptr->data_len);
+        DBG("Writing %li bytes from %p to %i\n", chain_ptr->data_len,chain_ptr->data_start, priv->fd);
+        ch_word bytes = write(priv->fd,chain_ptr->data_start,chain_ptr->data_len);
         if(bytes < 0){
             if(errno == EWOULDBLOCK || errno == EAGAIN){
                 return CAMIO_ETRYAGAIN;
@@ -366,14 +365,9 @@ static void tcp_destroy(camio_stream_t* this)
     }
     tcp_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
 
-    if(priv->rd_fd > -1){
-        close(priv->rd_fd);
-        priv->rd_fd = -1; //Make this reentrant safe
-    }
-
-    if(priv->wr_fd > -1){
-        close(priv->wr_fd);
-        priv->wr_fd = -1; //Make this reentrant safe
+    if(priv->fd > -1){
+        close(priv->fd);
+        priv->fd = -1; //Make this reentrant safe
     }
 
 
@@ -399,14 +393,11 @@ camio_error_t tcp_stream_construct(camio_stream_t* this, camio_connector_t* conn
     tcp_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
 
     priv->connector = *connector; //Keep a copy of the connector state
-    priv->rd_fd = fd;
-    priv->wr_fd = fd;
+    priv->fd = fd;
 
     //Make sure the file descriptors are in non-blocking mode
-    int flags = fcntl(priv->rd_fd, F_GETFL, 0);
-    fcntl(priv->rd_fd, F_SETFL, flags | O_NONBLOCK);
-    flags = fcntl(priv->wr_fd, F_GETFL, 0);
-    fcntl(priv->wr_fd, F_SETFL, flags | O_NONBLOCK);
+    int flags = fcntl(priv->fd, F_GETFL, 0);
+    fcntl(priv->fd, F_SETFL, flags | O_NONBLOCK);
 
     camio_error_t error = CAMIO_ENOERROR;
     error = buffer_malloc_linear_new(this,CAMIO_TCP_BUFFER_SIZE,CAMIO_TCP_BUFFER_COUNT,true,&priv->rd_buff_pool);
@@ -423,12 +414,12 @@ camio_error_t tcp_stream_construct(camio_stream_t* this, camio_connector_t* conn
     this->rd_muxable.mode              = CAMIO_MUX_MODE_READ;
     this->rd_muxable.parent.stream     = this;
     this->rd_muxable.vtable.ready      = tcp_read_ready;
-    this->rd_muxable.fd                = priv->rd_fd;
+    this->rd_muxable.fd                = priv->fd;
 
     this->wr_muxable.mode              = CAMIO_MUX_MODE_WRITE;
     this->wr_muxable.parent.stream     = this;
     this->wr_muxable.vtable.ready      = NULL;
-    this->wr_muxable.fd                = priv->wr_fd;
+    this->wr_muxable.fd                = priv->fd;
 
 
     DBG("Done constructing TCP stream with read_fd=%i and write_fd=%i\n", fd, fd);

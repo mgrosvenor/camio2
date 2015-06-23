@@ -81,6 +81,7 @@ static camio_error_t resolve_bind_connect(char* address, char* prot, ch_bool do_
         }
 
         if(do_connect){
+            DBG("Doing connect\n");
             if (connect(s, res->ai_addr, res->ai_addrlen) < 0) {
                 cause = "connect";
                 close(s);
@@ -89,7 +90,9 @@ static camio_error_t resolve_bind_connect(char* address, char* prot, ch_bool do_
             }
         }
 
+
         if(do_bind){
+            DBG("Doing bind addrelen=%i\n", res->ai_addrlen);
             if (bind(s, res->ai_addr, res->ai_addrlen) < 0) {
                 cause = "connect";
                 close(s);
@@ -129,6 +132,13 @@ static camio_error_t tcp_connect_peek(camio_connector_t* this)
         int flags = fcntl(this->muxable.fd, F_GETFL, 0);
         fcntl(this->muxable.fd, F_SETFL, flags | O_NONBLOCK);
 
+        //Mark the socket as listening if needed
+        if(priv->params->listen){
+           if(listen(this->muxable.fd,1024)){
+               DBG("Failed to listen with error %s\n", strerror(errno));
+               return CAMIO_ECHECKERRORNO;
+           }
+        }
     }
     //OK, now that we've set up a non-blocking descriptor, we can go and accept or connect
     if(!priv->params->listen){
@@ -137,15 +147,16 @@ static camio_error_t tcp_connect_peek(camio_connector_t* this)
     }
 
     //Time to accept now incoming connections
-    struct sockaddr_in client_addr;
-    socklen_t client_addr_len;
-    priv->con_fd_tmp = accept(this->muxable.fd,(struct sockaddr *)&client_addr,&client_addr_len);
+    //struct sockaddr_in client_addr;
+    //socklen_t client_addr_len = sizeof(struct sockaddr_in);
+    //priv->con_fd_tmp = accept(this->muxable.fd,(struct sockaddr *)&client_addr,&client_addr_len);
+    priv->con_fd_tmp = accept(this->muxable.fd,NULL,NULL);
     if(priv->con_fd_tmp < 0){
         if(errno == EWOULDBLOCK || errno == EAGAIN){
             return CAMIO_ETRYAGAIN;
         }
         else{
-            DBG("Something else went wrong, check errno value\n");
+            DBG("Something else went wrong, check errno value (%s)\n",strerror(errno));
             return CAMIO_ECHECKERRORNO;
         }
     }
