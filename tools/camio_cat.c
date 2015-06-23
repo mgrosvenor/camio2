@@ -45,7 +45,7 @@ int main(int argc, char** argv)
         //Block waiting for a stream to be ready
         camio_mux_select(mux,&which);
 
-        //Acquire a pointer to the new data
+        //Acquire a pointer to the new data now that it's ready
         err = camio_read_acquire(which->parent.stream, &rd_buffer);
         if(err){ DBG("Got a read error %i\n", err); return -1; }
 
@@ -53,7 +53,7 @@ int main(int argc, char** argv)
             break; //The connection is dead!
         }
 
-        //Get a buffer for writing stuff
+        //Get a buffer for writing stuff to
         err = camio_write_acquire(stream, &wr_buffer);
         if(err){ DBG("Could not connect to stream\n"); return CAMIO_EINVALID; /*TODO XXX put a better error here*/ }
 
