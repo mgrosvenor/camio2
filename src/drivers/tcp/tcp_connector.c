@@ -19,6 +19,7 @@
 #include "tcp_connector.h"
 #include "tcp_stream.h"
 
+
 #include <errno.h>
 #include <stdio.h>
 #include <fcntl.h>
@@ -48,6 +49,8 @@ typedef struct tcp_priv_s {
     //Has connect be called?
     int con_fd_tmp;
 
+    ch_bool connected_client;
+
 
 } tcp_connector_priv_t;
 
@@ -55,61 +58,89 @@ typedef struct tcp_priv_s {
 /**************************************************************************************************************************
  * Connect functions
  **************************************************************************************************************************/
+#define TCP_ERROR_NONE      0
+#define TCP_ERROR_SOCKET    1
+#define TCP_ERROR_CONNECT   2
+#define TCP_ERROR_BIND      3
+static char* tcp_error_strs[] = {
+        "No error",
+        "Socket error",
+        "Connect error",
+        "Bind error",
+};
 
 static camio_error_t resolve_bind_connect(char* address, char* prot, ch_bool do_bind, ch_bool do_connect,
         int* socket_fd_out)
 {
-    struct addrinfo hints, *res, *res0;
-    int s;
-    char* cause;
-    int error;
+    struct addrinfo hints       = {0};
+    struct addrinfo *res_head   = NULL;
+    int error                   = 0;
 
     memset(&hints, 0, sizeof(hints));
     hints.ai_family = PF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM; //This could be more general in the future if the code is moved out of the TCP stream
-    error = getaddrinfo(address, prot, &hints, &res0);
+    error = getaddrinfo(address, prot, &hints, &res_head);
     if (error) {
         DBG("Getaddrinfo() failed: %s\n", gai_strerror(error));
         return CAMIO_EBADOPT;
     }
-    s = -1;
-    for (res = res0; res; res = res->ai_next) {
-        s = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
-        if (s < 0) {
-            cause = "socket";
+    if(!res_head){//Not sure if this is even possible given the error check above?
+        DBG("Resolving address resulted in no options. Bad address??\n");
+        return CAMIO_EBADOPT;
+    }
+
+    //Iterate over all results, see if we can connect or bind to any of them
+    ch_word soc_fd = -1;
+    #define IP_STR_MAX (64)
+    char str_to_ip[IP_STR_MAX] = {0};
+
+    for ( struct addrinfo *res = res_head; res; res = res->ai_next) {
+        inet_ntop(res->ai_family,res->ai_addr,&str_to_ip[0],IP_STR_MAX);
+
+        soc_fd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+        if (soc_fd < 0) {
+            error = TCP_ERROR_SOCKET;
             continue;
         }
 
         if(do_connect){
-            DBG("Doing connect\n");
-            if (connect(s, res->ai_addr, res->ai_addrlen) < 0) {
-                cause = "connect";
-                close(s);
-                s = -1;
+            DBG("Doing TCP connect to (%s:%s) %s...\n",address, prot, str_to_ip);
+            if (connect(soc_fd, res->ai_addr, res->ai_addrlen) < 0) {
+                error = TCP_ERROR_CONNECT;
+                close(soc_fd);
+                soc_fd = -1;
                 continue;
             }
         }
 
 
         if(do_bind){
-            DBG("Doing bind addrelen=%i\n", res->ai_addrlen);
-            if (bind(s, res->ai_addr, res->ai_addrlen) < 0) {
-                cause = "connect";
-                close(s);
-                s = -1;
+            DBG("Doing TCP bind to (%s:%s) %s...\n",address, prot,str_to_ip );
+            if (bind(soc_fd, res->ai_addr, res->ai_addrlen) < 0) {
+                error = TCP_ERROR_BIND;
+                close(soc_fd);
+                soc_fd = -1;
                 continue;
             }
         }
 
         break;  /* okay we got one */
     }
-    if (s < 0) {
-        DBG("Socket failed: %s\n", cause);
-        return CAMIO_EINVALID;
+    if (soc_fd < 0) {
+        if(error == TCP_ERROR_CONNECT){
+            //Nothing to connect to, this is probably not fatal
+            return CAMIO_ENOTREADY;
+        }
+
+        //Other errors probably are fatal
+        const char* error_str = tcp_error_strs[error];
+        (void)error_str;
+        DBG("Creating socket failed: %s\n", error_str);
+        return CAMIO_EINVALID; //OK. We were not ready to connect for some reason. TODO XXX better error code here
     }
 
-    //If we get here, s is populated with something meaningful
-    *socket_fd_out = s;
+    //If we get here, soc_fd is populated with something meaningful! yay!
+    *socket_fd_out = soc_fd;
 
     DBG("Done %s to address %s with protocol %s\n", do_bind ? "binding" : "connecting", address, prot);
 
@@ -119,11 +150,17 @@ static camio_error_t resolve_bind_connect(char* address, char* prot, ch_bool do_
 //Try to see if connecting is possible. With TCP, it is always possible.
 static camio_error_t tcp_connect_peek(camio_connector_t* this)
 {
+
+    DBG("Doing TCP connect peek\n");
     tcp_connector_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
     if(this->muxable.fd < 0){ //No socket yet
         const bool do_bind    = priv->params->listen;
         const bool do_connect = !do_bind;
         camio_error_t err = resolve_bind_connect(priv->address.str,priv->protocol.str,do_bind,do_connect, &this->muxable.fd);
+        if(err == CAMIO_ENOTREADY){
+            DBG("TCP is not ready to connect, but it might be in the future\n");
+            return CAMIO_ETRYAGAIN;
+        }
         if(err != CAMIO_ENOERROR){
             return err; //We cannot connect something went wrong. //TODO XXX better error code
         }
@@ -168,28 +205,41 @@ static camio_error_t tcp_connect_peek(camio_connector_t* this)
 
 static camio_error_t tcp_connector_ready(camio_muxable_t* this)
 {
+    DBG("Checking if TCP is ready to connect...\n");
     tcp_connector_priv_t* priv = CONNECTOR_GET_PRIVATE(this->parent.connector);
 
-    if(priv-> con_fd_tmp > -1){
+    if(priv->connected_client){
+        DBG("Already connected!\n");
+        return CAMIO_ENOTREADY;
+    }
+
+    if(priv->con_fd_tmp > -1){
+        DBG("Ready to connect, FD is > -1\n");
         return CAMIO_EREADY;
     }
 
     camio_error_t err = tcp_connect_peek(this->parent.connector);
+    if(err == CAMIO_ETRYAGAIN){
+        DBG("Not ready to connect, try again in a while\n");
+        return CAMIO_ENOTREADY;
+    }
     if(err != CAMIO_ENOERROR){
+        DBG("Not ready to connect, Some other error (%i)\n", err);
         return err;
     }
 
+    DBG("Ready to connect, FD is now %i\n", priv->con_fd_tmp);
     return CAMIO_EREADY;
 }
 
 static camio_error_t tcp_connect(camio_connector_t* this, camio_stream_t** stream_o )
 {
     tcp_connector_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
-    camio_error_t err = tcp_connect_peek(this);
-    if(err != CAMIO_ENOERROR){
+    camio_error_t err = tcp_connector_ready(&this->muxable);
+    if(err != CAMIO_EREADY){
         return err;
     }
-    //DBG("Done connecting, now constructing TCP stream...\n");
+    DBG("Done connecting, now constructing TCP stream...\n");
 
     camio_stream_t* stream = NEW_STREAM(tcp);
     if(!stream){
@@ -202,6 +252,13 @@ static camio_error_t tcp_connect(camio_connector_t* this, camio_stream_t** strea
     if(err){
        return err;
     }
+
+
+    if(!priv->params->listen){ //Mkae sure we only connect once on a client
+        DBG("Only connect once!\n");
+        priv->connected_client = true;
+    }
+    priv->con_fd_tmp = -1;
 
     return CAMIO_ENOERROR;
 }
@@ -256,6 +313,7 @@ static camio_error_t tcp_construct(camio_connector_t* this, void** params, ch_wo
 
     //Populate the parameters
     priv->params                    = tcp_params;
+    priv->con_fd_tmp                = -1;
 
     //Populate the muxable structure
     this->muxable.mode              = CAMIO_MUX_MODE_CONNECT;

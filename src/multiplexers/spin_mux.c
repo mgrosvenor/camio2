@@ -35,7 +35,7 @@ camio_error_t spin_construct(camio_mux_t* this){
 
 camio_error_t spin_insert(camio_mux_t* this, camio_muxable_t* muxable, ch_word id)
 {
-    DBG("Inserting %p into mux\n");
+    DBG("Inserting %p into mux with id=%i\n",muxable,id);
     mux_spin_priv_t* priv = MUX_GET_PRIVATE(this);
     CH_VECTOR(CAMIO_MUXABLE_VEC)* muxables = priv->muxables;
     muxable->id = id;
@@ -72,7 +72,7 @@ camio_error_t spin_select(camio_mux_t* this, /*struct timespec timeout,*/ camio_
         camio_muxable_t* muxable = muxables->off(muxables,priv->idx);
         camio_error_t err = muxable->vtable.ready(muxable);
         if(err == CAMIO_EREADY){
-            DBG("Found an item at index %i\n", priv->idx);
+            DBG("Found ready item at index %i\n", priv->idx);
             priv->idx += 1;//Make sure we look at the next transport first
             *muxable_o = muxable;
             return CAMIO_ENOERROR;

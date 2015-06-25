@@ -21,7 +21,8 @@
 #set -x
 
 INCLUDES="-Ideps -Isrc"
-CFLAGS="-D_XOPEN_SOURCE=700 -D_BSD_SOURCE -std=c11 -Werror -Wall -Wextra -pedantic -Wno-missing-field-initializers -ggdb"
+#CFLAGS="-D_XOPEN_SOURCE=700 -D_BSD_SOURCE -std=c11 -Werror -Wall -Wextra -pedantic -Wno-missing-field-initializers -ggdb"
+CFLAGS="-std=c11 -Werror -Wall -Wextra -pedantic -Wno-missing-field-initializers -ggdb"
 LINKFLAGS="-Ideps/chaste"
 SRC=src/camio.c
 #TESTS="--begintests  tests/camio_udp_test.c --endtests"
@@ -41,4 +42,8 @@ cake $SRC\
 cake tools/camio_cat.c \
     --append-CFLAGS="$INCLUDES $CFLAGS"\
     --append-LINKFLAGS="$LINKFLAGS"
- 
+
+cake tools/camio_perf/camio_perf.c \
+    --append-CFLAGS="$INCLUDES $CFLAGS"\
+    --append-LINKFLAGS="$LINKFLAGS"
+  

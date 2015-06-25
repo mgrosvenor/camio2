@@ -244,6 +244,28 @@ static camio_error_t tcp_read_release(camio_stream_t* this, camio_rd_buffer_t** 
  * WRITE FUNCTIONS
  **************************************************************************************************************************/
 
+static camio_error_t tcp_write_ready(camio_muxable_t* this)
+{
+    //Basic sanity checks -- TODO XXX: Should these be made into (compile time optional?) asserts for runtime performance?
+    if( NULL == this){
+        DBG("This is null???\n"); //WTF?
+        return CAMIO_EINVALID;
+    }
+
+    if( this->mode != CAMIO_MUX_MODE_WRITE){
+        DBG("Wrong kind of muxable!\n"); //WTF??
+        return CAMIO_EINVALID;
+    }
+
+    //OK now the fun begins
+    //tcp_stream_priv_t* priv = STREAM_GET_PRIVATE(this->parent.stream);
+
+    //Keep it simple, just say we are always ready to begin with!
+    return CAMIO_EREADY;
+
+}
+
+
 static camio_error_t tcp_write_acquire(camio_stream_t* this, camio_wr_buffer_t** buffer_o)
 {
     //Basic sanity checks -- TODO XXX: Should these be made into (compile time optional?) asserts for runtime performance?
@@ -292,7 +314,7 @@ static camio_error_t tcp_write_commit(camio_stream_t* this, camio_wr_buffer_t** 
                 return CAMIO_ETRYAGAIN;
             }
             else{
-                DBG(" error %s\n",strerror(errno));
+                DBG("error %s\n",strerror(errno));
                 return CAMIO_ECHECKERRORNO;
             }
         }
@@ -418,7 +440,7 @@ camio_error_t tcp_stream_construct(camio_stream_t* this, camio_connector_t* conn
 
     this->wr_muxable.mode              = CAMIO_MUX_MODE_WRITE;
     this->wr_muxable.parent.stream     = this;
-    this->wr_muxable.vtable.ready      = NULL;
+    this->wr_muxable.vtable.ready      = tcp_write_ready;
     this->wr_muxable.fd                = priv->fd;
 
 

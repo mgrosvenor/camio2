@@ -71,12 +71,12 @@ typedef struct camio_buffer_s {
     //Some timestamps are inline with the data, some are not, this will point to the timestamp regardless of where it is.
     void* ts;
 
-    uint64_t data_len;      //Zero if there is no data. Length of data actually in the buffer
-    uint64_t orig_len;      //Sometimes there was more data than we have space. If orig_len > data_len, then
+    int64_t data_len;      //Zero if there is no data. Length of data actually in the buffer
+    int64_t orig_len;      //Sometimes there was more data than we have space. If orig_len > data_len, then
                             //truncation has happened. This probably only matters for reads
     void* data_start;       //Undefined if there is no data. Data may be offset into the buffer to allow for headers etc.
 
-    uint64_t buffer_len;    //Undefined if there is no data. Buffer_len is always >= data_len + (buffer_start - data_start)
+    int64_t buffer_len;    //Undefined if there is no data. Buffer_len is always >= data_len + (buffer_start - data_start)
     void* buffer_start;     //Undefined if there is no data
 
     camio_buffer_internal_t __internal; //Internal state, do not touch unless you are are stream implementor
