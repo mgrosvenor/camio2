@@ -15,14 +15,14 @@
 
 #include "delim_connector.h"
 
-typedef struct delim_global_s{
-    ch_bool is_init;
-    //int delim_fd;
-} delim_global_t;
+//No global state
+//typedef struct delim_global_s{
+//} delim_global_t;
 
 
 typedef struct {
-    len_string_t hierarchical;
+    char* base_uri; //URI for the base stream that this will be delimiting
+    int (*delim_fn)(char* buffer, int len); //Delimiting function
 } delim_params_t;
 
 void delim_init();

@@ -41,15 +41,8 @@ void delim_init()
 {
 
     DBG("Initializing delim...\n");
-    CH_VECTOR(CAMIO_TRANSPORT_PARAMS_VEC)* params = CH_VECTOR_NEW(CAMIO_TRANSPORT_PARAMS_VEC,256,NULL);
-    if(!params){
-        return; // No memory. Can't register this transport
-    }
 
-    //add_param_optional(params,"ra",delim_params_t,rd_address,"");
-    const ch_word hier_offset = offsetof(delim_params_t,hierarchical);
-    DBG("Hierarchical offset=%i...Done\n", hier_offset);
-
-    register_new_transport(scheme,strlen(scheme),hier_offset,construct,sizeof(delim_params_t),params,0);
+    //No params to add. The delimiter should only be used in binary form!
+    register_new_transport(scheme,strlen(scheme),0,construct,0,NULL,0);
     DBG("Initializing delim...Done\n");
 }

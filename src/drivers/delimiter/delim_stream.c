@@ -27,6 +27,15 @@
  **************************************************************************************************************************/
 typedef struct delim_stream_priv_s {
     camio_connector_t connector;
+    camio_stream_t* base;                     //Base stream that will be "decorated"
+    int is_closed;
+    uint8_t* working_buffer;
+    uint64_t working_buffer_size;
+    uint64_t working_buffer_contents_size;
+    uint8_t* read_buffer;
+    uint64_t read_buffer_size;
+    uint8_t* result_buffer;
+    uint64_t result_buffer_size;
 
 } delim_stream_priv_t;
 
@@ -330,7 +339,7 @@ static void delim_destroy(camio_stream_t* this)
 
 }
 
-camio_error_t delim_stream_construct(camio_stream_t* this, camio_connector_t* connector /** , ... , **/)
+camio_error_t delim_stream_construct(camio_stream_t* this, camio_connector_t* connector, camio_stream_t* base_stream)
 {
     //Basic sanity checks -- TODO DELIM: Should these be made into (compile time optional?) asserts for runtime performance?
     if( NULL == this){
@@ -339,6 +348,7 @@ camio_error_t delim_stream_construct(camio_stream_t* this, camio_connector_t* co
     }
     delim_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
 
+    priv->base      = base_stream;
     priv->connector = *connector; //Keep a copy of the connector state
 
     this->rd_muxable.mode              = CAMIO_MUX_MODE_READ;

@@ -109,7 +109,7 @@ static camio_error_t ttt_construct(camio_connector_t* this, void** params, ch_wo
     this->muxable.vtable.ready      = ttt_connector_ready;
     this->muxable.fd                = -1;
 
-    //Populate private state
+    //Populate private connector state
     //priv->... =  ...;
 
     return CAMIO_ENOERROR;
