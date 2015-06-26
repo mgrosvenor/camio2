@@ -354,12 +354,12 @@ camio_error_t delim_stream_construct(camio_stream_t* this, camio_connector_t* co
     this->rd_muxable.mode              = CAMIO_MUX_MODE_READ;
     this->rd_muxable.parent.stream     = this;
     this->rd_muxable.vtable.ready      = delim_read_ready;
-    //this->rd_muxable.fd                = ...
+    this->rd_muxable.fd                = base_stream->rd_muxable.fd;
 
     this->wr_muxable.mode              = CAMIO_MUX_MODE_WRITE;
     this->wr_muxable.parent.stream     = this;
     this->wr_muxable.vtable.ready      = NULL;
-    //this->wr_muxable.fd                = ...
+    this->wr_muxable.fd                = base_stream->wr_muxable.fd;
 
 
     DBG("Done constructing DELIM stream\n");
