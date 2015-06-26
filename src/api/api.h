@@ -41,6 +41,10 @@ camio_error_t camio_connect( camio_connector_t* this, camio_stream_t** stream_o 
  */
 void camio_connector_destroy(camio_connector_t* this);
 
+/**
+ * Check if the connector is ready to connect. A connector is ready if calling connect will be non-blocking.
+ */
+camio_error_t camio_connector_ready( camio_connector_t* this);
 
 /**
  * This function registers a read for new data from the CamIO Stream called 'this' with the buffer offset and source offset
@@ -59,6 +63,12 @@ void camio_connector_destroy(camio_connector_t* this);
  * elegant as the meaning of the API is now obscured, but it could be faster. Hmmm.. Defer to a later decision point
  */
 camio_error_t camio_read_request( camio_stream_t* this,  ch_word buffer_offset, ch_word source_offset);
+
+
+/**
+ * Check if the stream is ready to read. A connector is ready if calling read will be non-blocking.
+ */
+camio_error_t camio_read_ready( camio_stream_t* this);
 
 
 /**
@@ -100,6 +110,11 @@ camio_error_t camio_read_release(camio_stream_t* this, camio_rd_buffer_t** buffe
  *              transaction.
  */
 camio_error_t camio_write_acquire(camio_stream_t* this, camio_wr_buffer_t** buffer_o);
+
+/**
+ * Check if the stream is ready to write. A connector is ready if calling write will be non-blocking.
+ */
+camio_error_t camio_write_ready( camio_stream_t* this);
 
 
 /**
@@ -207,5 +222,6 @@ camio_error_t camio_mux_select(camio_mux_t* this, /*struct timespec timeout,*/ c
  * Free resources associated with this selector
  */
 void camio_mux_destroy(camio_mux_t* this);
+
 
 #endif /* API_H_ */
