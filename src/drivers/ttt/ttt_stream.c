@@ -1,9 +1,9 @@
 /*
  * CamIO - The Cambridge Input/Output API 
- * Copyright (c) 2014, All rights reserved.
+ * Copyright (c) ZZZZ, All rights reserved.
  * See LICENSE.txt for full details. 
  * 
- *  Created:   17 Nov 2014
+ *  Created:   PPP ZZZZ
  *  File name: ttt_stream.c
  *  Description:
  *  <INSERT DESCRIPTION HERE> 

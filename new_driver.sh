@@ -24,4 +24,12 @@ short_name_up=$(echo $short_name | tr '[:lower:]' '[:upper:]')
 perl -pi -w -e "s/ttt/$short_name/g;" $new_dir/*
 perl -pi -w -e "s/TTT/$short_name_up/g;" $new_dir/*
 
+#put the dates right
+d=$(date +%Y)
+perl -pi -w -e "s/ZZZZ/$d/g;" $new_dir/*
+
+d=$(date  +"%d %b")
+perl -pi -w -e "s/PPP/$d/g;" $new_dir/*
+
+
 

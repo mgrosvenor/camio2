@@ -1,9 +1,9 @@
 /*
  * CamIO - The Cambridge Input/Output API 
- * Copyright (c) 2015, All rights reserved.
+ * Copyright (c) ZZZZ, All rights reserved.
  * See LICENSE.txt for full details. 
  * 
- *  Created:   YY ZZZ PPP
+ *  Created:   PPP ZZZZ
  *  File name: ttt_connector.h
  *  Description:
  *  <INSERT DESCRIPTION HERE> 
