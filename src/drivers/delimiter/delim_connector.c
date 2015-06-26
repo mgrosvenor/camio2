@@ -41,6 +41,7 @@ typedef struct delim_priv_s {
  **************************************************************************************************************************/
 static camio_error_t delim_connector_ready(camio_muxable_t* this)
 {
+    //Forward the ready function from the base connector. The delimiter is always ready to party!
     delim_connector_priv_t* priv = CONNECTOR_GET_PRIVATE(this->parent.connector);
     return camio_connector_ready(priv->base);
 
@@ -52,7 +53,9 @@ static camio_error_t delim_connect(camio_connector_t* this, camio_stream_t** str
     camio_stream_t* base_stream;
     camio_error_t err = camio_connect(priv->base, &base_stream);
     if(err){
-        DBG("EEK error trying to call connect on base stream\n");
+        if(err != CAMIO_ETRYAGAIN){//ETRYAGAIN is ok.
+            DBG("EEK unexpected error trying to call connect on base stream\n");
+        }
         return err;
     }
 
@@ -65,10 +68,11 @@ static camio_error_t delim_connect(camio_connector_t* this, camio_stream_t** str
 
     err = delim_stream_construct(stream, this, base_stream);
     if(err){
+        DBG("Eeek! - Failed to construct the base stream. Now what??\n");
         return err;
     }
 
-    return CAMIO_ENOERROR;
+    return delim_stream_construct(stream,this,base_stream, priv->params->delim_fn);
 }
 
 
@@ -81,8 +85,6 @@ static camio_error_t delim_connect(camio_connector_t* this, camio_stream_t** str
 
 static camio_error_t delim_construct(camio_connector_t* this, void** params, ch_word params_size)
 {
-
-    delim_connector_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
     //Basic sanity check that the params is the right one.
     if(params_size != sizeof(delim_params_t)){
         DBG("Bad parameters structure passed\n");
@@ -96,7 +98,8 @@ static camio_error_t delim_construct(camio_connector_t* this, void** params, ch_
     }
 
     //Populate the parameters
-    priv->params                    = delim_params;
+    delim_connector_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
+    priv->params = delim_params;
 
     //OK try to construct the base stream connector...
     camio_error_t err = camio_transport_params_new(
@@ -114,8 +117,8 @@ static camio_error_t delim_construct(camio_connector_t* this, void** params, ch_
     this->muxable.mode              = CAMIO_MUX_MODE_CONNECT;
     this->muxable.parent.connector  = this;
     this->muxable.vtable.ready      = delim_connector_ready;
-    this->muxable.fd                = priv->base->muxable.id; //Pass this out, but retain the ready function. Smells bad...
-
+    this->muxable.fd                = priv->base->muxable.id; //Pass this out, but retain the ready function.
+                                                              //Smells a bit bad, but is probably ok.
     return CAMIO_ENOERROR;
 }
 
@@ -125,9 +128,7 @@ static void delim_destroy(camio_connector_t* this)
     DBG("Destroying delim connector...\n");
     delim_connector_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
 
-    //Free local stuff
-    //    if(priv->...)  { close(...); }
-    //    if(priv->...)  { free(...); }
+    if(priv->base){ camio_connector_destroy(priv->base); }
 
     if(priv->params) { free(priv->params); }
     free(this);

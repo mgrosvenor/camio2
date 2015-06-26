@@ -254,7 +254,7 @@ static camio_error_t tcp_connect(camio_connector_t* this, camio_stream_t** strea
     }
 
 
-    if(!priv->params->listen){ //Mkae sure we only connect once on a client
+    if(!priv->params->listen){ //Make sure we only connect once on a client
         DBG("Only connect once!\n");
         priv->connected_client = true;
     }
