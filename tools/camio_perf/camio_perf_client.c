@@ -73,7 +73,7 @@ int camio_perf_clinet(ch_cstr client_stream_uri, ch_word* stop)
     ch_word time_start_ns       = now.tv_sec * 1000 * 1000 * 1000 + now.tv_usec * 1000;
     ch_word time_int_start_ns   = time_start_ns;
     ch_word time_now_ns         = 0;
-    ch_word time_interval_ns    = 500 * 1000 * 1000;
+    ch_word time_interval_ns    = 1000 * 1000 * 1000;
     ch_word total_bytes         = 0;
     ch_word intv_bytes          = 0;
 
@@ -86,17 +86,19 @@ int camio_perf_clinet(ch_cstr client_stream_uri, ch_word* stop)
             time_int_start_ns       = time_now_ns;
             total_bytes             += intv_bytes;
             ch_word total_time_ns   = time_now_ns - time_start_ns;
-            double inst_rate_kbs    = ((double)intv_bytes / (double)time_interval_ns) * 1000 * 1000;
-            double ave_rate_kbs     = ((double)total_bytes / (double)total_time_ns) * 1000 * 1000;
+            double inst_rate_mbs    = ((double)intv_bytes / (double)time_interval_ns) * 1000;
+            double ave_rate_mbs     = ((double)total_bytes / (double)total_time_ns) * 1000;
 
-            DBG("[%lli - %lli] Bytes sent=%lli, inst rate=%3.3fkBs, total_bytes sent=%lli, average rate=%3.3fkBs\n ----!!!!***",
-                    time_start_ns,
-                    time_now_ns,
-                    intv_bytes,
-                    inst_rate_kbs,
-                    total_bytes,
-                    ave_rate_kbs
-                    );
+            printf("#### [%lli - %lli] Bytes sent=%lli, inst rate=%3.3fMBs, total_bytes sent=%lli, average rate=%3.3fMBs\n",
+                time_start_ns,
+                time_now_ns,
+                intv_bytes,
+                inst_rate_mbs,
+                total_bytes,
+                ave_rate_mbs
+            );
+
+            intv_bytes = 0;
         }
 
         //Block waiting for a stream to be ready

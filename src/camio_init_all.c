@@ -8,9 +8,10 @@
 //#include <src/drivers/netmap/netmap_transport.h>
 #include <src/drivers/udp/udp_transport.h>
 #include <src/drivers/tcp/tcp_transport.h>
+#include <src/drivers/delimiter/delim_transport.h>
+
 #include "camio_debug.h"
 #include "camio_init_all.h"
-
 
 // This is a dummy file to be filled in later with a compiler generated one. The aim is to have a configuration file that
 // allows users to specific compiletime and runtime loading of modules.
@@ -31,6 +32,7 @@ camio_error_t camio_init_all_transports(){
     //netmap_init();
     udp_init();
     tcp_init();
+    delim_init();
     //add more here
 
     DBG("Initializing transports...Done\n");

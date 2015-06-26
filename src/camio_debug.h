@@ -14,6 +14,7 @@
 #include <unistd.h>
 #include "types/types.h"
 
+
 #ifndef NDEBUG
     ch_word camio_debug_out_(ch_bool info, ch_word line_num, const char* filename, const char* format, ... );
     #define DBG( /*format, args*/...)  camio_debug_helper(__VA_ARGS__, "")

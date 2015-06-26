@@ -45,5 +45,6 @@ cake tools/camio_cat.c \
 
 cake tools/camio_perf/camio_perf.c \
     --append-CFLAGS="$INCLUDES $CFLAGS"\
-    --append-LINKFLAGS="$LINKFLAGS"
+    --append-LINKFLAGS="$LINKFLAGS"\
+#    --variant=release\
   
