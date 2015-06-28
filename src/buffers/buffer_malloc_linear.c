@@ -25,7 +25,7 @@ void buffer_malloc_linear_DBG(buffer_malloc_linear_t* buff){
     DBG("buffer_count=%li\n",buff->buffer_count);
     DBG("HDRS: ");
     for(int i = 0; i < buff->buffer_count; i++){
-        DBG2("%i",buff->headers[i].__internal.__in_use);
+        DBG2("%p[%i] ",buff->buffers[i], buff->headers[i].__internal.__in_use);
     }
     DBG2("\n");
 }
@@ -121,6 +121,7 @@ camio_error_t buffer_malloc_linear_new(camio_stream_t* parent, ch_word buffer_si
 
 camio_error_t buffer_malloc_linear_acquire(buffer_malloc_linear_t* lin_buff, camio_buffer_t** buffer_o)
 {
+    buffer_malloc_linear_DBG(lin_buff);
     const ch_word alloc_tail_idx    = lin_buff->alloc_tail_idx;
     const ch_word alloc_count       = lin_buff->alloc_count;
     const ch_word buffer_count      = lin_buff->buffer_count;
@@ -144,7 +145,7 @@ camio_error_t buffer_malloc_linear_acquire(buffer_malloc_linear_t* lin_buff, cam
     lin_buff->headers[alloc_head_idx].__internal.__in_use = true;
     lin_buff->alloc_count++;
     *buffer_o = &lin_buff->headers[alloc_head_idx];
-    //buffer_malloc_linear_DBG(lin_buff);
+    buffer_malloc_linear_DBG(lin_buff);
     return CAMIO_ENOERROR;
 }
 

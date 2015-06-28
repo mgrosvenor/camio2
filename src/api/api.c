@@ -109,11 +109,11 @@ inline camio_error_t camio_copy_rw(camio_wr_buffer_t** wr_buffer, camio_rd_buffe
     (void)offset;
 
     //TODO XXX this is temporary until the actual copy function is implemented
-    //DBG("Copying %lli bytes from %p to %p\n",rd_buffer->data_len,rd_buffer->buffer_start, wr_buffer->buffer_start);
+    DBG("Copying %lli bytes from %p to %p\n",(*rd_buffer)->data_len,(*rd_buffer)->data_start, (*wr_buffer)->buffer_start);
     memcpy( (*wr_buffer)->buffer_start, (*rd_buffer)->data_start, copy_len);
     (*wr_buffer)->data_start = (*wr_buffer)->buffer_start;
     (*wr_buffer)->data_len = (*rd_buffer)->data_len;
-    //DBG("Done copying %lli bytes from %p to %p\n",rd_buffer->data_len,rd_buffer->buffer_start, wr_buffer->buffer_start);
+    DBG("Done Copying %lli bytes from %p to %p\n",(*rd_buffer)->data_len,(*rd_buffer)->data_start, (*wr_buffer)->buffer_start);
 
     return CAMIO_ENOERROR;
 }

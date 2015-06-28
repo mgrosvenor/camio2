@@ -11,6 +11,7 @@
 
 #include <stdio.h>
 #include <stdarg.h>
+#include <libgen.h>
 
 #include "camio_debug.h"
 
@@ -23,11 +24,13 @@ ch_word camio_debug_out_(
         ch_bool info,
         ch_word line_num,
         const char* filename,
+        const char* function,
         const char* format, ... ) //Intentionally using char* here as these are passed in as constants
 {
     va_list args;
     va_start(args,format);
-    if(info) dprintf(OUTPUT_TO,"[%s:%i] -- ", filename, (int)line_num);
+    char* fn =  (char*)filename;
+    if(info) dprintf(OUTPUT_TO,"[%s:%i:%s()] -- ", basename(fn), (int)line_num, function);
     ch_word result = vdprintf(OUTPUT_TO,format,args);
     va_end(args);
 

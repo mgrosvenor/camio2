@@ -75,11 +75,12 @@ static void delim_read_close(camio_stream_t* this){
 static camio_error_t delim_read_peek( camio_stream_t* this)
 {
     //This is not a public function, can assume that preconditions have been checked.
-    DBG("Doing read peek\n");
+//    DBG("Doing read peek\n");
     delim_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
 
     //If this pointer is non-null, there there is already a result waiting to be consumed
     if(priv->result_rd_buff){
+        DBG("Already have a result buffer\n");
         return CAMIO_ENOERROR;
     }
 
@@ -88,6 +89,7 @@ static camio_error_t delim_read_peek( camio_stream_t* this)
         const ch_word delimit_size = priv->delim_fn(priv->work_rd_buff.data_start, priv->work_rd_buff.data_len);
         if(delimit_size > 0 && delimit_size <= priv->work_rd_buff.data_len){
             priv->result_rd_buff = &priv->work_rd_buff;
+            DBG("Yay! Delimiter success!\n");
             return CAMIO_ENOERROR;
         }
     }
@@ -102,12 +104,17 @@ static camio_error_t delim_read_peek( camio_stream_t* this)
             return err;
         }
         //We have now registered a read request, only do this once otherwise the base stream might get confused.
+        DBG("Requested new data from base!\n");
         priv->base_rd_registered = true;
     }
 
     //Now that a read has been registered, see if there is any data available
     camio_error_t err = camio_read_ready(priv->base);
+    if(err == CAMIO_ENOTREADY){
+        return CAMIO_ETRYAGAIN;
+    }
     if( err != CAMIO_EREADY){
+        DBG("Unexpected error from base ready()!\n");
         return err; //Damn, no data available. Come back later and try again.
     }
 
@@ -117,20 +124,27 @@ static camio_error_t delim_read_peek( camio_stream_t* this)
         DBG("Could not do read acquire on base stream\n");
         return err;
     }
-    DBG("Read another %llibytes from %p\n", priv->base_rd_buff->data_len, priv->base_rd_buff);
+    DBG("Read another %lli bytes from %p\n", priv->base_rd_buff->data_len, priv->base_rd_buff);
+    priv->base_rd_registered = false; //We got the data, next time we will need to register again.
 
     //Got some data, but is it just a closed stream?
     if(priv->base_rd_buff->data_len == 0){
         //There is no more data to read, time to give up
         delim_read_close(this);
+        DBG("Base stream is closed!\n");
         return CAMIO_ENOERROR;
     }
 
-    //We have real data, try a fast path. The data read exactly matches the data that we're looking for.
-    ch_word delimit_size = priv->delim_fn(priv->base_rd_buff->data_start, priv->base_rd_buff->data_len);
-    if(delimit_size == priv->base_rd_buff->data_len){
-        priv->result_rd_buff = priv->base_rd_buff;
-        return CAMIO_ENOERROR;
+    //We have real data and the working buffer is empty, try a fast path. If the data read exactly matches the data that
+    //we're looking for then there is no need to copy it into the working buffer.
+    if(priv->work_rd_buff.data_len == 0){
+        const ch_word delimit_size = priv->delim_fn(priv->base_rd_buff->data_start, priv->base_rd_buff->data_len);
+        if(delimit_size == priv->base_rd_buff->data_len){
+            priv->result_rd_buff = priv->base_rd_buff;
+            priv->result_rd_buff->data_len = delimit_size;
+            DBG("Exact match from delimiter!\n");
+            return CAMIO_ENOERROR;
+        }
     }
 
     //OK. Let's put the data somewhere
@@ -138,26 +152,29 @@ static camio_error_t delim_read_peek( camio_stream_t* this)
         DBG("Growing working buffer from %lu to %lu\n", priv->work_rd_buff.buffer_len, priv->work_rd_buff.buffer_len * 2 );
         priv->work_rd_buff.buffer_len *= 2;
         priv->work_rd_buff.buffer_start = realloc(priv->work_rd_buff.buffer_start, priv->work_rd_buff.buffer_len);
+        priv->work_rd_buff.data_start = priv->work_rd_buff.buffer_start;
     }
 
     //TODO XXX, can potentially avoid this if the delimiter says that data in read_buffer includes a complete packet but have
     //to deal with a partial fragment(s) left over in the buffer.
-    void* new_data_dst = (char*)priv->work_rd_buff.data_start + priv->work_rd_buff.data_len;
-    DBG("Adding %lu bytes at %p (offset=%lu)\n", priv->work_rd_buff.buffer_len, new_data_dst, priv->work_rd_buff.data_len);
+    void* new_data_dst = (char*)priv->work_rd_buff.buffer_start + priv->work_rd_buff.data_len;
+    DBG("Adding %lu bytes at %p (offset=%lu)\n", priv->base_rd_buff->data_len, new_data_dst, priv->work_rd_buff.data_len);
     memcpy(new_data_dst, priv->base_rd_buff->data_start, priv->base_rd_buff->data_len);
     priv->work_rd_buff.data_len += priv->base_rd_buff->data_len;
+
 
     //Now that the data is copied, we don't need the buffer any more.
     camio_read_release(priv->base,&priv->base_rd_buff);
 
     //OK. Now that we've got some more data. Try one last time to delimit it.
-    delimit_size = priv->delim_fn(priv->work_rd_buff.data_start, priv->work_rd_buff.data_len);
+    const ch_word delimit_size = priv->delim_fn(priv->work_rd_buff.data_start, priv->work_rd_buff.data_len);
     if(delimit_size > 0 && delimit_size <= priv->work_rd_buff.data_len){
         priv->result_rd_buff = &priv->work_rd_buff;
+        priv->result_rd_buff->data_len = delimit_size;
         return CAMIO_ENOERROR;
     }
 
-    return CAMIO_ENOERROR;
+    return CAMIO_ETRYAGAIN; //We've got nothing
 }
 
 
@@ -190,6 +207,8 @@ static camio_error_t delim_read_ready(camio_muxable_t* this)
         return CAMIO_EREADY;
     }
 
+    DBG("Checking if delimiter is ready\n");
+
     //Nope, OK, see if we can get some
     camio_error_t err = delim_read_peek(this->parent.stream);
     if(err == CAMIO_ENOERROR ){
@@ -202,7 +221,7 @@ static camio_error_t delim_read_ready(camio_muxable_t* this)
         return CAMIO_ENOTREADY;
     }
 
-    DBG("Something bad happened!\n");
+    DBG("Something bad happened err=%lli!\n", err);
     return err;
 
 
@@ -267,12 +286,13 @@ static camio_error_t delim_read_acquire( camio_stream_t* this,  camio_rd_buffer_
     }
 
     if(!priv->read_registered){
-        DBG("Requested a buffer, but no read registered. Ignoring\n");
+        DBG("Requested a buffer, but not read registered. Ignoring\n");
         return CAMIO_EINVALID;
     }
 
     if(priv->result_rd_buff){ //yay! There's data!
         *buffer_o = priv->result_rd_buff;
+        DBG("Returning data that's been waiting\n");
         return CAMIO_ENOERROR;
     }
 
@@ -448,6 +468,7 @@ camio_error_t delim_stream_construct(
 
     priv->work_rd_buff.buffer_start    = calloc(1,DELIM_BUFFER_DEFAULT_SIZE);
     priv->work_rd_buff.buffer_len      = DELIM_BUFFER_DEFAULT_SIZE;
+    priv->work_rd_buff.data_start      = priv->work_rd_buff.buffer_start;
     if(!priv->work_rd_buff.buffer_start){
         DBG("Could not allocate memory for backing buffer\n");
         return CAMIO_ENOMEM;

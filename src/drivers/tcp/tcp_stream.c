@@ -289,6 +289,7 @@ static camio_error_t tcp_write_acquire(camio_stream_t* this, camio_wr_buffer_t**
     camio_error_t err = buffer_malloc_linear_acquire(priv->wr_buff_pool,buffer_o);
     if(err){ return err; }
 
+    DBG("Returning new buffer of size %lli at %p\n", (*buffer_o)->buffer_len, (*buffer_o)->buffer_start);
     return CAMIO_ENOERROR;
 }
 

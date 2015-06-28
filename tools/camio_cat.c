@@ -21,11 +21,14 @@ USE_CAMIO;
 #define DELIM_LEN 8
 int delimit(char* buffer, int len)
 {
+    DBG("Running delimiter on buffer=%p with len=%i\n", buffer,len);
     (void)buffer;
     if(len < DELIM_LEN){
-        return -1;
+        DBG("Failed on delim\n");
+        return 0;
     }
 
+    DBG("Success on delim\n");
     return DELIM_LEN;
 }
 
@@ -92,7 +95,8 @@ int main(int argc, char** argv)
         if(rd_buffer->data_len == 0){
             break; //The connection is dead!
         }
-
+        DBG("Got %lli bytes of new data at %p\n", rd_buffer->data_len, rd_buffer->data_start);
+;
         //Get a buffer for writing stuff to
         err = camio_write_acquire(stream, &wr_buffer);
         if(err){ DBG("Could not connect to stream\n"); return CAMIO_EINVALID; /*TODO XXX put a better error here*/ }
