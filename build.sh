@@ -27,24 +27,27 @@ LINKFLAGS="-Ideps/chaste"
 SRC=src/camio.c
 #TESTS="--begintests  tests/camio_udp_test.c --endtests"
 
-#cake $SRC\
-#    --variant=release\
-#    --append-CFLAGS="$INCLUDES $CFLAGS"\
-#    --LINKFLAGS="$LINKFLAGS"\
-#    --static-library\
- 
+cake $SRC\
+    --variant=release\
+    --append-CFLAGS="$INCLUDES $CFLAGS"\
+    --LINKFLAGS="$LINKFLAGS"\
+    --static-library\
+    $@
+     
 #SRC=tests/camio_udp_test.c
 #cake $SRC\
 #    --append-CFLAGS="$INCLUDES $CFLAGS"\
 #    --LINKFLAGS="$LINKFLAGS"\
 #    $TESTS
  
-#cake tools/camio_cat.c \
-#    --append-CFLAGS="$INCLUDES $CFLAGS"\
-#    --append-LINKFLAGS="$LINKFLAGS"
+cake tools/camio_cat.c \
+    --append-CFLAGS="$INCLUDES $CFLAGS"\
+    --append-LINKFLAGS="$LINKFLAGS"\
+    $@
 
 cake tools/camio_perf/camio_perf.c \
     --append-CFLAGS="$INCLUDES $CFLAGS"\
     --append-LINKFLAGS="$LINKFLAGS"\
+    $@
 #    --variant=release\
   

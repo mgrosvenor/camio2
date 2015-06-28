@@ -12,9 +12,22 @@
 #include <stdio.h>
 #include <src/api/api_easy.h>
 #include <src/camio_debug.h>
+#include <src/drivers/delimiter/delim_transport.h>
 
 
 USE_CAMIO;
+
+
+#define DELIM_LEN 8
+int delimit(char* buffer, int len)
+{
+    (void)buffer;
+    if(len < DELIM_LEN){
+        return -1;
+    }
+
+    return DELIM_LEN;
+}
 
 
 int main(int argc, char** argv)
@@ -22,14 +35,40 @@ int main(int argc, char** argv)
     //We don't use these for the test ... yet
     (void)argc;
     (void)argv;
+    char* uri = "tcp:localhost:2000?listen=1";
 
     //Create a new multiplexer for streams to go into
     camio_mux_t* mux = NULL;
     camio_error_t err = camio_mux_new(CAMIO_MUX_HINT_PERFORMANCE, &mux);
 
-    //Create and connect to a new stream
+
+    //Construct a delimiter
+    ch_word id;
+    err = camio_transport_get_id("delim",&id);
+    delim_params_t delim_params = {
+            .base_uri = uri,
+            .delim_fn = delimit,
+    };
+    ch_word params_size = sizeof(delim_params_t);
+    void* params = &delim_params;
+
+    //Use the parameters structure to construct a new connector object
+    camio_connector_t* connector = NULL;
+    err = camio_transport_constr(id,&params,params_size,&connector);
+    if(err){
+        DBG("Could not construct connector\n");
+        return CAMIO_EINVALID; //TODO XXX put a better error here
+    }
+
+
+    while( (err = camio_connector_ready(connector)) == CAMIO_ENOTREADY ){}
+    if(err != CAMIO_EREADY){
+        DBG("Unexpected error in connector\n");
+        return CAMIO_EINVALID;
+    }
+
     camio_stream_t* stream = NULL;
-    err = camio_stream_new("tcp:localhost:2000?listen=1", &stream);
+    err = camio_connect(connector,&stream);
     if(err){ DBG("Could not connect to stream\n"); return CAMIO_EINVALID; /*TODO XXX put a better error here*/ }
 
     //Put the read stream into the mux

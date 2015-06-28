@@ -142,6 +142,7 @@ camio_error_t camio_transport_params_new( ch_cstr uri_str, void** params_o, ch_w
     DBG("Got state scheme:%.*s\n", state->scheme_len, state->scheme);
 
     //There is a valid scheme -> transport mapping. Now make a parameters structure and try to populate it
+    DBG("making params_struct of size %lli\n", state->param_struct_size );
     char* params_struct = calloc(1, state->param_struct_size);
     void* params_struct_value = &params_struct[state->param_struct_hier_offset];
     len_string_t* param_ptr = (len_string_t*)params_struct_value;
@@ -154,9 +155,11 @@ camio_error_t camio_transport_params_new( ch_cstr uri_str, void** params_o, ch_w
     CH_VECTOR(CAMIO_TRANSPORT_PARAMS_VEC)* params = state->params;
     CH_LIST(KV)* uri_opts = uri->key_vals;
     DBG("Iterating over %i parameters...\n", params->count);
+    //DBG("params->first=%p, params->end=%p, uri_opts=%p\n", params->first, params->end, uri_opts);
     for( camio_transport_param_t* param = params->first;
          param != params->end && uri_opts;
          param = params->next(params,param) ){
+        DBG("1\n");
 
         //Search for the parameter name (ie key) in the key/value uri options list. This should answer the question,
         //"Was the parameter with a given name present in the URI supplied".
@@ -165,6 +168,7 @@ camio_error_t camio_transport_params_new( ch_cstr uri_str, void** params_o, ch_w
         CH_LIST_IT(KV) end   = uri_opts->end(uri_opts);
         CH_LIST_IT(KV) found = uri_opts->find(uri_opts,&first, &end, kv);
 
+        DBG("1\n");
         //We found it! OK. try to num parse it just in case its a number. If not, this will have no effect.
         num_result_t num_result = {0};
         ch_cstr value           = NULL;
@@ -177,6 +181,7 @@ camio_error_t camio_transport_params_new( ch_cstr uri_str, void** params_o, ch_w
             DBG("num_result.type=%i\n", num_result.type);
         }
 
+        DBG("1\n");
         //Some sanity checking...
         if(found.value && param->found){ //Oh shit, we already did this before! Can only assign once!
             DBG("Parameter with name %s already found. You can only assign once!\n", param->param_name);
@@ -184,12 +189,13 @@ camio_error_t camio_transport_params_new( ch_cstr uri_str, void** params_o, ch_w
             goto exit_params;
         }
 
+        DBG("1\n");
         if(!found.value && param->opt_mode == CAMIO_TRANSPORT_PARAMS_MODE_REQUIRED){ //Oh shit this was required!
             DBG("Parameter with name %s is required but not supplied!\n", param->param_name);
             result = CAMIO_EINVALID; //TODO XXX make a better return value
             goto exit_params;
         }
-
+        DBG("1\n");
         //Assuming there is either an option int the URI, or a default value, where will we place the result?
         void* params_struct_value = &params_struct[param->param_struct_offset];
 
@@ -278,10 +284,15 @@ camio_error_t camio_transport_params_new( ch_cstr uri_str, void** params_o, ch_w
         }
     }
 
+    DBG("params_o=%p, params_size_o=%p, id_o=%p\n", params_o, params_size_o, id_o);
+
+
     //Output the things that we care about
     *params_o       = params_struct;
     *params_size_o  = state->param_struct_size;
     *id_o           = trans_state->get_idx(trans_state,state);
+
+    DBG("Done making new parameters struct!\n");
     return CAMIO_ENOERROR;
 
 
@@ -317,12 +328,18 @@ camio_error_t camio_transport_constr(ch_word id, void** params, ch_word params_s
 
 camio_error_t camio_transport_get_id( ch_cstr scheme_name, ch_word* id_o)
 {
+    DBG("Searching for scheme named %s\n",scheme_name);
+    if(!__camio_state_container.is_initialized){
+        init_camio();
+    }
+
     CH_VECTOR(CAMIO_TRANSPORT_STATE_VEC)* trans_state = __camio_state_container.trans_state;
     camio_transport_state_t  tmp = { 0 };
     tmp.scheme     = scheme_name;
     tmp.scheme_len = strlen(scheme_name);
     camio_transport_state_t* state = trans_state->find(trans_state,trans_state->first,trans_state->end, tmp);
     if(NULL == state){//transport has not yet been registered
+        DBG("Could not find scheme named %s\n", scheme_name);
         return CAMIO_NOTIMPLEMENTED;
     }
     DBG("Got state scheme:%.*s\n", state->scheme_len, state->scheme);

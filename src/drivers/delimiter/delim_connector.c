@@ -28,8 +28,8 @@ typedef struct delim_priv_s {
     //Properties of the base stream
     camio_connector_t* base;
     void* base_params;
-    ch_word* base_params_size;
-    ch_word* base_stream_id;
+    ch_word base_params_size;
+    ch_word base_id;
 
 } delim_connector_priv_t;
 
@@ -41,6 +41,7 @@ typedef struct delim_priv_s {
  **************************************************************************************************************************/
 static camio_error_t delim_connector_ready(camio_muxable_t* this)
 {
+    DBG("Checking if base connector is ready\n");
     //Forward the ready function from the base connector. The delimiter is always ready to party!
     delim_connector_priv_t* priv = CONNECTOR_GET_PRIVATE(this->parent.connector);
     return camio_connector_ready(priv->base);
@@ -51,6 +52,7 @@ static camio_error_t delim_connect(camio_connector_t* this, camio_stream_t** str
 {
     delim_connector_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
     camio_stream_t* base_stream;
+    DBG("Doing connect on base connector\n");
     camio_error_t err = camio_connect(priv->base, &base_stream);
     if(err){
         if(err != CAMIO_ETRYAGAIN){//ETRYAGAIN is ok.
@@ -59,6 +61,7 @@ static camio_error_t delim_connect(camio_connector_t* this, camio_stream_t** str
         return err;
     }
 
+    DBG("Making new delimiter stream\n");
     camio_stream_t* stream = NEW_STREAM(delim);
     if(!stream){
         *stream_o = NULL;
@@ -99,13 +102,20 @@ static camio_error_t delim_construct(camio_connector_t* this, void** params, ch_
     camio_error_t err = camio_transport_params_new(
         priv->params->base_uri,
         &priv->base_params,
-        priv->base_params_size,
-        priv->base_stream_id
+        &priv->base_params_size,
+        &priv->base_id
     );
+    if(err){
+        DBG("Uh ohh, got %lli error trying to make base connector parameters\n",err);
+        return err;
+    }
+
+    err = camio_transport_constr(priv->base_id,&priv->base_params,priv->base_params_size,&priv->base);
     if(err){
         DBG("Uh ohh, got %lli error trying to construct base connector\n",err);
         return err;
     }
+
 
     //Populate the muxable structure
     this->muxable.mode              = CAMIO_MUX_MODE_CONNECT;
@@ -113,6 +123,8 @@ static camio_error_t delim_construct(camio_connector_t* this, void** params, ch_
     this->muxable.vtable.ready      = delim_connector_ready;
     this->muxable.fd                = priv->base->muxable.id; //Pass this out, but retain the ready function.
                                                               //Smells a bit bad, but is probably ok.
+
+    DBG("Finished constructing delimiter connector and base connector\n");
     return CAMIO_ENOERROR;
 }
 

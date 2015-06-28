@@ -28,6 +28,10 @@ struct options_t options;
 
 int main(int argc, char** argv)
 {
+#ifdef NDEBUG
+    printf("NDEBUG defined\n");
+    #endif
+    DBG("Starting camio perf!\n");
 //    ch_opt_addfi(CH_OPTION_OPTIONAL,'e',"fifth","This is the 5th option", &options.opt5, 42.0);
 //    ch_opt_addxi(CH_OPTION_OPTIONAL,'i',"eighth","This is the 8th option", &options.opt8, 0xDEADBEEF);
 //    ch_opt_adduu(CH_OPTION_REQUIRED,'a',"first","This is the 1st option", &options.opt1);
@@ -47,6 +51,7 @@ int main(int argc, char** argv)
 
 
     ch_word stop = 0;
+    DBG("Starting camio perf client\n");
     camio_perf_clinet("tcp:localhost:2000",&stop);
 
     return 0;

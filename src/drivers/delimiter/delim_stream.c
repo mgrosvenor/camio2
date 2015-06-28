@@ -332,6 +332,25 @@ static camio_error_t delim_read_release(camio_stream_t* this, camio_rd_buffer_t*
 /**************************************************************************************************************************
  * WRITE FUNCTIONS
  **************************************************************************************************************************/
+static camio_error_t delim_write_ready(camio_muxable_t* this)
+{
+    //Basic sanity checks -- TODO DELIM: Should these be made into (compile time optional?) asserts for runtime performance?
+    if( NULL == this){
+        DBG("This is null???\n"); //WTF?
+        return CAMIO_EINVALID;
+    }
+
+    if( this->mode != CAMIO_MUX_MODE_WRITE){
+        DBG("Wrong kind of muxable!\n"); //WTF??
+        return CAMIO_EINVALID;
+    }
+
+    //OK now the fun begins
+    delim_stream_priv_t* priv = STREAM_GET_PRIVATE(this->parent.stream);
+
+    return camio_write_ready(priv->base);
+
+}
 
 static camio_error_t delim_write_acquire(camio_stream_t* this, camio_wr_buffer_t** buffer_o)
 {
@@ -424,7 +443,7 @@ camio_error_t delim_stream_construct(
 
     this->wr_muxable.mode              = CAMIO_MUX_MODE_WRITE;
     this->wr_muxable.parent.stream     = this;
-    this->wr_muxable.vtable.ready      = NULL;
+    this->wr_muxable.vtable.ready      = delim_write_ready;
     this->wr_muxable.fd                = base_stream->wr_muxable.fd;
 
     priv->work_rd_buff.buffer_start    = calloc(1,DELIM_BUFFER_DEFAULT_SIZE);

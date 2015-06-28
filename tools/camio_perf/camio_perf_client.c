@@ -10,15 +10,28 @@
  */
 
 #include <stdio.h>
+
+#include <deps/chaste/chaste.h>
+
 #include <src/api/api_easy.h>
 #include <src/camio_debug.h>
-#include <deps/chaste/chaste.h>
+#include <src/drivers/delimiter/delim_transport.h>
 
 #include "options.h"
 extern struct options_t options;
 
 #define CONNECTOR_ID 0
 
+#define DELIM_LEN 8
+int delimit(char* buffer, int len)
+{
+    (void)buffer;
+    if(len < DELIM_LEN){
+        return -1;
+    }
+
+    return DELIM_LEN;
+}
 
 int camio_perf_clinet(ch_cstr client_stream_uri, ch_word* stop)
 {
@@ -27,15 +40,16 @@ int camio_perf_clinet(ch_cstr client_stream_uri, ch_word* stop)
     camio_mux_t* mux = NULL;
     camio_error_t err = camio_mux_new(CAMIO_MUX_HINT_PERFORMANCE, &mux);
 
-    //Parse up parameters
-    void* params;
-    ch_word params_size;
+    //Construct a delimiter
     ch_word id;
-    err = camio_transport_params_new(client_stream_uri,&params, &params_size, &id);
-    if(err){
-        DBG("Could not convert parameters into structure\n");
-        return CAMIO_EINVALID; //TODO XXX put a better error here
-    }
+    err = camio_transport_get_id("delim",&id);
+
+    delim_params_t delim_params = {
+            .base_uri = client_stream_uri,
+            .delim_fn = delimit,
+    };
+    ch_word params_size = sizeof(delim_params_t);
+    void* params = &delim_params;
 
     //Use the parameters structure to construct a new connector object
     camio_connector_t* connector = NULL;
