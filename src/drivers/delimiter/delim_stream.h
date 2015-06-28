@@ -16,6 +16,11 @@
 
 NEW_STREAM_DECLARE(delim);
 
-camio_error_t delim_stream_construct(camio_stream_t* this, camio_connector_t* connector, camio_stream_t* base_stream);
+camio_error_t delim_stream_construct(
+    camio_stream_t* this,
+    camio_connector_t* connector,
+    camio_stream_t* base_stream,
+    int (*delim_fn)(char* buffer, int len)
+);
 
 #endif /* SRC_DRIVERS_DELIM_DELIM_STREAM_H_ */

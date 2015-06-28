@@ -66,12 +66,6 @@ static camio_error_t delim_connect(camio_connector_t* this, camio_stream_t** str
     }
     *stream_o = stream;
 
-    err = delim_stream_construct(stream, this, base_stream);
-    if(err){
-        DBG("Eeek! - Failed to construct the base stream. Now what??\n");
-        return err;
-    }
-
     return delim_stream_construct(stream,this,base_stream, priv->params->delim_fn);
 }
 
