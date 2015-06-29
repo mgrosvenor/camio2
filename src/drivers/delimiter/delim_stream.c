@@ -79,6 +79,7 @@ static void delim_read_close(camio_stream_t* this){
         free(priv->rd_working_buff.buffer_start);
         reset_buffer(&priv->rd_working_buff);
         reset_buffer(&priv->rd_result_buff);
+        priv->is_rd_closed = true;
     }
 }
 
@@ -283,6 +284,7 @@ static camio_error_t delim_read_request( camio_stream_t* this, ch_word buffer_of
 
 static camio_error_t delim_read_acquire( camio_stream_t* this,  camio_rd_buffer_t** buffer_o)
 {
+    DBG("Acquiring buffer\n");
 
     //Basic sanity checks -- TODO DELIM: Should these be made into (compile time optional?) asserts for runtime performance?
     if( NULL == this){
@@ -301,6 +303,7 @@ static camio_error_t delim_read_acquire( camio_stream_t* this,  camio_rd_buffer_
     if(priv->is_rd_closed){
         reset_buffer(&priv->rd_result_buff);
         *buffer_o = &priv->rd_result_buff;
+        DBG("Delimiter is closed, returning null\n");
         return CAMIO_ENOERROR;
     }
 
@@ -374,23 +377,35 @@ static camio_error_t delim_read_release(camio_stream_t* this, camio_rd_buffer_t*
         return CAMIO_EINVALID;
     }
 
+    if(!priv->read_registered){
+        DBG("WFT? Why are you trying to release something if you haven't read anyhting?\n");
+        return CAMIO_EINVALID;
+    }
+
+    //Deal with the basic release operations.
+    priv->read_registered = false;
+    *buffer = NULL; //Remove dangling pointer for the source
+
     //Calculate this now, we'll need it later
     char* result_head_next = (char*)priv->rd_result_buff.data_start + priv->rd_result_buff.data_len ;
 
-    //Handle case 1a)
-    if(priv->rd_result_buff.data_start == priv->rd_base_buff->data_start){
+    //Handle case 1a) -- Data was returned pass through.
+    if(priv->rd_base_buff && priv->rd_result_buff.data_start == priv->rd_base_buff->data_start){
+        DBG("Doing case 1a\n");
         //The result is directly from the underlying stream, so we should release it now.
         camio_read_release(priv->base,&priv->rd_base_buff);
         goto reset_and_exit;
     }
 
+    //Handle case 1b) -- New data was read and the delimiter was successful
     if(priv->rd_working_buff.data_len >= priv->rd_result_buff.data_len ){
-
+        DBG("Doing case 1b -- releasing underlying buffer\n");
         //This is how much is now left over
         priv->rd_working_buff.data_len -= priv->rd_result_buff.data_len;
 
         //If there is nothing left over, give up and bug out
         if(!priv->rd_working_buff.data_len){
+            DBG("There's no data left\n");
             goto reset_and_exit;
         }
 
@@ -400,6 +415,7 @@ static camio_error_t delim_read_release(camio_stream_t* this, camio_rd_buffer_t*
         const ch_word delimit_size = priv->delim_fn(result_head_next, priv->rd_working_buff.data_len);
         if(delimit_size > 0 && delimit_size <= priv->rd_working_buff.data_len){
             //Ready for the next round with data available! No memmove required!
+            DBG("Success in case 1b) no need to move data\n");
             assign_buffer(&priv->rd_result_buff,&priv->rd_working_buff,result_head_next,delimit_size);
             return CAMIO_ENOERROR;
         }
@@ -415,16 +431,16 @@ static camio_error_t delim_read_release(camio_stream_t* this, camio_rd_buffer_t*
         goto reset_and_exit; //goto is not strictly necessary, but this is what the program flow will do
     }
 
-    //Handle case 2)
-    //There is some data leftover, but less than the last result buffer size.
+    //Handle case 2) -- There is some data leftover, but less than the last result buffer size.
     else{
-
+        DBG("Doing case 2\n");
         //Optimistically check if there is a new packet in this left over. Remember, packets are not all the same
         //size, so a small packet could follow a big packet.
         const ch_word delimit_size = priv->delim_fn(result_head_next, priv->rd_working_buff.data_len);
         if(delimit_size > 0 && delimit_size <= priv->rd_working_buff.data_len){
             //Ready for the next round with data available! No memmove required!
             assign_buffer(&priv->rd_result_buff,&priv->rd_working_buff,result_head_next,delimit_size);
+            priv->read_registered   = false;
             return CAMIO_ENOERROR;
         }
 
@@ -442,9 +458,8 @@ static camio_error_t delim_read_release(camio_stream_t* this, camio_rd_buffer_t*
     //Ready for the next round, there is no new delimited packet available, so reset everything and get ready for a call to
     //read more data
 reset_and_exit:
+    DBG("Releasing result buffer and exiting\n");
     reset_buffer(&priv->rd_result_buff); //We're done with this buffer pointer for the moment until there's new data
-    priv->read_registered   = false;
-    *buffer                 = NULL; //Remove dangling pointer for the source
 
     return CAMIO_ENOERROR;
 }

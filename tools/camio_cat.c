@@ -93,6 +93,7 @@ int main(int argc, char** argv)
         if(err){ DBG("Got a read error %i\n", err); return -1; }
 
         if(rd_buffer->data_len == 0){
+            DBG("The connection is closed, exiting now\n");
             break; //The connection is dead!
         }
         DBG("Got %lli bytes of new data at %p\n", rd_buffer->data_len, rd_buffer->data_start);
