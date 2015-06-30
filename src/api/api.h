@@ -53,7 +53,9 @@ camio_error_t camio_connector_ready( camio_connector_t* this);
  * This may fail and is only supported if the read_to_buff_off feature is supported. If the source offset is non-zero, the
  * read will try to retrieve data from offset bytes from the beginning of the source. This may fail and is only supported if
  * the read_from_src_off feature is supported by the stream. read_register may be called multiple times, but some streams
- * will only support a limited number (e.g 1) of outstanding requests.
+ * will only support a limited number (e.g 1) of outstanding requests. If a size hint is given, it give an indication as to
+ * how much data the reader would like. Not all streams will respect this hint and many will give less than the desired
+ * hint.
  * Return values:
  * - ENOERROR:  Completed successfully, read request has been registered
  * - ETOOMANY:  Too many read requests registered. This one has been ignored
@@ -62,7 +64,7 @@ camio_error_t camio_connector_ready( camio_connector_t* this);
  * TODO XXX: Another way to build this interface would be to register the buffer pointer here as well. I feel that it is less
  * elegant as the meaning of the API is now obscured, but it could be faster. Hmmm.. Defer to a later decision point
  */
-camio_error_t camio_read_request( camio_stream_t* this,  ch_word buffer_offset, ch_word source_offset);
+camio_error_t camio_read_request( camio_stream_t* this,  ch_word buffer_offset, ch_word source_offset, ch_word size_hint);
 
 
 /**

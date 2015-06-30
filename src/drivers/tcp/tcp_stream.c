@@ -25,7 +25,7 @@
 /**************************************************************************************************************************
  * PER STREAM STATE
  **************************************************************************************************************************/
-#define CAMIO_TCP_BUFFER_SIZE (64 * 1024 * 1024)
+#define CAMIO_TCP_BUFFER_SIZE (4 * 1024 * 1024)
 //Current (simple) TCP recv only does one buffer at a time, this could change with vectored I/O in the future.
 #define CAMIO_TCP_BUFFER_COUNT (1)
 
@@ -43,6 +43,7 @@ typedef struct tcp_stream_priv_s {
     ch_bool read_registered;    //Has a read been registered?
     camio_buffer_t* rd_buffer;  //A place to keep a read buffer until it's ready to be consumed
     ch_word rd_buff_offset;     //Where should data be placed in the read buffer
+    ch_word rd_size_hint;
 
 
 } tcp_stream_priv_t;
@@ -66,11 +67,12 @@ static camio_error_t tcp_read_peek( camio_stream_t* this)
         return err;
     }
 
-    //TODO XXX: Should convert this logic to use recvmesg instead, and put meta-data in meta struct, including overflow
-    //          errors etc.
     priv->rd_buff_offset = MIN(CAMIO_TCP_BUFFER_SIZE, priv->rd_buff_offset); //Make sure we don't overflow the buffer
     char* read_buffer = (char*)priv->rd_buffer->buffer_start + priv->rd_buff_offset; //Do the offset that we need
-    const ch_word read_size = CAMIO_TCP_BUFFER_SIZE - priv->rd_buff_offset; //Also make sure we don't overflow
+    ch_word read_size = CAMIO_TCP_BUFFER_SIZE - priv->rd_buff_offset; //Also make sure we don't overflow
+    if(priv->rd_size_hint){
+        read_size = MIN(read_size,priv->rd_size_hint);
+    }
     ch_word bytes = read(priv->fd, read_buffer, read_size);
     if(bytes < 0){ //Shit, got an error. Maybe there just isn't any data?
         buffer_malloc_linear_release(priv->rd_buff_pool,&priv->rd_buffer); //TODO, could remove this step and reuse buffer..
@@ -138,7 +140,7 @@ static camio_error_t tcp_read_ready(camio_muxable_t* this)
 
 }
 
-static camio_error_t tcp_read_request( camio_stream_t* this, ch_word buffer_offset, ch_word source_offset)
+static camio_error_t tcp_read_request( camio_stream_t* this, ch_word buffer_offset, ch_word source_offset, ch_word size_hint)
 {
     DBG("Doing TCP read register...!\n");
     //Basic sanity checks -- TODO XXX: Should these be made into (compile time optional?) asserts for runtime performance?
@@ -160,6 +162,14 @@ static camio_error_t tcp_read_request( camio_stream_t* this, ch_word buffer_offs
     if(priv->read_registered){
         DBG("New read request registered, but request is still outstanding\n");
         return CAMIO_ETOOMANY;
+    }
+
+    if(size_hint > 0){
+        if(size_hint > CAMIO_TCP_BUFFER_SIZE){
+            //TODO XXX: Could realloc buffer here to be the right size...
+            size_hint = CAMIO_TCP_BUFFER_SIZE;
+        }
+        priv->rd_size_hint = size_hint;
     }
 
     //Sanity checks done, do some work now

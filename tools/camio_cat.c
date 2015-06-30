@@ -83,7 +83,7 @@ int main(int argc, char** argv)
     camio_muxable_t* which       = NULL;
     while(1){
         //Tell the stream that we want some data
-        camio_read_request(stream,0,0);
+        camio_read_request(stream,0,0,0);
 
         //Block waiting for a stream to be ready
         camio_mux_select(mux,&which);
@@ -97,7 +97,7 @@ int main(int argc, char** argv)
             break; //The connection is dead!
         }
         DBG("Got %lli bytes of new data at %p\n", rd_buffer->data_len, rd_buffer->data_start);
-;
+
         //Get a buffer for writing stuff to
         err = camio_write_acquire(stream, &wr_buffer);
         if(err){ DBG("Could not connect to stream\n"); return CAMIO_EINVALID; /*TODO XXX put a better error here*/ }

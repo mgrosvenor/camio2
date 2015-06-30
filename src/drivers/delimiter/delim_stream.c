@@ -39,7 +39,9 @@ typedef struct delim_stream_priv_s {
     camio_buffer_t* rd_base_buff;
     ch_word rd_base_buff_offset;     //Where should data be placed in the read buffer
     ch_word rd_base_src_offset;   //Where should data be placed in the read buffer
+    ch_word rd_base_size_hint;
     ch_bool rd_base_registered;
+
 
     ch_bool is_rd_closed;
 
@@ -113,7 +115,12 @@ static camio_error_t delim_read_peek( camio_stream_t* this)
     if(!priv->rd_base_registered){
         //TODO XXX BUG: Here's a problem.. We may have to do multiple read requests here to get enough data to delimit, but,
         //the user really needed to refresh the values of priv->rd_base_buff_offset & priv->rd_base_src_offset.
-        camio_error_t err = camio_read_request(priv->base,priv->rd_base_buff_offset, priv->rd_base_src_offset);
+        camio_error_t err = camio_read_request(
+            priv->base,
+            priv->rd_base_buff_offset,
+            priv->rd_base_src_offset,
+            priv->rd_base_size_hint
+        );
         if(err != CAMIO_ENOERROR){
             DBG("Read request from base stream failed with error =%lli\n", err);
             return err;
@@ -249,7 +256,12 @@ static camio_error_t delim_read_ready(camio_muxable_t* this)
 
 }
 
-static camio_error_t delim_read_request( camio_stream_t* this, ch_word buffer_offset, ch_word source_offset)
+static camio_error_t delim_read_request(
+        camio_stream_t* this,
+        ch_word buffer_offset,
+        ch_word source_offset,
+        ch_word size_hint
+)
 {
     DBG("Doing delim read request...!\n");
     //Basic sanity checks -- TODO  Should these be made into (compile time optional?) asserts for runtime performance?
@@ -272,6 +284,7 @@ static camio_error_t delim_read_request( camio_stream_t* this, ch_word buffer_of
     }
     priv->rd_base_buff_offset = buffer_offset;
     priv->rd_base_src_offset  = source_offset;
+    priv->rd_base_size_hint   = size_hint;
 
     //OK. Register the read
     priv->read_registered = true;

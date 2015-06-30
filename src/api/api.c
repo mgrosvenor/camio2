@@ -49,9 +49,13 @@ inline camio_error_t camio_connector_ready( camio_connector_t* this)
 }
 
 
-inline camio_error_t camio_read_request( camio_stream_t* this,  ch_word buffer_offset, ch_word source_offset)
+inline camio_error_t camio_read_request(
+        camio_stream_t* this,
+        ch_word buffer_offset,
+        ch_word source_offset,
+        ch_word size_hint)
 {
-    return this->vtable.read_request(this, buffer_offset, source_offset);
+    return this->vtable.read_request(this, buffer_offset, source_offset, size_hint);
 }
 
 
