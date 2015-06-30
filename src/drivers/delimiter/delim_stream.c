@@ -35,16 +35,13 @@ typedef struct delim_stream_priv_s {
     //The result buffer is where we put stuff when there is a result to send out to the outside world
     camio_buffer_t rd_result_buff;
 
-    //The base buffer is used to gather data from the base stream
+    //The base variables are used to gather data from the underlying stream
     camio_buffer_t* rd_base_buff;
-    ch_word rd_base_buff_offset;     //Where should data be placed in the read buffer
-    ch_word rd_base_src_offset;   //Where should data be placed in the read buffer
-    ch_word rd_base_size_hint;
+    camio_read_req_t* rd_base_req_vec;
+    ch_word rd_base_req_vec_len;
     ch_bool rd_base_registered;
 
-
     ch_bool is_rd_closed;
-
     ch_bool read_registered;
 
     int (*delim_fn)(char* buffer, int len);
@@ -115,12 +112,7 @@ static camio_error_t delim_read_peek( camio_stream_t* this)
     if(!priv->rd_base_registered){
         //TODO XXX BUG: Here's a problem.. We may have to do multiple read requests here to get enough data to delimit, but,
         //the user really needed to refresh the values of priv->rd_base_buff_offset & priv->rd_base_src_offset.
-        camio_error_t err = camio_read_request(
-            priv->base,
-            priv->rd_base_buff_offset,
-            priv->rd_base_src_offset,
-            priv->rd_base_size_hint
-        );
+        camio_error_t err = camio_read_request( priv->base, priv->rd_base_req_vec, priv->rd_base_req_vec_len );
         if(err != CAMIO_ENOERROR){
             DBG("Read request from base stream failed with error =%lli\n", err);
             return err;
@@ -256,12 +248,7 @@ static camio_error_t delim_read_ready(camio_muxable_t* this)
 
 }
 
-static camio_error_t delim_read_request(
-        camio_stream_t* this,
-        ch_word buffer_offset,
-        ch_word source_offset,
-        ch_word size_hint
-)
+static camio_error_t delim_read_request(camio_stream_t* this, camio_read_req_t* req_vec, ch_word req_vec_len)
 {
     DBG("Doing delim read request...!\n");
     //Basic sanity checks -- TODO  Should these be made into (compile time optional?) asserts for runtime performance?
@@ -270,6 +257,10 @@ static camio_error_t delim_read_request(
         return CAMIO_EINVALID;
     }
 
+    if(req_vec_len != 1){
+        DBG("request length of %lli requested. This value is not currently supported\n", req_vec_len);
+        return CAMIO_NOTIMPLEMENTED;
+    }
     delim_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
 
     if(priv->read_registered){
@@ -277,14 +268,12 @@ static camio_error_t delim_read_request(
         return CAMIO_ETOOMANY;
     }
 
-    //Hang on to these for another time when it is needed TODO XXX see the dilimter function for a bug related to this...
-    if(buffer_offset != 0){
-        DBG("Delimiter only supports buffer offsets of 0\n");
+    //Hang on to these for another time when it is needed TODO XXX see the delimiter function for a bug related to this...
+    if(req_vec[1].dst_offset_hint != 0){
+        DBG("Delimiter currently only supports buffer offsets of 0\n");
         return CAMIO_EINVALID; //TODO XXX: Better error
     }
-    priv->rd_base_buff_offset = buffer_offset;
-    priv->rd_base_src_offset  = source_offset;
-    priv->rd_base_size_hint   = size_hint;
+    priv->rd_base_req_vec = req_vec;
 
     //OK. Register the read
     priv->read_registered = true;
@@ -516,7 +505,7 @@ static camio_error_t delim_write_acquire(camio_stream_t* this, camio_wr_buffer_t
 }
 
 
-static camio_error_t delim_write_commit(camio_stream_t* this, camio_wr_buffer_t** buffer_chain )
+static camio_error_t delim_write_request(camio_stream_t* this, camio_write_req_t* req_vec, ch_word req_vec_len)
 {
     //Basic sanity checks -- TODO DELIM: Should these be made into (compile time optional?) asserts for runtime performance?
     if( NULL == this){
@@ -524,7 +513,7 @@ static camio_error_t delim_write_commit(camio_stream_t* this, camio_wr_buffer_t*
         return CAMIO_EINVALID;
     }
     delim_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
-    return camio_write_commit(priv->base,buffer_chain);
+    return camio_write_request(priv->base,req_vec,req_vec_len);
 }
 
 
