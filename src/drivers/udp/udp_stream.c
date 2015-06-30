@@ -142,7 +142,7 @@ static camio_error_t udp_read_ready(camio_muxable_t* this)
 
 }
 
-static camio_error_t udp_read_request(camio_stream_t* this, ch_word buffer_offset, ch_word source_offset, ch_word size_hint)
+static camio_error_t udp_read_request(camio_stream_t* this, camio_read_req_t* req_vec, ch_word req_vec_len)
 {
     DBG("Doing UDP read register...!\n");
     //Basic sanity checks -- TODO XXX: Should these be made into (compile time optional?) asserts for runtime performance?
@@ -283,7 +283,7 @@ static camio_error_t udp_write_acquire(camio_stream_t* this, camio_wr_buffer_t**
 }
 
 
-static camio_error_t udp_write_commit(camio_stream_t* this, camio_wr_buffer_t** buffer_chain )
+static camio_error_t udp_write_commit(camio_stream_t* this, camio_write_req_t* req_vec, ch_word req_vec_len)
 {
     //Basic sanity checks -- TODO XXX: Should these be made into (compile time optional?) asserts for runtime performance?
     if( NULL == this){
