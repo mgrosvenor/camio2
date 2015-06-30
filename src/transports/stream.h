@@ -19,6 +19,19 @@
 
 #include "features.h"
 
+typedef struct camio_read_req_s {
+    ch_word src_offset_hint;
+    ch_word dst_offset_hint;
+    ch_word read_size_hint;
+} camio_read_req_t;
+
+typedef struct camio_write_req_s {
+    ch_word src_offset_hint;
+    ch_word dst_offset_hint;
+    ch_word write_size_hint;
+    camio_wr_buffer_t* buffer;
+} camio_write_req_t;
+
 
 /**
  * Every CamIO stream must implement this interface, see function prototypes in api.h
@@ -28,14 +41,14 @@ typedef struct camio_stream_interface_s{
     void (*destroy)(camio_stream_t* this);
 
     //Read operations
-    camio_error_t (*read_request)(camio_stream_t* this, ch_word buffer_offset, ch_word source_offset, ch_word size_hint);
+    camio_error_t (*read_request)(camio_stream_t* this, camio_read_req_t* req_vec, ch_word req_vec_len );
     camio_error_t (*read_acquire)(camio_stream_t* this, camio_rd_buffer_t** buffer_o);
     camio_error_t (*read_release)(camio_stream_t* this, camio_wr_buffer_t** buffer_o);
 
     //Write operations
     camio_error_t (*write_acquire)(camio_stream_t* this, camio_wr_buffer_t** buffer_o);
-    camio_error_t (*write_commit)( camio_stream_t* this, camio_wr_buffer_t** buffer_chain );
-    camio_error_t (*write_release)(camio_stream_t* this, camio_wr_buffer_t** buffers_chain);
+    camio_error_t (*write_request)(camio_stream_t* this, camio_write_req_t* req_vec, ch_word req_vec_len);
+    camio_error_t (*write_release)(camio_stream_t* this, camio_wr_buffer_t** buffer);
 
 } camio_stream_interface_t;
 
@@ -82,7 +95,7 @@ typedef struct camio_stream_s {
             .read_acquire   = NAME##_read_acquire,\
             .read_release   = NAME##_read_release,\
             .write_acquire  = NAME##_write_acquire,\
-            .write_commit   = NAME##_write_commit,\
+            .write_request  = NAME##_write_request,\
             .write_release  = NAME##_write_release,\
             .destroy        = NAME##_destroy,\
     };\

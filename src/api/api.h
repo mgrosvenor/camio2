@@ -20,6 +20,7 @@
 #include <src/buffers/buffer.h>
 #include <src/transports/features.h>
 #include <src/multiplexers/mux.h>
+#include <src/transports/stream.h>
 
 
 /**
@@ -47,28 +48,44 @@ void camio_connector_destroy(camio_connector_t* this);
 camio_error_t camio_connector_ready( camio_connector_t* this);
 
 /**
- * This function registers a read for new data from the CamIO Stream called 'this' with the buffer offset and source offset
- * parameters. When data is available, it will be returned by a read_acquire call. You should check for data availability
- * using a camio_multiplexer. If buffer_offset is non-zero, the read will try to place data at offset bytes into each buffer.
- * This may fail and is only supported if the read_to_buff_off feature is supported. If the source offset is non-zero, the
- * read will try to retrieve data from offset bytes from the beginning of the source. This may fail and is only supported if
- * the read_from_src_off feature is supported by the stream. read_register may be called multiple times, but some streams
- * will only support a limited number (e.g 1) of outstanding requests. If a size hint is given, it give an indication as to
- * how much data the reader would like. Not all streams will respect this hint and many will give less than the desired
- * hint.
+ * This function requests new data from the CamIO Stream called 'this'. Read requests are supplied as a vector of
+ * read_req_t structures. Each structure contains a destination buffer offset hint, a source offset hint and a read size
+ * hint. The length of the vector is given by read_vec_len.
+ *
+ * When data is available, the ready() function will return EREADY and data will be returned by a read_acquire call. You
+ * should not normally check ready() manually, but use a camio_multiplexer instead to do this. The maximum size of the
+ * read_vev_len is stream dependent. read_register may also be called multiple times, but some streams will only support a
+ * limited number (e.g 1) of outstanding requests.
+ *
+ * Notes:
+ * - If the source offset is non-zero, the read will try to retrieve data at offset bytes from the beginning of the source.
+ *   This may fail and is only supported if the read_from_src_off feature is supported by the stream.
+ * - If the destination offset is non-zero, the read will try to place data at offset bytes into the result buffer. This may
+ *   fail and is only supported if the read_to_buff_off feature is supported.
+ * - If a size hint is given, it gives an indication as to how much data the reader would like. Not all streams will respect
+ *   this hint and many will give less than the desired hint.
+ * - If the infinite_read feature is supported, you can supply a value of read_req_vec_len < 0. In this case, it is assumed
+ *   that the read_req_vec contains precisely 1 entry. You will then only need to call read_req once and this entry will be
+ *   repeated until the stream runs out of data.
+ *
  * Return values:
- * - ENOERROR:  Completed successfully, read request has been registered
- * - ETOOMANY:  Too many read requests registered. This one has been ignored
+ * - ENOERROR:      Completed successfully, read request has been registered
+ * - ETOOMANY:      Too many read requests registered. This one has been ignored
+ * - EOVERSIZEVEC:  The vector is too big to be registered.
  * - TODO XXX: Fill in more here
  *
  * TODO XXX: Another way to build this interface would be to register the buffer pointer here as well. I feel that it is less
  * elegant as the meaning of the API is now obscured, but it could be faster. Hmmm.. Defer to a later decision point
  */
-camio_error_t camio_read_request( camio_stream_t* this,  ch_word buffer_offset, ch_word source_offset, ch_word size_hint);
+camio_error_t camio_read_request( camio_stream_t* this, camio_read_req_t* req_vec, ch_word req_vec_len );
 
 
 /**
  * Check if the stream is ready to read. A connector is ready if calling read will be non-blocking.
+ * Return values:
+ * - EREADY - the stream is ready to be read
+ * - ENOTREDY - the stream is not ready to be read, try again later
+ * - other - some other error has happened on the underlying stream
  */
 camio_error_t camio_read_ready( camio_stream_t* this);
 
@@ -137,30 +154,15 @@ camio_error_t camio_ignore(camio_wr_buffer_t** wr_buffer, camio_rd_buffer_t** rd
  *  - EBYTESCOPPIED:    Completed successfully, bytes were copied
  *  - ENOBYTESCOPPIED:  Completed successfully, no bytes were copied.
  */
-camio_error_t camio_copy_rw(camio_wr_buffer_t** wr_buffer, camio_rd_buffer_t** rd_buffer, ch_word offset, ch_word copy_len);
+camio_error_t camio_copy_rw(
+        camio_wr_buffer_t** wr_buffer,
+        camio_rd_buffer_t** rd_buffer,
+        ch_word src_offset,
+        ch_word dst_offset,
+        ch_word copy_len
+        );
 
-
-/**
- * Set options on a write buffer. If the dest_offset is non-zero, the write will try to collect data starting
- * at offset bytes from the beginning of the destination. This may fail and is only supported if the write_to_dst_off
- * feature is supported by the stream. If buffer_offset is non-zero, the write will try to write data at offset bytes into
- * the stream. This may fail and is only supported if the write_from_buff feature is supported by the stream.
- */
-camio_error_t camio_set_opts(camio_wr_buffer_t** wr_buffer,  ch_word buffer_offset, ch_word dest_offset);
-
-
-/**
- * A single buffer object is a buffer chain of length 1. If you require batching performance, you can append additional write
- * buffers to form a longer chain. Some streams may have ordering requirements on appending chains and many streams will have
- * limits on the length of chains that are permitted.
- * * Returns:
- * - ENOERROR: Completed successfully.
- * - TODO XXX: Add more here
- */
-camio_error_t camio_chain(camio_wr_buffer_t** buffer_chain_head, camio_wr_buffer_t** buffer );
-
-
-/* Write data described by the buffer, or buffer_chain to the stream called 'this'. Write may or may not block. Use a
+/* Write data described by the , or buffer_chain to the stream called 'this'. Write may or may not block. Use a
  * selector loop to ensure that the stream is ready for writing if you do not wish to block. In some streams, the act of
  * calling write will cause the write buffer to become automatically released. The writer will return EAUTORELEASE in this
  * case. This means that you cannot re-use the write buffer, and you must call read_aquire again to get another buffer.
@@ -168,17 +170,17 @@ camio_error_t camio_chain(camio_wr_buffer_t** buffer_chain_head, camio_wr_buffer
  * - ENOERROR: Completed successfully.
  * - TODO XXX: Add more here
  */
-camio_error_t camio_write_commit(camio_stream_t* this, camio_wr_buffer_t** buffer_chain );
+camio_error_t camio_write_request(camio_stream_t* this, camio_write_req_t* req_vec, ch_word req_vec_len);
 
 
 /**
- * Relinquish resources associated with the given write buffer chain. If you try to release an invalid sequence, an EBADSEQ
+ * Relinquish resources associated with the given write buffer If you try to release an invalid sequence, an EBADSEQ
  * error may be raised.
  * Return values:
  * - ENOERROR: All good, please continue.
  * - EBADSEQ:  You cannot release this buffer without releasing previous buffers in the sequence too.
  */
-camio_error_t camio_write_release(camio_stream_t* this, camio_wr_buffer_t** buffers_chain);
+camio_error_t camio_write_release(camio_stream_t* this, camio_wr_buffer_t** buffer);
 
 
 /**
