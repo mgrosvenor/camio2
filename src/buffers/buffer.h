@@ -46,9 +46,9 @@ typedef struct camio_buffer_internal_s {
         uint64_t        ts_fixed3232;
     } __ts; //Private, don't play with this directly!
 
-    camio_buffer_t* __next;   //Pointer to the next buffer in this queue, if null, there is no more.
-    camio_buffer_t* __last;   //Pointer to the last buffer in this queue, if null, there is no more.
-    ch_word __queue_len;      //How many items in this queue, typically just 1.
+    //camio_buffer_t* __next;   //Pointer to the next buffer in this queue, if null, there is no more.
+    //camio_buffer_t* __last;   //Pointer to the last buffer in this queue, if null, there is no more.
+    //ch_word __queue_len;      //How many items in this queue, typically just 1.
 
 } camio_buffer_internal_t;
 
