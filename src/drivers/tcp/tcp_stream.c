@@ -41,10 +41,15 @@ typedef struct tcp_stream_priv_s {
 
     //The current read buffer
     ch_bool read_registered;    //Has a read been registered?
+    ch_bool read_ready;         //Is the stream ready for writing (for edge triggered multiplexers)
     camio_buffer_t* rd_buffer;  //A place to keep a read buffer until it's ready to be consumed
-    ch_word rd_buff_offset;     //Where should data be placed in the read buffer
-    ch_word rd_size_hint;
+    camio_read_req_t* read_req; //Read request vector to put data into when there is new data
+    ch_word read_req_len;       //size of the request vector
 
+    ch_bool write_registered;     //Has a write been registered?
+    ch_bool write_ready;          //Is the stream ready for writing (for edge triggered multiplexers)
+    camio_write_req_t* write_req; //Write request vector to take data out of when there is new data.
+    ch_word write_req_len;        //size of the request vector
 
 } tcp_stream_priv_t;
 
@@ -140,7 +145,7 @@ static camio_error_t tcp_read_ready(camio_muxable_t* this)
 
 }
 
-static camio_error_t tcp_read_request( camio_stream_t* this, ch_word buffer_offset, ch_word source_offset, ch_word size_hint)
+static camio_error_t tcp_read_request( camio_stream_t* this, camio_read_req_t* req_vec, ch_word req_vec_len )
 {
     DBG("Doing TCP read register...!\n");
     //Basic sanity checks -- TODO XXX: Should these be made into (compile time optional?) asserts for runtime performance?
@@ -148,6 +153,11 @@ static camio_error_t tcp_read_request( camio_stream_t* this, ch_word buffer_offs
         DBG("This null???\n"); //WTF?
         return CAMIO_EINVALID;
     }
+    if(req_vec_len != 1){
+
+    }
+
+
     if( source_offset != 0){
         DBG("This is TCP, you're not allowed to have a source offset!\n"); //WTF?
         return CAMIO_EINVALID;
@@ -254,6 +264,35 @@ static camio_error_t tcp_read_release(camio_stream_t* this, camio_rd_buffer_t** 
  * WRITE FUNCTIONS
  **************************************************************************************************************************/
 
+//Try to write to the underlying, stream.
+static camio_error_t tcp_write_try(camio_stream_t* this)
+{
+    tcp_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
+
+    for(int i = 0; i < this->wrreq_vec_len; i++){
+        DBG("Writing %li bytes from %p to %i\n", chain_ptr->data_len,chain_ptr->data_start, priv->fd);
+        ch_word bytes = write(priv->fd,chain_ptr->data_start,chain_ptr->data_len);
+        if(bytes < 0){
+            if(errno == EWOULDBLOCK || errno == EAGAIN){
+                return CAMIO_ETRYAGAIN;
+            }
+            else{
+                DBG("error %s\n",strerror(errno));
+                return CAMIO_ECHECKERRORNO;
+            }
+        }
+        chain_ptr->data_len -= bytes;
+        const char* data_start_new = (char*)chain_ptr->data_start + bytes;
+        chain_ptr->data_start = (void*)data_start_new;
+
+        chain_ptr = chain_ptr->__internal.__next;
+    }
+    return CAMIO_ENOERROR;
+}
+
+
+
+
 static camio_error_t tcp_write_ready(camio_muxable_t* this)
 {
     //Basic sanity checks -- TODO XXX: Should these be made into (compile time optional?) asserts for runtime performance?
@@ -268,10 +307,24 @@ static camio_error_t tcp_write_ready(camio_muxable_t* this)
     }
 
     //OK now the fun begins
-    //tcp_stream_priv_t* priv = STREAM_GET_PRIVATE(this->parent.stream);
+    camio_error_t err = tcp_write_try(this->parent.stream);
+    if(err == CAMIO_ENOERROR){
+        DBG("Writing has completed successfully. Release the buffers and/or write some more\n");
+        return CAMIO_EREADY;
+    }
 
-    //Keep it simple, just say we are always ready to begin with!
-    return CAMIO_EREADY;
+    if(err == CAMIO_ETRYAGAIN){
+        DBG("Writing not yet complete, come back later and try again\n");
+        return CAMIO_ENOTREADY;
+    }
+
+    if(err == CAMIO_ECLOSED){
+        DBG("The stream has been closed. You cannot write any more\n");
+        return CAMIO_ECLOSED;
+    }
+
+    DBG("Ouch, something bad happened. Unexpected err = %lli \n", err);
+    return err;
 
 }
 
@@ -304,39 +357,29 @@ static camio_error_t tcp_write_acquire(camio_stream_t* this, camio_wr_buffer_t**
 }
 
 
-static camio_error_t tcp_write_commit(camio_stream_t* this, camio_wr_buffer_t** buffer_chain )
+static camio_error_t tcp_write_request(camio_stream_t* this, camio_write_req_t* req_vec, ch_word req_vec_len)
 {
     //Basic sanity checks -- TODO XXX: Should these be made into (compile time optional?) asserts for runtime performance?
     if( NULL == this){
         DBG("This is null???\n"); //WTF?
         return CAMIO_EINVALID;
     }
+
     tcp_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
 
-    DBG("Got a buffer chain head with %li bytes in a %li byte buffer starting at %p\n",
-            (*buffer_chain)->data_len, (*buffer_chain)->buffer_len, (*buffer_chain)->data_start);
-
-    camio_rd_buffer_t* chain_ptr = *buffer_chain;
-    while(chain_ptr != NULL){
-        DBG("Writing %li bytes from %p to %i\n", chain_ptr->data_len,chain_ptr->data_start, priv->fd);
-        ch_word bytes = write(priv->fd,chain_ptr->data_start,chain_ptr->data_len);
-        if(bytes < 0){
-            if(errno == EWOULDBLOCK || errno == EAGAIN){
-                return CAMIO_ETRYAGAIN;
-            }
-            else{
-                DBG("error %s\n",strerror(errno));
-                return CAMIO_ECHECKERRORNO;
-            }
-        }
-        chain_ptr->data_len -= bytes;
-        const char* data_start_new = (char*)chain_ptr->data_start + bytes;
-        chain_ptr->data_start = (void*)data_start_new;
-
-        chain_ptr = chain_ptr->__internal.__next;
+    DBG("Got a write request vector with %lli items\n", req_vec_len);
+    if(priv->write_registered){
+        DBG("Already registered a write request. Currently this stream only handles one outstanding request at a time\n");
+        return CAMIO_EINVALID; //TODO XXX better error code
     }
 
-    return CAMIO_ENOERROR;
+    //Register the new write request
+    priv->write_req         = req_vec;
+    priv->write_req_len     = req_vec_len;
+    priv->write_registered  = true;
+
+    //Have a go a doing the write immediately. This may or may not succeed.
+    return tcp_write_try(this);
 }
 
 
