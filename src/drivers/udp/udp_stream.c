@@ -25,7 +25,7 @@
 /**************************************************************************************************************************
  * PER STREAM STATE
  **************************************************************************************************************************/
-#define CAMIO_UDP_BUFFER_SIZE (64 * 1024)
+#define CAMIO_UDP_BUFFER_SIZE (64 * 1024) //TODO XXX -- this should be converted to a stream option
 //Current (simple) UDP recv only does one buffer at a time, this could change with vectored I/O in the future.
 #define CAMIO_UDP_BUFFER_COUNT (1)
 
@@ -42,9 +42,17 @@ typedef struct udp_stream_priv_s {
 
     //The current read buffer
     ch_bool read_registered;    //Has a read been registered?
+    ch_bool read_ready;         //Is the stream ready for writing (for edge triggered multiplexers)
     camio_buffer_t* rd_buffer;  //A place to keep a read buffer until it's ready to be consumed
-    ch_word rd_buff_offset;     //Where should data be placed in the read buffer
-    ch_word rd_size_hint;
+    camio_read_req_t* read_req; //Read request vector to put data into when there is new data
+    ch_word read_req_len;       //size of the request vector
+    ch_word read_req_curr;      //This will be needed later
+
+    ch_bool write_registered;     //Has a write been registered?
+    ch_bool write_ready;          //Is the stream ready for writing (for edge triggered multiplexers)
+    camio_write_req_t* write_req; //Write request vector to take data out of when there is new data.
+    ch_word write_req_len;        //size of the request vector
+    ch_word write_req_curr;
 
 } udp_stream_priv_t;
 
@@ -150,33 +158,39 @@ static camio_error_t udp_read_request(camio_stream_t* this, camio_read_req_t* re
         DBG("This null???\n"); //WTF?
         return CAMIO_EINVALID;
     }
-    if( source_offset != 0){
-        DBG("This is UDP, you're not allowed to have a source offset!\n"); //WTF?
+    udp_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
+
+    if(req_vec_len != 1){
+        DBG("Stream currently only supports read requests of size 1\n"); //TODO this should be coded in the features struct
         return CAMIO_EINVALID;
     }
-    if( buffer_offset > CAMIO_UDP_BUFFER_SIZE){
+    priv->read_req_len = req_vec_len;
+    //WARNING: Code below here assumes that req len == 1!!
+
+    if( req_vec->src_offset_hint != 0){
+        DBG("This is TCP, you're not allowed to have a source offset!\n"); //WTF?
+        return CAMIO_EINVALID;
+    }
+    if( req_vec->dst_offset_hint > CAMIO_UDP_BUFFER_SIZE){
         DBG("You're trying to set a buffer offset (%i) which is greater than the buffer size (%i) ???\n",
-                buffer_offset, CAMIO_UDP_BUFFER_SIZE); //WTF?
+                req_vec->dst_offset_hint, CAMIO_UDP_BUFFER_SIZE); //WTF?
         return CAMIO_EINVALID;
     }
 
-    udp_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
     if(priv->read_registered){
-        DBG("New read request registered, but request is still outstanding\n");
-        return CAMIO_ETOOMANY;
+        DBG("Already registered a read request. Currently this stream only handles one outstanding request at a time\n");
+        return CAMIO_ETOOMANY; //TODO XXX better error code
+    }
+
+    if(req_vec->read_size_hint > 0){
+        if(req_vec->read_size_hint > CAMIO_UDP_BUFFER_SIZE){
+            //TODO XXX: Could realloc buffer here to be the right size...
+            req_vec->read_size_hint = CAMIO_UDP_BUFFER_SIZE;
+        }
     }
 
     //Sanity checks done, do some work now
-    priv->rd_buff_offset = buffer_offset;
     priv->read_registered = true;
-
-    if(size_hint > 0){
-        if(size_hint > CAMIO_UDP_BUFFER_SIZE){
-            //TODO XXX: Could realloc buffer here to be the right size...
-            size_hint = CAMIO_UDP_BUFFER_SIZE;
-        }
-        priv->rd_size_hint = size_hint;
-    }
 
     DBG("Doing UDP read register...Done!..Successful\n");
     return CAMIO_ENOERROR;
