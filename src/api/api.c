@@ -143,9 +143,12 @@ inline camio_error_t camio_mux_remove(camio_mux_t* this, camio_muxable_t* muxabl
 }
 
 
-inline camio_error_t camio_mux_select(camio_mux_t* this, /*struct timespec timeout,*/ camio_muxable_t** muxable_o)
+inline camio_error_t camio_mux_select(camio_mux_t* this,
+        /*struct timespec timeout,*/
+        camio_muxable_t** muxable_o,
+        ch_word* which_o)
 {
-    return this->vtable.select(this, /*timeout,*/ muxable_o);
+    return this->vtable.select(this, /*timeout,*/ muxable_o, which_o);
 }
 
 

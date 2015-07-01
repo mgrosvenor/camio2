@@ -59,7 +59,7 @@ camio_error_t spin_remove(camio_mux_t* this, camio_muxable_t* muxable)
 }
 
 
-camio_error_t spin_select(camio_mux_t* this, /*struct timespec timeout,*/ camio_muxable_t** muxable_o)
+camio_error_t spin_select(camio_mux_t* this, /*struct timespec timeout,*/ camio_muxable_t** muxable_o, ch_word* which_o)
 {
    /* (void)timeout; //Ignore the timeouts for the moment TODO - Implement this! */
 
@@ -75,11 +75,14 @@ camio_error_t spin_select(camio_mux_t* this, /*struct timespec timeout,*/ camio_
             DBG("Found ready item at index %i\n", priv->idx);
             priv->idx += 1;//Make sure we look at the next transport first
             *muxable_o = muxable;
+            *which_o = muxable->id;
             return CAMIO_ENOERROR;
         }
 
         if(err != CAMIO_ENOTREADY){
             DBG("Muxable had an unexpected error = %i\n", err);
+            *muxable_o = muxable;
+            *which_o = muxable->id;
             return err;
         }
 

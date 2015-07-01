@@ -238,7 +238,7 @@ static camio_error_t delim_read_ready(camio_muxable_t* this)
     }
 
     if(err == CAMIO_ETRYAGAIN){
-        //DBG("This is no new data waiting!\n");
+        DBG("This is no new data waiting!\n");
         return CAMIO_ENOTREADY;
     }
 
@@ -274,6 +274,7 @@ static camio_error_t delim_read_request(camio_stream_t* this, camio_read_req_t* 
         return CAMIO_EINVALID; //TODO XXX: Better error
     }
     priv->rd_base_req_vec = req_vec;
+    priv->rd_base_req_vec_len = req_vec_len;
 
     //OK. Register the read
     priv->read_registered = true;
@@ -519,6 +520,7 @@ static camio_error_t delim_write_request(camio_stream_t* this, camio_write_req_t
 
 static camio_error_t delim_write_release(camio_stream_t* this, camio_wr_buffer_t** buffer_chain)
 {
+    DBG("Doing delimiter write release\n");
     //Basic sanity checks -- TODO DELIM: Should these be made into (compile time optional?) asserts for runtime performance?
     if( NULL == this){
         DBG("This null???\n"); //WTF?

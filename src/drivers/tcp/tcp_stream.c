@@ -66,7 +66,7 @@ typedef struct tcp_stream_priv_s {
 static camio_error_t tcp_read_peek( camio_stream_t* this)
 {
     //This is not a public function, can assume that preconditions have been checked.
-    //DBG("Doing read peek\n");
+    DBG("Doing read peek\n");
     tcp_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
     camio_error_t err = buffer_malloc_linear_acquire(priv->rd_buff_pool,&priv->rd_buffer);
     if(err){
@@ -74,7 +74,7 @@ static camio_error_t tcp_read_peek( camio_stream_t* this)
         return err;
     }
 
-    camio_read_req_t * req = priv->read_req;
+    camio_read_req_t* req = priv->read_req;
     req->dst_offset_hint = MIN(CAMIO_TCP_BUFFER_SIZE, req->dst_offset_hint); //Make sure we don't overflow the buffer
     char* read_buffer = (char*)priv->rd_buffer->buffer_start + req->dst_offset_hint; //Do the offset that we need
     ch_word read_size = CAMIO_TCP_BUFFER_SIZE - req->dst_offset_hint; //Also make sure we don't overflow
@@ -162,7 +162,6 @@ static camio_error_t tcp_read_request( camio_stream_t* this, camio_read_req_t* r
         DBG("Stream currently only supports read requests of size 1\n"); //TODO this should be coded in the features struct
         return CAMIO_EINVALID;
     }
-    priv->read_req_len = req_vec_len;
     //WARNING: Code below here assumes that req len == 1!!
 
     if( req_vec->src_offset_hint != 0){
@@ -188,7 +187,9 @@ static camio_error_t tcp_read_request( camio_stream_t* this, camio_read_req_t* r
     }
 
     //Sanity checks done, do some work now
-    priv->read_registered = true;
+    priv->read_req          = req_vec;
+    priv->read_req_len      = req_vec_len;
+    priv->read_registered   = true;
 
     DBG("Doing TCP read request...Done!..Successful\n");
     return CAMIO_ENOERROR;
@@ -353,6 +354,7 @@ static camio_error_t tcp_write_try(camio_stream_t* this)
     }
 
     //If we get here, we've successfully written all the records out. This means we're now ready to take more write requests
+    DBG("De registering write\n");
     priv->write_registered = false;
 
     return CAMIO_ENOERROR;
@@ -372,6 +374,11 @@ static camio_error_t tcp_write_ready(camio_muxable_t* this)
     if( this->mode != CAMIO_MUX_MODE_WRITE){
         DBG("Wrong kind of muxable!\n"); //WTF??
         return CAMIO_EINVALID;
+    }
+
+    tcp_stream_priv_t* priv = STREAM_GET_PRIVATE(this->parent.stream);
+    if(!priv->write_registered){ //No body has asked us to write anything, so we're not ready
+        return CAMIO_ENOTREADY;
     }
 
     //OK now the fun begins

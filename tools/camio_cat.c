@@ -67,29 +67,37 @@ int main(int argc, char** argv)
         return CAMIO_EINVALID;
     }
 
-    camio_stream_t* stream = NULL;
-    err = camio_connect(connector,&stream);
+    camio_stream_t* io_stream = NULL;
+    err = camio_connect(connector,&io_stream);
     if(err){ DBG("Could not connect to stream\n"); return CAMIO_EINVALID; /*TODO XXX put a better error here*/ }
 
     //Put the read stream into the mux
     typedef enum { READ_STREAM, WRITE_STREAM } camio_cat_state_e;
-    camio_mux_insert(mux,&stream->rd_muxable,READ_STREAM);
-    camio_mux_insert(mux,&stream->wr_muxable,WRITE_STREAM);
+    camio_mux_insert(mux,&io_stream->rd_muxable,READ_STREAM);
+    camio_mux_insert(mux,&io_stream->wr_muxable,WRITE_STREAM);
 
    //Read and write bytes to and from the stream - just do loopback for now
     camio_rd_buffer_t* rd_buffer = NULL;
     camio_rd_buffer_t* wr_buffer = NULL;
-    camio_muxable_t* which       = NULL;
+    camio_muxable_t* muxable     = NULL;
+    ch_word which                = -1;
     camio_read_req_t  rd_req = { 0 };
     camio_write_req_t wr_req = { 0 };
-    camio_read_request(stream,&rd_req,1); //kick the process off -- tell the read stream that we would like some data,
+    err = camio_read_request(io_stream,&rd_req,1); //kick the process off -- tell the read stream that we would like some data,
+    if(err){ DBG("Got a read request error %i\n", err); return -1; }
+
     while(1){
         //Block waiting for a stream to be ready
-        camio_mux_select(mux,&which);
-        switch(which->id){
+        err = camio_mux_select(mux,&muxable,&which);
+        if(err != CAMIO_ENOERROR){
+            DBG("Unexpected error %lli on stream with id =%lli\n", err, which);
+            break;
+        }
+        switch(which){
             case READ_STREAM: {//There is new data to be read
                 //Acquire a pointer to the new data now that it's ready
-                err = camio_read_acquire(which->parent.stream, &rd_buffer);
+                DBG("Handling read event\n");
+                err = camio_read_acquire(muxable->parent.stream, &rd_buffer);
                 if(err){ DBG("Got a read error %i\n", err); return -1; }
                 DBG("Got %lli bytes of new data at %p\n", rd_buffer->data_len, rd_buffer->data_start);
 
@@ -99,7 +107,7 @@ int main(int argc, char** argv)
                 }
 
                 //Get a buffer for writing stuff to
-                err = camio_write_acquire(stream, &wr_buffer);
+                err = camio_write_acquire(io_stream, &wr_buffer);
                 if(err){ DBG("Could not connect to stream\n"); return CAMIO_EINVALID; /*TODO XXX put a better error here*/ }
 
                 //Copy data over from the read buffer to the write buffer
@@ -108,19 +116,22 @@ int main(int argc, char** argv)
 
                 //Data copied, let's commit it and send it off
                 wr_req.buffer = wr_buffer;
-                err = camio_write_request(stream, &wr_req,1);
+                err = camio_write_request(io_stream, &wr_req,1);
                 if(err){ DBG("Got a write request error %i\n", err); return -1; }
 
                 //And we're done with the read buffer now, release it
-                err = camio_read_release(stream, &rd_buffer);
+                err = camio_read_release(io_stream, &rd_buffer);
                 if(err){ DBG("Got a read release error %i\n", err); return -1; }
                 break;
             }
             case WRITE_STREAM: {//Data has finished writing
+                DBG("Handling write event\n");
                 //Done with the write buffer, release it
-                camio_write_release(stream,&wr_buffer);
+                err = camio_write_release(io_stream,&wr_buffer);
+                if(err){ DBG("Got a write release error %i\n", err); return -1; }
 
-                camio_read_request(stream,&rd_req,1); //Tell the read stream that we would like some more data..
+                err = camio_read_request(io_stream,&rd_req,1); //Tell the read stream that we would like some more data..
+                if(err){ DBG("Got a read request error %i\n", err); return -1; }
                 break;
             }
         }
