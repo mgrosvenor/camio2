@@ -269,7 +269,7 @@ static camio_error_t delim_read_request(camio_stream_t* this, camio_read_req_t* 
     }
 
     //Hang on to these for another time when it is needed TODO XXX see the delimiter function for a bug related to this...
-    if(req_vec[1].dst_offset_hint != 0){
+    if(req_vec->dst_offset_hint != 0){
         DBG("Delimiter currently only supports buffer offsets of 0\n");
         return CAMIO_EINVALID; //TODO XXX: Better error
     }

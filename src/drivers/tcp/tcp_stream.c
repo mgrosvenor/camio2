@@ -425,6 +425,11 @@ static camio_error_t tcp_write_release(camio_stream_t* this, camio_wr_buffer_t**
     }
 
     DBG("Removing data buffer %p staring at %p\n", buffer, (*buffer)->buffer_start);
+    camio_error_t err = buffer_malloc_linear_release(priv->wr_buff_pool,buffer);
+    if(err){
+        DBG("Unexpected release error %lli\n", err);
+        return err;
+    }
 
     *buffer = NULL; //Remove dangling pointers!
 

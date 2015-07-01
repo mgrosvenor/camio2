@@ -103,12 +103,12 @@ int main(int argc, char** argv)
 
                 if(rd_buffer->data_len == 0){
                     DBG("The connection is closed, exiting now\n");
-                    break; //The connection is dead!
+                    return -1; //The connection is dead!
                 }
 
                 //Get a buffer for writing stuff to
                 err = camio_write_acquire(io_stream, &wr_buffer);
-                if(err){ DBG("Could not connect to stream\n"); return CAMIO_EINVALID; /*TODO XXX put a better error here*/ }
+                if(err){ DBG("Could acquire new write buffer %lli\n", err); return -1; /*TODO XXX put a better error here*/ }
 
                 //Copy data over from the read buffer to the write buffer
                 err = camio_copy_rw(&wr_buffer,&rd_buffer,0,0,rd_buffer->data_len);
@@ -130,6 +130,7 @@ int main(int argc, char** argv)
                 err = camio_write_release(io_stream,&wr_buffer);
                 if(err){ DBG("Got a write release error %i\n", err); return -1; }
 
+                DBG("req.off=%lli req.dst=%lli req.size=%lli\n",rd_req.src_offset_hint, rd_req.dst_offset_hint, rd_req.read_size_hint);
                 err = camio_read_request(io_stream,&rd_req,1); //Tell the read stream that we would like some more data..
                 if(err){ DBG("Got a read request error %i\n", err); return -1; }
                 break;
