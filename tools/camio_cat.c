@@ -48,10 +48,7 @@ int main(int argc, char** argv)
     //Construct a delimiter
     ch_word id;
     err = camio_transport_get_id("delim",&id);
-    delim_params_t delim_params = {
-            .base_uri = uri,
-            .delim_fn = delimit,
-    };
+    delim_params_t delim_params = { .base_uri = uri, .delim_fn = delimit };
     ch_word params_size = sizeof(delim_params_t);
     void* params = &delim_params;
 
@@ -75,47 +72,58 @@ int main(int argc, char** argv)
     if(err){ DBG("Could not connect to stream\n"); return CAMIO_EINVALID; /*TODO XXX put a better error here*/ }
 
     //Put the read stream into the mux
-    camio_mux_insert(mux,&stream->rd_muxable,0);
+    typedef enum { READ_STREAM, WRITE_STREAM } camio_cat_state_e;
+    camio_mux_insert(mux,&stream->rd_muxable,READ_STREAM);
+    camio_mux_insert(mux,&stream->wr_muxable,WRITE_STREAM);
 
    //Read and write bytes to and from the stream - just do loopback for now
     camio_rd_buffer_t* rd_buffer = NULL;
     camio_rd_buffer_t* wr_buffer = NULL;
     camio_muxable_t* which       = NULL;
+    camio_read_req_t  rd_req = { 0 };
+    camio_write_req_t wr_req = { 0 };
+    camio_read_request(stream,&rd_req,1); //kick the process off -- tell the read stream that we would like some data,
     while(1){
-        //Tell the stream that we want some data
-        camio_read_request(stream,0,0,0);
-
         //Block waiting for a stream to be ready
         camio_mux_select(mux,&which);
+        switch(which->id){
+            case READ_STREAM: {//There is new data to be read
+                //Acquire a pointer to the new data now that it's ready
+                err = camio_read_acquire(which->parent.stream, &rd_buffer);
+                if(err){ DBG("Got a read error %i\n", err); return -1; }
+                DBG("Got %lli bytes of new data at %p\n", rd_buffer->data_len, rd_buffer->data_start);
 
-        //Acquire a pointer to the new data now that it's ready
-        err = camio_read_acquire(which->parent.stream, &rd_buffer);
-        if(err){ DBG("Got a read error %i\n", err); return -1; }
+                if(rd_buffer->data_len == 0){
+                    DBG("The connection is closed, exiting now\n");
+                    break; //The connection is dead!
+                }
 
-        if(rd_buffer->data_len == 0){
-            DBG("The connection is closed, exiting now\n");
-            break; //The connection is dead!
+                //Get a buffer for writing stuff to
+                err = camio_write_acquire(stream, &wr_buffer);
+                if(err){ DBG("Could not connect to stream\n"); return CAMIO_EINVALID; /*TODO XXX put a better error here*/ }
+
+                //Copy data over from the read buffer to the write buffer
+                err = camio_copy_rw(&wr_buffer,&rd_buffer,0,0,rd_buffer->data_len);
+                if(err){ DBG("Got a copy error %i\n", err); return -1; }
+
+                //Data copied, let's commit it and send it off
+                wr_req.buffer = wr_buffer;
+                err = camio_write_request(stream, &wr_req,1);
+                if(err){ DBG("Got a write request error %i\n", err); return -1; }
+
+                //And we're done with the read buffer now, release it
+                err = camio_read_release(stream, &rd_buffer);
+                if(err){ DBG("Got a read release error %i\n", err); return -1; }
+                break;
+            }
+            case WRITE_STREAM: {//Data has finished writing
+                //Done with the write buffer, release it
+                camio_write_release(stream,&wr_buffer);
+
+                camio_read_request(stream,&rd_req,1); //Tell the read stream that we would like some more data..
+                break;
+            }
         }
-        DBG("Got %lli bytes of new data at %p\n", rd_buffer->data_len, rd_buffer->data_start);
-
-        //Get a buffer for writing stuff to
-        err = camio_write_acquire(stream, &wr_buffer);
-        if(err){ DBG("Could not connect to stream\n"); return CAMIO_EINVALID; /*TODO XXX put a better error here*/ }
-
-        //Copy data over from the read buffer to the write buffer
-        err = camio_copy_rw(&wr_buffer,&rd_buffer,0,rd_buffer->data_len);
-        if(err){ DBG("Got a copy error %i\n", err); return -1; }
-
-        //Data copied, let's commit it and send it off
-        err = camio_write_commit(stream, &wr_buffer );
-        if(err){ DBG("Got a commit error %i\n", err); return -1; }
-
-        //Done with the write buffer, release it
-        camio_write_release(stream,&wr_buffer);
-
-        //And we're done with the read buffer too, release it as well
-        err = camio_read_release(stream, &rd_buffer);
-        if(err){ DBG("Got a read release error %i\n", err); return -1; }
     }
 
     return 0;
