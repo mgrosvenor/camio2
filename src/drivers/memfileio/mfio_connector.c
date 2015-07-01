@@ -64,7 +64,7 @@ static camio_error_t mfio_connect_peek(camio_connector_t* this)
 
     //Get the file size
     struct stat st;
-    stat(priv->params->hierarchical, &st);
+    stat(priv->params->hierarchical.str, &st);
     priv->mmap_buff.buffer_len = st.st_size;
 
     if(priv->mmap_buff.buffer_len)
@@ -73,7 +73,7 @@ static camio_error_t mfio_connect_peek(camio_connector_t* this)
 
         //Map the whole thing into memory
         priv->mmap_buff.buffer_start = mmap( NULL, priv->mmap_buff.buffer_len, PROT_READ, MAP_SHARED, priv->base_fd, 0);
-        if(unlikely(priv->mmap_buff.buffer_len == MAP_FAILED)){
+        if(priv->mmap_buff.buffer_start == MAP_FAILED){
             DBG("Could not memory map blob file \"%s\". Error=%s\n", priv->params->hierarchical, strerror(errno));
             return CAMIO_ECHECKERRORNO; //TODO XXX better errors
         }
@@ -88,13 +88,11 @@ static camio_error_t mfio_connect_peek(camio_connector_t* this)
 
 static camio_error_t mfio_connector_ready(camio_muxable_t* this)
 {
-    mfio_connector_priv_t* priv = CONNECTOR_GET_PRIVATE(this->parent.connector);
-
     if(this->fd > -1){
         return CAMIO_EREADY;
     }
 
-    camio_error_t err = mfio_connect_peek(priv);
+    camio_error_t err = mfio_connect_peek(this->parent.connector);
     if(err != CAMIO_ENOERROR){
         return err;
     }
@@ -105,7 +103,7 @@ static camio_error_t mfio_connector_ready(camio_muxable_t* this)
 static camio_error_t mfio_connect(camio_connector_t* this, camio_stream_t** stream_o )
 {
     mfio_connector_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
-    camio_error_t err = mfio_connect_peek(priv);
+    camio_error_t err = mfio_connect_peek(this);
     if(err != CAMIO_ENOERROR){
         return err;
     }
@@ -122,7 +120,7 @@ static camio_error_t mfio_connect(camio_connector_t* this, camio_stream_t** stre
     }
     *stream_o = stream;
 
-    err = mfio_stream_construct(stream, this, priv->blob, priv->base_fd, priv->mmap_buff);
+    err = mfio_stream_construct(stream, this, priv->base_fd, priv->mmap_buff);
     if(err){
        return err;
     }
@@ -156,8 +154,8 @@ static camio_error_t mfio_construct(camio_connector_t* this, void** params, ch_w
     }
 
     //Open up the file and get it ready to connect
-    priv->base_fd = open(mfio_params->hierarchical, O_RDWR);
-    if(unlikely(priv->base_fd < 0)){
+    priv->base_fd = open(mfio_params->hierarchical.str, O_RDWR);
+    if(priv->base_fd < 0){
         DBG("Could not open file \"%s\". Error=%s\n", mfio_params->hierarchical, strerror(errno));
         return CAMIO_EINVALID;
     }

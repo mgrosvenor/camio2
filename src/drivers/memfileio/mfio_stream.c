@@ -35,13 +35,13 @@ typedef struct mfio_stream_priv_s {
     //The current read buffer
     ch_bool read_registered;    //Has a read been registered?
     ch_bool read_ready;         //Is the stream ready for writing (for edge triggered multiplexers)
-    camio_read_req_t read_req;  //Read request vector to put data into when there is new data
+    camio_read_req_t* read_req;  //Read request vector to put data into when there is new data
     ch_word read_req_len;       //size of the request vector
     ch_word read_req_curr;      //This will be needed later
 
     ch_bool write_registered;     //Has a write been registered?
     ch_bool write_ready;          //Is the stream ready for writing (for edge triggered multiplexers)
-    camio_write_req_t write_req;  //Write request vector to take data out of when there is new data.
+    camio_write_req_t* write_req;  //Write request vector to take data out of when there is new data.
     ch_word write_req_len;        //size of the request vector
     ch_word write_req_curr;
 
@@ -67,6 +67,7 @@ static camio_error_t mfio_read_peek( camio_stream_t* this)
     mfio_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
 
     if(priv->is_rd_closed){
+        DBG("Cannot keep reading, the stream is closed\n");
         return CAMIO_ECLOSED;
     }
 
@@ -81,7 +82,7 @@ static camio_error_t mfio_read_peek( camio_stream_t* this)
         return CAMIO_EINVALID;
     }
     if( req->dst_offset_hint != CAMIO_READ_REQ_DST_OFFSET_NONE){
-        DBG("This stream does not support destination offsets.It is a buffer donor!\n");
+        DBG("This stream does not support destination offsets. (It is a buffer donor!)\n");
         return CAMIO_EINVALID;
     }
     if(req->read_size_hint == CAMIO_READ_REQ_SIZE_ANY){
@@ -92,28 +93,22 @@ static camio_error_t mfio_read_peek( camio_stream_t* this)
         req->read_size_hint = priv->mmap_rd_buff.buffer_len;
     }
 
+    char* new_data_start         = (char*)priv->mmap_rd_buff.data_start + priv->mmap_rd_buff.data_len;
+    const ch_word current_offset = (char*)priv->mmap_rd_buff.data_start - (char*)priv->mmap_rd_buff.data_start;
+    const ch_word max_read_size  = priv->mmap_rd_buff.buffer_len - current_offset;
+    ch_word read_size = MIN(max_read_size,req->read_size_hint);
 
-
-    if(priv->mmap_rd_buff.data_start >= priv->mmap_rd_buff_bu  || priv->is_closed){
-        priv->read_size = 0;
-        return 0; //Nothing more to read
+    //Check if we're at the end of the buffer
+    if( current_offset >= priv->mmap_rd_buff.buffer_len  || priv->is_rd_closed){
+        mfio_read_close(this);
+        DBG("Have run out of data. Cannot keep reading, the stream is closed\n");
+        return CAMIO_ECLOSED; //Nothing more to read
     }
 
-    //There is data, it is unread
-    priv->read_size = priv->blob_size;
+    priv->mmap_rd_buff.data_start = new_data_start;
+    priv->mmap_rd_buff.data_len   = read_size;
 
-    char* read_buffer = (char*)priv->mmap_rd_buffer->buffer_start + req->dst_offset_hint; //Do the offset that we need
-    ch_word read_size = priv->mmap_rd_buff.buffer_len - req->dst_offset_hint; //Also make sure we don't overflow
-    read_size = MIN(read_size,req->read_size_hint);
-
-
-    return priv->read_size;
-
-
-    priv->rd_buffer->data_len = bytes;
-    priv->rd_buffer->data_start = read_buffer;
-    DBG("Got %lli bytes from MFIO peek\n", priv->rd_buffer->data_len );
-
+    DBG("Success - got %lli bytes from MFIO peek\n", priv->mmap_rd_buff.data_len );
     return CAMIO_ENOERROR;
 }
 
