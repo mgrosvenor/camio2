@@ -150,18 +150,21 @@ static camio_error_t tcp_read_ready(camio_muxable_t* this)
 
 static camio_error_t tcp_read_request( camio_stream_t* this, camio_read_req_t* req_vec, ch_word req_vec_len )
 {
-    DBG("Doing TCP read register...!\n");
+    DBG("Doing TCP read request...!\n");
     //Basic sanity checks -- TODO XXX: Should these be made into (compile time optional?) asserts for runtime performance?
     if( NULL == this){
         DBG("This null???\n"); //WTF?
         return CAMIO_EINVALID;
     }
+    tcp_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
+
     if(req_vec_len != 1){
         DBG("Stream currently only supports read requests of size 1\n"); //TODO this should be coded in the features struct
         return CAMIO_EINVALID;
     }
+    priv->read_req_len = req_vec_len;
+    //WARNING: Code below here assumes that req len == 1!!
 
-    tcp_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
     if( req_vec->src_offset_hint != 0){
         DBG("This is TCP, you're not allowed to have a source offset!\n"); //WTF?
         return CAMIO_EINVALID;
@@ -187,7 +190,7 @@ static camio_error_t tcp_read_request( camio_stream_t* this, camio_read_req_t* r
     //Sanity checks done, do some work now
     priv->read_registered = true;
 
-    DBG("Doing TCP read register...Done!..Successful\n");
+    DBG("Doing TCP read request...Done!..Successful\n");
     return CAMIO_ENOERROR;
 
 }
