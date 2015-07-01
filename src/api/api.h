@@ -54,8 +54,9 @@ camio_error_t camio_connector_ready( camio_connector_t* this);
  *
  * When data is available, the ready() function will return EREADY and data will be returned by a read_acquire call. You
  * should not normally check ready() manually, but use a camio_multiplexer instead to do this. The maximum size of the
- * read_vev_len is stream dependent. read_register may also be called multiple times, but some streams will only support a
- * limited number (e.g 1) of outstanding requests.
+ * read_vec_len is stream dependent you can check the max_read_req_vec_len feature for this size. read_register() may be
+ * called multiple times, but some streams will only support a limited number (e.g 1) of outstanding requests. You can check
+ * the max_read_reqs feature for this size.
  *
  * Notes:
  * - If the source offset is non-zero, the read will try to retrieve data at offset bytes from the beginning of the source.
