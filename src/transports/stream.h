@@ -19,12 +19,17 @@
 
 #include "features.h"
 
+#define CAMIO_READ_REQ_SIZE_ANY (-1)
+#define CAMIO_READ_REQ_SRC_OFFSET_NONE (-1)
+#define CAMIO_READ_REQ_DST_OFFSET_NONE (0)
 typedef struct camio_read_req_s {
     ch_word src_offset_hint;
     ch_word dst_offset_hint;
     ch_word read_size_hint;
 } camio_read_req_t;
 
+#define CAMIO_WRITE_REQ_DST_OFFSET_NONE (-1)
+#define CAMIO_WRITE_REQ_SRC_OFFSET_NONE (0)
 typedef struct camio_write_req_s {
     ch_word src_offset_hint;
     ch_word dst_offset_hint;

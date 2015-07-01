@@ -4,65 +4,61 @@
  * See LICENSE.txt for full details. 
  * 
  *  Created:   PPP ZZZZ
- *  File name: ttt_connector.c
+ *  File name: ttt_connector.h
  *  Description:
  *  <INSERT DESCRIPTION HERE> 
  */
 
-#include "../../transports/connector.h"
-#include "../../camio.h"
-#include "../../camio_debug.h"
+#include <src/transports/connector.h>
+#include <src/camio.h>
+#include <src/camio_debug.h>
 
 #include "ttt_transport.h"
 #include "ttt_connector.h"
 #include "ttt_stream.h"
 
 
+
 /**************************************************************************************************************************
- * PER STREAM STATE
+ * Setup and teardown
  **************************************************************************************************************************/
 typedef struct ttt_priv_s {
-    //Parameters used when a connection happens
-    ttt_params_t* params;
-
+    ch_word temp;
 } ttt_connector_priv_t;
-
-
 
 
 /**************************************************************************************************************************
  * Connect functions
  **************************************************************************************************************************/
-//Try to see if connecting is possible. With TTT, it is always possible.
-static camio_error_t ttt_connect_peek(ttt_connector_priv_t* priv)
+
+//Try to see if connecting is possible.
+static camio_error_t ttt_connect_peek(camio_connector_t* this)
 {
-    (void)priv;
-    return CAMIO_NOTIMPLEMENTED;
+    DBG("Doing TTT connect peek\n");
+
+    return CAMIO_ETRYAGAIN;
+    return CAMIO_ECHECKERRORNO;
+    return CAMIO_ENOERROR;
 }
 
 static camio_error_t ttt_connector_ready(camio_muxable_t* this)
 {
+    DBG("Checking if TTT is ready to connect...\n");
     ttt_connector_priv_t* priv = CONNECTOR_GET_PRIVATE(this->parent.connector);
 
-//    if(priv->){
-//        return CAMIO_EREADY;
-//    }
 
-    camio_error_t err = ttt_connect_peek(priv);
-    if(err != CAMIO_ENOERROR){
-        return err;
-    }
-
+    return CAMIO_ENOTREADY;
     return CAMIO_EREADY;
 }
 
 static camio_error_t ttt_connect(camio_connector_t* this, camio_stream_t** stream_o )
 {
     ttt_connector_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
-    camio_error_t err = ttt_connect_peek(priv);
-    if(err != CAMIO_ENOERROR){
+    camio_error_t err = ttt_connector_ready(&this->muxable);
+    if(err != CAMIO_EREADY){
         return err;
     }
+    DBG("Done connecting, now constructing TTT stream...\n");
 
     camio_stream_t* stream = NEW_STREAM(ttt);
     if(!stream){
@@ -71,7 +67,7 @@ static camio_error_t ttt_connect(camio_connector_t* this, camio_stream_t** strea
     }
     *stream_o = stream;
 
-    err = ttt_stream_construct(stream, this /**, , , **/);
+    err = ttt_stream_construct(stream, this /*....*/);
     if(err){
        return err;
     }
@@ -94,14 +90,11 @@ static camio_error_t ttt_construct(camio_connector_t* this, void** params, ch_wo
     //Basic sanity check that the params is the right one.
     if(params_size != sizeof(ttt_params_t)){
         DBG("Bad parameters structure passed\n");
-        return CAMIO_EINVALID; //TODO TTT : Need better error values
+        return CAMIO_EINVALID; //TODO XXX : Need better error values
     }
     ttt_params_t* ttt_params = (ttt_params_t*)(*params);
 
-    /// .... check and parse the parameters here
-
     //Populate the parameters
-    priv->params                    = ttt_params;
 
     //Populate the muxable structure
     this->muxable.mode              = CAMIO_MUX_MODE_CONNECT;
@@ -109,25 +102,19 @@ static camio_error_t ttt_construct(camio_connector_t* this, void** params, ch_wo
     this->muxable.vtable.ready      = ttt_connector_ready;
     this->muxable.fd                = -1;
 
-    //Populate private connector state
-    //priv->... =  ...;
-
     return CAMIO_ENOERROR;
 }
 
 
 static void ttt_destroy(camio_connector_t* this)
 {
-    DBG("Destroying ttt connector...\n");
+    DBG("Destorying ttt connector\n");
     ttt_connector_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
 
-    //Free local stuff
-    //    if(priv->...)  { close(...); }
-    //    if(priv->...)  { free(...); }
-
     if(priv->params) { free(priv->params); }
+    DBG("Freed params\n");
     free(this);
-    DBG("Done destroying ttt connector structure\n");
+    DBG("Freed connector structure\n");
 }
 
 NEW_CONNECTOR_DEFINE(ttt, ttt_connector_priv_t)

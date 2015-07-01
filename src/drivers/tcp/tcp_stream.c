@@ -25,7 +25,7 @@
 /**************************************************************************************************************************
  * PER STREAM STATE
  **************************************************************************************************************************/
-#define CAMIO_TCP_BUFFER_SIZE (4 * 1024 * 1024)
+#define CAMIO_TCP_BUFFER_SIZE (16 * 1024 * 1024)
 //Current (simple) TCP recv only does one buffer at a time, this could change with vectored I/O in the future.
 #define CAMIO_TCP_BUFFER_COUNT (1)
 
@@ -74,13 +74,32 @@ static camio_error_t tcp_read_peek( camio_stream_t* this)
         return err;
     }
 
+    //TODO XXX - Should pick the right request vec here
     camio_read_req_t* req = priv->read_req;
+
+    //WARNING: Code below here assumes that req len == 1!!
+    if( req->src_offset_hint != CAMIO_READ_REQ_SRC_OFFSET_NONE){
+        DBG("This is TCP, you're not allowed to have a source offset!\n"); //WTF?
+        return CAMIO_EINVALID;
+    }
+    if( req->dst_offset_hint > CAMIO_TCP_BUFFER_SIZE){
+        DBG("You're trying to set a buffer offset (%i) which is greater than the buffer size (%i) ???\n",
+                req->dst_offset_hint, CAMIO_TCP_BUFFER_SIZE); //WTF?
+        return CAMIO_EINVALID;
+    }
+    if(req->read_size_hint == CAMIO_READ_REQ_SIZE_ANY){
+        req->read_size_hint = CAMIO_TCP_BUFFER_SIZE;
+    }
+    if(req->read_size_hint > CAMIO_TCP_BUFFER_SIZE){
+        //TODO XXX: Could realloc buffer here to be the right size...
+        req->read_size_hint = CAMIO_TCP_BUFFER_SIZE;
+    }
+
     req->dst_offset_hint = MIN(CAMIO_TCP_BUFFER_SIZE, req->dst_offset_hint); //Make sure we don't overflow the buffer
     char* read_buffer = (char*)priv->rd_buffer->buffer_start + req->dst_offset_hint; //Do the offset that we need
     ch_word read_size = CAMIO_TCP_BUFFER_SIZE - req->dst_offset_hint; //Also make sure we don't overflow
-    if(req->read_size_hint){
-        read_size = MIN(read_size,req->read_size_hint);
-    }
+    read_size = MIN(read_size,req->read_size_hint);
+
     ch_word bytes = read(priv->fd, read_buffer, read_size);
     if(bytes < 0){ //Shit, got an error. Maybe there just isn't any data?
         buffer_malloc_linear_release(priv->rd_buff_pool,&priv->rd_buffer); //TODO, could remove this step and reuse buffer..
@@ -162,28 +181,10 @@ static camio_error_t tcp_read_request( camio_stream_t* this, camio_read_req_t* r
         DBG("Stream currently only supports read requests of size 1\n"); //TODO this should be coded in the features struct
         return CAMIO_EINVALID;
     }
-    //WARNING: Code below here assumes that req len == 1!!
-
-    if( req_vec->src_offset_hint != 0){
-        DBG("This is TCP, you're not allowed to have a source offset!\n"); //WTF?
-        return CAMIO_EINVALID;
-    }
-    if( req_vec->dst_offset_hint > CAMIO_TCP_BUFFER_SIZE){
-        DBG("You're trying to set a buffer offset (%i) which is greater than the buffer size (%i) ???\n",
-                req_vec->dst_offset_hint, CAMIO_TCP_BUFFER_SIZE); //WTF?
-        return CAMIO_EINVALID;
-    }
 
     if(priv->read_registered){
         DBG("Already registered a read request. Currently this stream only handles one outstanding request at a time\n");
         return CAMIO_ETOOMANY; //TODO XXX better error code
-    }
-
-    if(req_vec->read_size_hint > 0){
-        if(req_vec->read_size_hint > CAMIO_TCP_BUFFER_SIZE){
-            //TODO XXX: Could realloc buffer here to be the right size...
-            req_vec->read_size_hint = CAMIO_TCP_BUFFER_SIZE;
-        }
     }
 
     //Sanity checks done, do some work now

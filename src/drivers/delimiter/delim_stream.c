@@ -49,25 +49,6 @@ typedef struct delim_stream_priv_s {
 } delim_stream_priv_t;
 
 
-//Reset the buffers internal pointers to point to nothing
-static inline void reset_buffer(camio_buffer_t* dst)
-{
-    dst->buffer_start       = NULL;
-    dst->buffer_len         = 0;
-    dst->data_start         = NULL;
-    dst->data_len           = 0;
-}
-
-
-//Assign the pointers from one buffer to another
-static inline void assign_buffer(camio_buffer_t* dst, camio_buffer_t* src, void* data_start, ch_word data_len)
-{
-    dst->buffer_start       = src->buffer_start;
-    dst->buffer_len         = src->buffer_len;
-    dst->data_start         = data_start;
-    dst->data_len           = data_len;
-}
-
 
 /**************************************************************************************************************************
  * READ FUNCTIONS
@@ -81,8 +62,6 @@ static void delim_read_close(camio_stream_t* this){
         priv->is_rd_closed = true;
     }
 }
-
-
 
 
 //See if there is something to read
