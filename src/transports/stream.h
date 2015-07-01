@@ -28,7 +28,6 @@ typedef struct camio_read_req_s {
 typedef struct camio_write_req_s {
     ch_word src_offset_hint;
     ch_word dst_offset_hint;
-    ch_word write_size_hint;
     camio_wr_buffer_t* buffer;
 } camio_write_req_t;
 
