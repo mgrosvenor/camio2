@@ -77,11 +77,12 @@ static camio_error_t udp_read_peek( camio_stream_t* this)
 
     //TODO XXX: Should convert this logic to use recvmesg instead, and put meta-data in meta struct, including overflow
     //          errors etc.
-    priv->rd_buff_offset = MIN(CAMIO_UDP_BUFFER_SIZE, priv->rd_buff_offset); //Make sure we don't overflow the buffer
-    char* read_buffer = (char*)priv->rd_buffer->buffer_start + priv->rd_buff_offset; //Do the offset that we need
-    ch_word read_size = CAMIO_UDP_BUFFER_SIZE - priv->rd_buff_offset; //Also make sure we don't overflow
-    if(priv->rd_size_hint){
-        read_size = MIN(read_size,priv->rd_size_hint);
+    camio_read_req_t * req = priv->read_req;
+    req->dst_offset_hint = MIN(CAMIO_UDP_BUFFER_SIZE, req->dst_offset_hint); //Make sure we don't overflow the buffer
+    char* read_buffer = (char*)priv->rd_buffer->buffer_start + req->dst_offset_hint; //Do the offset that we need
+    ch_word read_size = CAMIO_UDP_BUFFER_SIZE - req->dst_offset_hint; //Also make sure we don't overflow
+    if(req->read_size_hint){
+        read_size = MIN(read_size,req->read_size_hint);
     }
     ch_word bytes = read(priv->rd_fd, read_buffer, read_size);
     if(bytes < 0){ //Shit, got an error. Maybe there just isn't any data?
@@ -168,7 +169,7 @@ static camio_error_t udp_read_request(camio_stream_t* this, camio_read_req_t* re
     //WARNING: Code below here assumes that req len == 1!!
 
     if( req_vec->src_offset_hint != 0){
-        DBG("This is TCP, you're not allowed to have a source offset!\n"); //WTF?
+        DBG("This is UDP, you're not allowed to have a source offset!\n"); //WTF?
         return CAMIO_EINVALID;
     }
     if( req_vec->dst_offset_hint > CAMIO_UDP_BUFFER_SIZE){
@@ -270,6 +271,8 @@ static camio_error_t udp_read_release(camio_stream_t* this, camio_rd_buffer_t** 
  * WRITE FUNCTIONS
  **************************************************************************************************************************/
 
+
+
 static camio_error_t udp_write_acquire(camio_stream_t* this, camio_wr_buffer_t** buffer_o)
 {
     //Basic sanity checks -- TODO XXX: Should these be made into (compile time optional?) asserts for runtime performance?
@@ -293,47 +296,113 @@ static camio_error_t udp_write_acquire(camio_stream_t* this, camio_wr_buffer_t**
     camio_error_t err = buffer_malloc_linear_acquire(priv->wr_buff_pool,buffer_o);
     if(err){ return err; }
 
+    DBG("Returning new buffer of size %lli at %p\n", (*buffer_o)->buffer_len, (*buffer_o)->buffer_start);
     return CAMIO_ENOERROR;
 }
 
 
-static camio_error_t udp_write_commit(camio_stream_t* this, camio_write_req_t* req_vec, ch_word req_vec_len)
+static camio_error_t udp_write_request(camio_stream_t* this, camio_write_req_t* req_vec, ch_word req_vec_len)
 {
     //Basic sanity checks -- TODO XXX: Should these be made into (compile time optional?) asserts for runtime performance?
     if( NULL == this){
         DBG("This is null???\n"); //WTF?
         return CAMIO_EINVALID;
     }
+
     udp_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
 
-    DBG("Got a buffer chain head with %li bytes in a %li byte buffer starting at %p\n",
-            (*buffer_chain)->data_len, (*buffer_chain)->buffer_len, (*buffer_chain)->data_start);
-
-    camio_rd_buffer_t* chain_ptr = *buffer_chain;
-    while(chain_ptr != NULL){
-        DBG("Writing %li bytes from %p to %i\n", chain_ptr->data_len,chain_ptr->data_start, priv->wr_fd);
-        ch_word bytes = write(priv->wr_fd,chain_ptr->data_start,chain_ptr->data_len);
-        if(bytes < 0){
-            if(errno == EWOULDBLOCK || errno == EAGAIN){
-                return CAMIO_ETRYAGAIN;
-            }
-            else{
-                DBG(" error %s\n",strerror(errno));
-                return CAMIO_ECHECKERRORNO;
-            }
-        }
-        chain_ptr->data_len -= bytes;
-        const char* data_start_new = (char*)chain_ptr->data_start + bytes;
-        chain_ptr->data_start = (void*)data_start_new;
-
-        chain_ptr = chain_ptr->__internal.__next;
+    DBG("Got a write request vector with %lli items\n", req_vec_len);
+    if(priv->write_registered){
+        DBG("Already registered a write request. Currently this stream only handles one outstanding request at a time\n");
+        return CAMIO_EINVALID; //TODO XXX better error code
     }
+
+    //Register the new write request
+    priv->write_req         = req_vec;
+    priv->write_req_len     = req_vec_len;
+    priv->write_registered  = true;
+    priv->write_req_curr    = 0;
 
     return CAMIO_ENOERROR;
 }
 
 
-static camio_error_t udp_write_release(camio_stream_t* this, camio_wr_buffer_t** buffer_chain)
+//Try to write to the underlying, stream. This function is private, so no precondition checks necessary
+static camio_error_t udp_write_try(camio_stream_t* this)
+{
+    udp_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
+
+    for(int i = priv->write_req_curr; i < priv->write_req_len; i++){
+        camio_write_req_t* req = priv->write_req + i;
+        camio_buffer_t* buff   = req->buffer;
+        DBG("Trying to writing %li bytes from %p to %i\n", buff->data_len,buff->data_start, priv->wr_fd);
+        ch_word bytes = write(priv->wr_fd,buff->data_start,buff->data_len);
+        if(bytes < 0){
+            if(errno == EWOULDBLOCK || errno == EAGAIN){
+                return CAMIO_ETRYAGAIN;
+            }
+            else{
+                DBG("error %s\n",strerror(errno));
+                return CAMIO_ECHECKERRORNO;
+            }
+        }
+
+        buff->data_len -= bytes;
+        const char* data_start_new = (char*)buff->data_start + bytes;
+        buff->data_start = (void*)data_start_new;
+
+        if(buff->data_len != 0){
+            return CAMIO_ETRYAGAIN;
+        }
+
+    }
+
+    //If we get here, we've successfully written all the records out. This means we're now ready to take more write requests
+    priv->write_registered = false;
+
+    return CAMIO_ENOERROR;
+}
+
+
+
+//Is the underlying stream done writing and ready for more?
+static camio_error_t udp_write_ready(camio_muxable_t* this)
+{
+    //Basic sanity checks -- TODO XXX: Should these be made into (compile time optional?) asserts for runtime performance?
+    if( NULL == this){
+        DBG("This is null???\n"); //WTF?
+        return CAMIO_EINVALID;
+    }
+
+    if( this->mode != CAMIO_MUX_MODE_WRITE){
+        DBG("Wrong kind of muxable!\n"); //WTF??
+        return CAMIO_EINVALID;
+    }
+
+    //OK now the fun begins
+    camio_error_t err = udp_write_try(this->parent.stream);
+    if(err == CAMIO_ENOERROR){
+        DBG("Writing has completed successfully. Release the buffers and/or write some more\n");
+        return CAMIO_EREADY;
+    }
+
+    if(err == CAMIO_ETRYAGAIN){
+        DBG("Writing not yet complete, come back later and try again\n");
+        return CAMIO_ENOTREADY;
+    }
+
+    if(err == CAMIO_ECLOSED){
+        DBG("The stream has been closed. You cannot write any more\n");
+        return CAMIO_ECLOSED;
+    }
+
+    DBG("Ouch, something bad happened. Unexpected err = %lli \n", err);
+    return err;
+
+}
+
+
+static camio_error_t udp_write_release(camio_stream_t* this, camio_wr_buffer_t** buffer)
 {
     //Basic sanity checks -- TODO XXX: Should these be made into (compile time optional?) asserts for runtime performance?
     if( NULL == this){
@@ -343,33 +412,19 @@ static camio_error_t udp_write_release(camio_stream_t* this, camio_wr_buffer_t**
     udp_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
     (void)priv;
 
-    if( NULL == buffer_chain){
+    if( NULL == buffer){
         DBG("Buffer chain pointer null\n"); //WTF?
         return CAMIO_EINVALID;
     }
 
-    if( NULL == *buffer_chain){
+    if( NULL == *buffer){
         DBG("Buffer chain null\n"); //WTF?
         return CAMIO_EINVALID;
     }
 
-    camio_rd_buffer_t* chain_ptr = *buffer_chain;
-    camio_rd_buffer_t* chain_ptr_prev = NULL;
-    while(chain_ptr != NULL){
-        DBG("Removing data buffer %p staring at %p\n", chain_ptr, chain_ptr->buffer_start);
-        camio_error_t err = buffer_malloc_linear_release(priv->wr_buff_pool,&chain_ptr);
-        if(err){
-            DBG("Could not release buffer??\n");
-            return err;
-        }
+    DBG("Removing data buffer %p staring at %p\n", buffer, (*buffer)->buffer_start);
 
-        //Step to the next buffer, and unlink the last
-        chain_ptr_prev               = chain_ptr;
-        chain_ptr                    = (*buffer_chain)->__internal.__next;
-        chain_ptr_prev->__internal.__next = NULL;
-    }
-
-    *buffer_chain = NULL; //Remove dangling pointers!
+    *buffer = NULL; //Remove dangling pointers!
 
     return CAMIO_ENOERROR;
 }
@@ -452,7 +507,7 @@ camio_error_t udp_stream_construct(camio_stream_t* this, camio_connector_t* conn
 
     this->wr_muxable.mode              = CAMIO_MUX_MODE_WRITE;
     this->wr_muxable.parent.stream     = this;
-    this->wr_muxable.vtable.ready      = NULL;
+    this->wr_muxable.vtable.ready      = udp_write_ready;
     this->wr_muxable.fd                = priv->wr_fd;
 
 
