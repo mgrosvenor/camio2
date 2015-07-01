@@ -45,11 +45,13 @@ typedef struct tcp_stream_priv_s {
     camio_buffer_t* rd_buffer;  //A place to keep a read buffer until it's ready to be consumed
     camio_read_req_t* read_req; //Read request vector to put data into when there is new data
     ch_word read_req_len;       //size of the request vector
+    ch_word read_req_curr;      //This will be needed later
 
     ch_bool write_registered;     //Has a write been registered?
     ch_bool write_ready;          //Is the stream ready for writing (for edge triggered multiplexers)
     camio_write_req_t* write_req; //Write request vector to take data out of when there is new data.
     ch_word write_req_len;        //size of the request vector
+    ch_word write_req_curr;
 
 } tcp_stream_priv_t;
 
@@ -72,11 +74,12 @@ static camio_error_t tcp_read_peek( camio_stream_t* this)
         return err;
     }
 
-    priv->rd_buff_offset = MIN(CAMIO_TCP_BUFFER_SIZE, priv->rd_buff_offset); //Make sure we don't overflow the buffer
-    char* read_buffer = (char*)priv->rd_buffer->buffer_start + priv->rd_buff_offset; //Do the offset that we need
-    ch_word read_size = CAMIO_TCP_BUFFER_SIZE - priv->rd_buff_offset; //Also make sure we don't overflow
-    if(priv->rd_size_hint){
-        read_size = MIN(read_size,priv->rd_size_hint);
+    camio_read_req_t * req = priv->read_req;
+    req->dst_offset_hint = MIN(CAMIO_TCP_BUFFER_SIZE, req->dst_offset_hint); //Make sure we don't overflow the buffer
+    char* read_buffer = (char*)priv->rd_buffer->buffer_start + req->dst_offset_hint; //Do the offset that we need
+    ch_word read_size = CAMIO_TCP_BUFFER_SIZE - req->dst_offset_hint; //Also make sure we don't overflow
+    if(req->read_size_hint){
+        read_size = MIN(read_size,req->read_size_hint);
     }
     ch_word bytes = read(priv->fd, read_buffer, read_size);
     if(bytes < 0){ //Shit, got an error. Maybe there just isn't any data?
@@ -154,36 +157,34 @@ static camio_error_t tcp_read_request( camio_stream_t* this, camio_read_req_t* r
         return CAMIO_EINVALID;
     }
     if(req_vec_len != 1){
-
-    }
-
-
-    if( source_offset != 0){
-        DBG("This is TCP, you're not allowed to have a source offset!\n"); //WTF?
-        return CAMIO_EINVALID;
-    }
-    if( buffer_offset > CAMIO_TCP_BUFFER_SIZE){
-        DBG("You're trying to set a buffer offset (%i) which is greater than the buffer size (%i) ???\n",
-                buffer_offset, CAMIO_TCP_BUFFER_SIZE); //WTF?
+        DBG("Stream currently only supports read requests of size 1\n"); //TODO this should be coded in the features struct
         return CAMIO_EINVALID;
     }
 
     tcp_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
-    if(priv->read_registered){
-        DBG("New read request registered, but request is still outstanding\n");
-        return CAMIO_ETOOMANY;
+    if( req_vec->src_offset_hint != 0){
+        DBG("This is TCP, you're not allowed to have a source offset!\n"); //WTF?
+        return CAMIO_EINVALID;
+    }
+    if( req_vec->dst_offset_hint > CAMIO_TCP_BUFFER_SIZE){
+        DBG("You're trying to set a buffer offset (%i) which is greater than the buffer size (%i) ???\n",
+                req_vec->dst_offset_hint, CAMIO_TCP_BUFFER_SIZE); //WTF?
+        return CAMIO_EINVALID;
     }
 
-    if(size_hint > 0){
-        if(size_hint > CAMIO_TCP_BUFFER_SIZE){
+    if(priv->read_registered){
+        DBG("Already registered a read request. Currently this stream only handles one outstanding request at a time\n");
+        return CAMIO_ETOOMANY; //TODO XXX better error code
+    }
+
+    if(req_vec->read_size_hint > 0){
+        if(req_vec->read_size_hint > CAMIO_TCP_BUFFER_SIZE){
             //TODO XXX: Could realloc buffer here to be the right size...
-            size_hint = CAMIO_TCP_BUFFER_SIZE;
+            req_vec->read_size_hint = CAMIO_TCP_BUFFER_SIZE;
         }
-        priv->rd_size_hint = size_hint;
     }
 
     //Sanity checks done, do some work now
-    priv->rd_buff_offset = buffer_offset;
     priv->read_registered = true;
 
     DBG("Doing TCP read register...Done!..Successful\n");
@@ -264,71 +265,6 @@ static camio_error_t tcp_read_release(camio_stream_t* this, camio_rd_buffer_t** 
  * WRITE FUNCTIONS
  **************************************************************************************************************************/
 
-//Try to write to the underlying, stream.
-static camio_error_t tcp_write_try(camio_stream_t* this)
-{
-    tcp_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
-
-    for(int i = 0; i < this->wrreq_vec_len; i++){
-        DBG("Writing %li bytes from %p to %i\n", chain_ptr->data_len,chain_ptr->data_start, priv->fd);
-        ch_word bytes = write(priv->fd,chain_ptr->data_start,chain_ptr->data_len);
-        if(bytes < 0){
-            if(errno == EWOULDBLOCK || errno == EAGAIN){
-                return CAMIO_ETRYAGAIN;
-            }
-            else{
-                DBG("error %s\n",strerror(errno));
-                return CAMIO_ECHECKERRORNO;
-            }
-        }
-        chain_ptr->data_len -= bytes;
-        const char* data_start_new = (char*)chain_ptr->data_start + bytes;
-        chain_ptr->data_start = (void*)data_start_new;
-
-        chain_ptr = chain_ptr->__internal.__next;
-    }
-    return CAMIO_ENOERROR;
-}
-
-
-
-
-static camio_error_t tcp_write_ready(camio_muxable_t* this)
-{
-    //Basic sanity checks -- TODO XXX: Should these be made into (compile time optional?) asserts for runtime performance?
-    if( NULL == this){
-        DBG("This is null???\n"); //WTF?
-        return CAMIO_EINVALID;
-    }
-
-    if( this->mode != CAMIO_MUX_MODE_WRITE){
-        DBG("Wrong kind of muxable!\n"); //WTF??
-        return CAMIO_EINVALID;
-    }
-
-    //OK now the fun begins
-    camio_error_t err = tcp_write_try(this->parent.stream);
-    if(err == CAMIO_ENOERROR){
-        DBG("Writing has completed successfully. Release the buffers and/or write some more\n");
-        return CAMIO_EREADY;
-    }
-
-    if(err == CAMIO_ETRYAGAIN){
-        DBG("Writing not yet complete, come back later and try again\n");
-        return CAMIO_ENOTREADY;
-    }
-
-    if(err == CAMIO_ECLOSED){
-        DBG("The stream has been closed. You cannot write any more\n");
-        return CAMIO_ECLOSED;
-    }
-
-    DBG("Ouch, something bad happened. Unexpected err = %lli \n", err);
-    return err;
-
-}
-
-
 static camio_error_t tcp_write_acquire(camio_stream_t* this, camio_wr_buffer_t** buffer_o)
 {
     //Basic sanity checks -- TODO XXX: Should these be made into (compile time optional?) asserts for runtime performance?
@@ -377,13 +313,88 @@ static camio_error_t tcp_write_request(camio_stream_t* this, camio_write_req_t* 
     priv->write_req         = req_vec;
     priv->write_req_len     = req_vec_len;
     priv->write_registered  = true;
+    priv->write_req_curr    = 0;
 
-    //Have a go a doing the write immediately. This may or may not succeed.
-    return tcp_write_try(this);
+    return CAMIO_ENOERROR;
 }
 
 
-static camio_error_t tcp_write_release(camio_stream_t* this, camio_wr_buffer_t** buffer_chain)
+//Try to write to the underlying, stream. This function is private, so no precondition checks necessary
+static camio_error_t tcp_write_try(camio_stream_t* this)
+{
+    tcp_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
+
+    for(int i = priv->write_req_curr; i < priv->write_req_len; i++){
+        camio_write_req_t* req = priv->write_req + i;
+        camio_buffer_t* buff   = req->buffer;
+        DBG("Trying to writing %li bytes from %p to %i\n", buff->data_len,buff->data_start, priv->fd);
+        ch_word bytes = write(priv->fd,buff->data_start,buff->data_len);
+        if(bytes < 0){
+            if(errno == EWOULDBLOCK || errno == EAGAIN){
+                return CAMIO_ETRYAGAIN;
+            }
+            else{
+                DBG("error %s\n",strerror(errno));
+                return CAMIO_ECHECKERRORNO;
+            }
+        }
+
+        buff->data_len -= bytes;
+        const char* data_start_new = (char*)buff->data_start + bytes;
+        buff->data_start = (void*)data_start_new;
+
+        if(buff->data_len != 0){
+            return CAMIO_ETRYAGAIN;
+        }
+
+    }
+
+    //If we get here, we've successfully written all the records out. This means we're now ready to take more write requests
+    priv->write_registered = false;
+
+    return CAMIO_ENOERROR;
+}
+
+
+
+//Is the underlying stream done writing and ready for more?
+static camio_error_t tcp_write_ready(camio_muxable_t* this)
+{
+    //Basic sanity checks -- TODO XXX: Should these be made into (compile time optional?) asserts for runtime performance?
+    if( NULL == this){
+        DBG("This is null???\n"); //WTF?
+        return CAMIO_EINVALID;
+    }
+
+    if( this->mode != CAMIO_MUX_MODE_WRITE){
+        DBG("Wrong kind of muxable!\n"); //WTF??
+        return CAMIO_EINVALID;
+    }
+
+    //OK now the fun begins
+    camio_error_t err = tcp_write_try(this->parent.stream);
+    if(err == CAMIO_ENOERROR){
+        DBG("Writing has completed successfully. Release the buffers and/or write some more\n");
+        return CAMIO_EREADY;
+    }
+
+    if(err == CAMIO_ETRYAGAIN){
+        DBG("Writing not yet complete, come back later and try again\n");
+        return CAMIO_ENOTREADY;
+    }
+
+    if(err == CAMIO_ECLOSED){
+        DBG("The stream has been closed. You cannot write any more\n");
+        return CAMIO_ECLOSED;
+    }
+
+    DBG("Ouch, something bad happened. Unexpected err = %lli \n", err);
+    return err;
+
+}
+
+
+static camio_error_t tcp_write_release(camio_stream_t* this, camio_wr_buffer_t** buffer)
 {
     //Basic sanity checks -- TODO XXX: Should these be made into (compile time optional?) asserts for runtime performance?
     if( NULL == this){
@@ -393,33 +404,19 @@ static camio_error_t tcp_write_release(camio_stream_t* this, camio_wr_buffer_t**
     tcp_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
     (void)priv;
 
-    if( NULL == buffer_chain){
+    if( NULL == buffer){
         DBG("Buffer chain pointer null\n"); //WTF?
         return CAMIO_EINVALID;
     }
 
-    if( NULL == *buffer_chain){
+    if( NULL == *buffer){
         DBG("Buffer chain null\n"); //WTF?
         return CAMIO_EINVALID;
     }
 
-    camio_rd_buffer_t* chain_ptr = *buffer_chain;
-    camio_rd_buffer_t* chain_ptr_prev = NULL;
-    while(chain_ptr != NULL){
-        DBG("Removing data buffer %p staring at %p\n", chain_ptr, chain_ptr->buffer_start);
-        camio_error_t err = buffer_malloc_linear_release(priv->wr_buff_pool,&chain_ptr);
-        if(err){
-            DBG("Could not release buffer??\n");
-            return err;
-        }
+    DBG("Removing data buffer %p staring at %p\n", buffer, (*buffer)->buffer_start);
 
-        //Step to the next buffer, and unlink the last
-        chain_ptr_prev               = chain_ptr;
-        chain_ptr                    = (*buffer_chain)->__internal.__next;
-        chain_ptr_prev->__internal.__next = NULL;
-    }
-
-    *buffer_chain = NULL; //Remove dangling pointers!
+    *buffer = NULL; //Remove dangling pointers!
 
     return CAMIO_ENOERROR;
 }
