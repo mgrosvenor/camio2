@@ -64,6 +64,11 @@ static void delim_read_close(camio_stream_t* this){
 }
 
 static camio_error_t grow_working_buff(delim_stream_priv_t* priv) {
+    if(!priv->rd_base_buff){
+        return CAMIO_ENOERROR; //No need to grow buffer because no new space is needed
+    }
+
+
     //     ( The amount of free space in the buffer)                                     <  (Extra space needed         )
     while ((priv->rd_working_buff.__internal.__mem_len - priv->rd_working_buff.data_len) < (priv->rd_base_buff->data_len)) {
         DBG("Growing working buffer from %lu to %lu\n", priv->rd_working_buff.__internal.__mem_len,
@@ -407,6 +412,7 @@ static camio_error_t delim_read_release(camio_stream_t* this, camio_rd_buffer_t*
             //The result is directly from the underlying stream, so we should release it now.
             camio_read_release(priv->base,&priv->rd_base_buff);
         }
+        delim_read_close(this);
         goto reset_and_exit;
     }
 
@@ -417,11 +423,12 @@ static camio_error_t delim_read_release(camio_stream_t* this, camio_rd_buffer_t*
     const ch_word delimit_size = priv->delim_fn(data_next, data_next_len);
     if(delimit_size > 0 && delimit_size <= data_next_len){
         //Ready for the next round with data available! No memmove required!
-        DBG("Success! No memmove required this time!\n");
+        DBG("Success! Delimt size = %lli, No memmove required this time!\n", delimit_size);
         priv->rd_result_buff.data_start = data_next;
         priv->rd_result_buff.data_len   = delimit_size;
         return CAMIO_ENOERROR;
     }
+    DBG("Failed to delimit, will have to move memory\n");
 
     //Nope. No success with the delimiter. Looks like we have to move stuff arround. Move waht we have right back to the
     //beginning of the working buffer. First make sure that the buffer is big enough
@@ -431,7 +438,7 @@ static camio_error_t delim_read_release(camio_stream_t* this, camio_rd_buffer_t*
         return err;
     }
 
-    printf("Doing mem move of %lli from %p to %p\n", data_next_len, data_next,
+    DBG("Doing mem move of %lli from %p to %p\n", data_next_len, data_next,
             priv->rd_working_buff.__internal.__mem_start );
     memmove(priv->rd_working_buff.__internal.__mem_start, data_next, data_next_len);
     priv->rd_working_buff.data_start = priv->rd_working_buff.__internal.__mem_start;

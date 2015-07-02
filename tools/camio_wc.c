@@ -23,23 +23,17 @@ ch_word delimit(char* buffer, ch_word len)
 {
     DBG("Running delimiter on buffer=%p with len=%i\n", buffer,len);
 
-/*    for(int i = 0; i < len; i++){
-        DBG2("[%02X] ", (int)buffer[i]);
-        if(buffer[i] == '\n'){
-            DBG2("\n");
-            DBG("Success on delim, new line is %i chars long\n", i+1);
-            return i + 1;
-        }
-    }
-*/
     const char* result = memchr(buffer,'\n',len);
     if(!result){
-        DBG2("\n");
         DBG("Failed, could not find a new line\n");
         return -1;
     }
 
-    return result - (char*)buffer + 1;
+    const ch_word offset = result - (char*)buffer + 1;
+    DBG("Success result =%p, offset=%lli\n", result,offset);
+    DBG("--> %.*s\n", (int)offset - 1, buffer);
+    return offset;
+
 }
 
 

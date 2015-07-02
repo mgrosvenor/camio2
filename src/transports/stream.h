@@ -94,7 +94,7 @@ typedef struct camio_stream_s {
         camio_stream_t* new_##NAME##_stream()
 
 #define NEW_STREAM_DEFINE(NAME, PRIVATE_TYPE) \
-    const static camio_stream_interface_t NAME##_stream_interface = {\
+    static const camio_stream_interface_t NAME##_stream_interface = {\
             .read_request   = NAME##_read_request,\
             .read_acquire   = NAME##_read_acquire,\
             .read_release   = NAME##_read_release,\
