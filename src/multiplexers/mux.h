@@ -56,7 +56,7 @@ typedef struct camio_mux_s {
         camio_mux_t* new_##NAME##_mux()
 
 #define NEW_MUX_DEFINE(NAME, PRIVATE_TYPE) \
-    const static camio_mux_interface_t NAME##_mux_interface = {\
+    static const camio_mux_interface_t NAME##_mux_interface = {\
             .construct  = NAME##_construct,\
             .insert     = NAME##_insert,\
             .remove     = NAME##_remove,\

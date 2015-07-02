@@ -74,7 +74,7 @@ typedef struct camio_connector_s {
         camio_connector_t* new_##NAME##_connector()
 
 #define NEW_CONNECTOR_DEFINE(NAME, PRIVATE_TYPE) \
-    const static camio_connector_interface_t NAME##_connector_interface = {\
+    static const camio_connector_interface_t NAME##_connector_interface = {\
             .construct = NAME##_construct,\
             .connect   = NAME##_connect,\
             .destroy   = NAME##_destroy,\

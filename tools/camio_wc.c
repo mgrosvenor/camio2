@@ -42,6 +42,7 @@ ch_word delimit(char* buffer, ch_word len)
     return result - (char*)buffer + 1;
 }
 
+typedef enum { READ_STREAM } camio_cat_state_e;
 
 int main(int argc, char** argv)
 {
@@ -84,7 +85,6 @@ int main(int argc, char** argv)
     if(err){ DBG("Could not connect to stream\n"); return CAMIO_EINVALID; /*TODO XXX put a better error here*/ }
 
     //Put the read stream into the mux
-    typedef enum { READ_STREAM } camio_cat_state_e;
     camio_mux_insert(mux,&io_stream->rd_muxable,READ_STREAM);
 
    //Read and write bytes to and from the stream - just do loopback for now
