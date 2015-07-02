@@ -63,20 +63,20 @@ int main(int argc, char** argv)
     camio_connector_t* connector = NULL;
     err = camio_transport_constr(id,&params,params_size,&connector);
     if(err){
-        DBG("Could not construct connector\n");
+        ERR("Could not construct connector\n");
         return CAMIO_EINVALID; //TODO XXX put a better error here
     }
 
     //Spin waiting for a connection. A little bit naughty.
     while( (err = camio_connector_ready(connector)) == CAMIO_ENOTREADY ){}
     if(err != CAMIO_EREADY){
-        DBG("Unexpected error in connector\n");
+        ERR("Unexpected error in connector\n");
         return CAMIO_EINVALID;
     }
 
     camio_stream_t* io_stream = NULL;
     err = camio_connect(connector,&io_stream);
-    if(err){ DBG("Could not connect to stream\n"); return CAMIO_EINVALID; /*TODO XXX put a better error here*/ }
+    if(err){ ERR("Could not connect to stream\n"); return CAMIO_EINVALID; /*TODO XXX put a better error here*/ }
 
     //Put the read stream into the mux
     camio_mux_insert(mux,&io_stream->rd_muxable,READ_STREAM);
@@ -91,7 +91,7 @@ int main(int argc, char** argv)
             .read_size_hint  = CAMIO_READ_REQ_SIZE_ANY
     };
     err = camio_read_request(io_stream,&rd_req,1); //kick the process off -- tell the read stream that we would like some data,
-    if(err){ DBG("Got a read request error %i\n", err); return -1; }
+    if(err){ ERR("Got a read request error %i\n", err); return -1; }
 
     ch_word line_count = 0;
 
@@ -99,7 +99,7 @@ int main(int argc, char** argv)
         //Block waiting for a stream to be ready
         err = camio_mux_select(mux,&muxable,&which);
         if(err != CAMIO_ENOERROR){
-            DBG("Unexpected error %lli on stream with id =%lli\n", err, which);
+            ERR("Unexpected error %lli on stream with id =%lli\n", err, which);
             break;
         }
         switch(which){
@@ -107,7 +107,7 @@ int main(int argc, char** argv)
                 //Acquire a pointer to the new data now that it's ready
                 DBG("Handling read event\n");
                 err = camio_read_acquire(muxable->parent.stream, &rd_buffer);
-                if(err){ DBG("Got a read error %i\n", err); return -1; }
+                if(err){ ERR("Got a read error %i\n", err); return -1; }
                 DBG("Got %lli bytes of new data at %p\n", rd_buffer->data_len, rd_buffer->data_start);
 
                 if(rd_buffer->data_len == 0){
@@ -121,14 +121,14 @@ int main(int argc, char** argv)
 
                 //And we're done with the read buffer now, release it
                 err = camio_read_release(io_stream, &rd_buffer);
-                if(err){ DBG("Got a read release error %i\n", err); return -1; }
+                if(err){ ERR("Got a read release error %i\n", err); return -1; }
 
                 err = camio_read_request(io_stream,&rd_req,1); //kick the process off -- tell the read stream that we would like some data,
-                if(err){ DBG("Got a read request error %i\n", err); return -1; }
+                if(err){ ERR("Got a read request error %i\n", err); return -1; }
                 break;
             }
             default:{
-                DBG("Eeek. Something strange happened\n");
+                ERR("Eeek. Something strange happened\n");
                 return -1;
             }
 

@@ -14,9 +14,13 @@
 #include <unistd.h>
 #include "types/types.h"
 
+ch_word camio_debug_out_(ch_bool info, ch_word line_num, const char* filename, const char* function,  const char* format, ... );
+#define ERR( /*format, args*/...)  camio_err_helper(__VA_ARGS__, "")
+#define camio_err_helper(format, ...) camio_debug_out_(true,__LINE__, __FILE__, __FUNCTION__, format, __VA_ARGS__ )
+
 
 #ifndef NDEBUG
-    ch_word camio_debug_out_(ch_bool info, ch_word line_num, const char* filename, const char* function,  const char* format, ... );
+    //ch_word camio_debug_out_(ch_bool info, ch_word line_num, const char* filename, const char* function,  const char* format, ... );
     #define DBG( /*format, args*/...)  camio_debug_helper(__VA_ARGS__, "")
     #define camio_debug_helper(format, ...) camio_debug_out_(true,__LINE__, __FILE__, __FUNCTION__, format, __VA_ARGS__ )
     #define DBG2( /*format, args*/...)  camio_debug_helper2(__VA_ARGS__, "")

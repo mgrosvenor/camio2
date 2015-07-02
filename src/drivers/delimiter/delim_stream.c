@@ -116,7 +116,7 @@ static camio_error_t delim_read_peek( camio_stream_t* this)
         //the user really needed to refresh the values of priv->rd_base_buff_offset & priv->rd_base_src_offset.
         camio_error_t err = camio_read_request( priv->base, priv->rd_base_req_vec, priv->rd_base_req_vec_len );
         if(err != CAMIO_ENOERROR){
-            DBG("Read request from base stream failed with error =%lli\n", err);
+            ERR("Read request from base stream failed with error =%lli\n", err);
             return err;
         }
         //We have now registered a read request, only do this once otherwise the base stream might get confused.
@@ -130,7 +130,7 @@ static camio_error_t delim_read_peek( camio_stream_t* this)
         return CAMIO_ETRYAGAIN;
     }
     if( err != CAMIO_EREADY){
-        DBG("Unexpected error from base ready()!\n");
+        ERR("Unexpected error from base ready()!\n");
         return err; //Damn, no data available. Come back later and try again.
     }
     DBG("Data is ready to be read from base!\n");
@@ -138,7 +138,7 @@ static camio_error_t delim_read_peek( camio_stream_t* this)
     //Yes! We have some more data. Get at it.
     err = camio_read_acquire(priv->base,&priv->rd_base_buff);
     if(err){
-        DBG("Could not do read acquire on base stream\n");
+        ERR("Could not do read acquire on base stream\n");
         return err;
     }
     DBG("Read another %lli bytes from %p. Data starts at %p\n", priv->rd_base_buff->data_len, priv->rd_base_buff, priv->rd_base_buff->data_start);
@@ -168,14 +168,14 @@ static camio_error_t delim_read_peek( camio_stream_t* this)
 
     //Just check that this is assumption true. If it's not, the following code will break!
     if(priv->rd_working_buff.data_start != priv->rd_working_buff.__internal.__mem_start){
-        DBG("Invariant violation. Assumptions will be broken!\n");
+        ERR("Invariant violation. Assumptions will be broken!\n");
         return CAMIO_EINVALID;
     }
 
     //Let's put the data somewhere that we can work with it later. First make sure we have enough space:
     err = grow_working_buff(priv);
     if (err){
-        DBG("Could not grow working buff\n");
+        ERR("Could not grow working buff\n");
         return err;
     }
 
@@ -206,24 +206,24 @@ static camio_error_t delim_read_ready(camio_muxable_t* this)
 
     //Basic sanity checks -- TODO DELIM: Should these be made into (compile time optional?) asserts for runtime performance?
     if( NULL == this){
-        DBG("This is null???\n"); //WTF?
+        ERR("This is null???\n"); //WTF?
         return CAMIO_EINVALID;
     }
 
     if( this->mode != CAMIO_MUX_MODE_READ){
-        DBG("Wrong kind of muxable!\n"); //WTF??
+        ERR("Wrong kind of muxable!\n"); //WTF??
         return CAMIO_EINVALID;
     }
 
     //OK now the fun begins
     delim_stream_priv_t* priv = STREAM_GET_PRIVATE(this->parent.stream);
     if(priv->is_rd_closed){
-        DBG("Stream is now closed. There will be no more non null data\n");
+        ERR("Stream is now closed. There will be no more non null data\n");
         return CAMIO_EREADY;
     }
 
     if(!priv->read_registered){ //Even if there is data waiting, nobody want's it, so ignore for now.
-        DBG("Nobody wants the data\n");
+        ERR("Nobody wants the data\n");
         return CAMIO_ENOTREADY;
     }
 
@@ -231,19 +231,19 @@ static camio_error_t delim_read_ready(camio_muxable_t* this)
         return CAMIO_EREADY;
     }
 
-    //Nope, OK, see if we can get some
+    //Nope, OK, see if we can get some new data
     camio_error_t err = delim_read_peek(this->parent.stream);
     if(err == CAMIO_ENOERROR ){
-        DBG("There is new data waiting!\n");
+        //DBG("There is new data waiting!\n");
         return CAMIO_EREADY;
     }
 
     if(err == CAMIO_ETRYAGAIN){
-        DBG("This is no new data waiting!\n");
+        //DBG("This is no new data waiting!\n");
         return CAMIO_ENOTREADY;
     }
 
-    DBG("Something bad happened err=%lli!\n", err);
+    ERR("Something bad happened err=%lli!\n", err);
     return err;
 
 
@@ -254,24 +254,24 @@ static camio_error_t delim_read_request(camio_stream_t* this, camio_read_req_t* 
     DBG("Doing delim read request...!\n");
     //Basic sanity checks -- TODO  Should these be made into (compile time optional?) asserts for runtime performance?
     if( NULL == this){
-        DBG("This null???\n"); //WTF?
+        ERR("This null???\n"); //WTF?
         return CAMIO_EINVALID;
     }
 
     if(req_vec_len != 1){
-        DBG("request length of %lli requested. This value is not currently supported\n", req_vec_len);
+        ERR("request length of %lli requested. This value is not currently supported\n", req_vec_len);
         return CAMIO_NOTIMPLEMENTED;
     }
     delim_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
 
     if(priv->read_registered){
-        DBG("New read request registered, but old request is still outstanding. Ignoring request.\n");
+        ERR("New read request registered, but old request is still outstanding. Ignoring request.\n");
         return CAMIO_ETOOMANY;
     }
 
     //Hang on to these for another time when it is needed TODO XXX see the delimiter function for a bug related to this...
     if(req_vec->dst_offset_hint != 0){
-        DBG("Delimiter currently only supports buffer offsets of 0\n");
+        ERR("Delimiter currently only supports buffer offsets of 0\n");
         return CAMIO_EINVALID; //TODO XXX: Better error
     }
     priv->rd_base_req_vec = req_vec;
@@ -292,15 +292,15 @@ static camio_error_t delim_read_acquire( camio_stream_t* this,  camio_rd_buffer_
 
     //Basic sanity checks -- TODO DELIM: Should these be made into (compile time optional?) asserts for runtime performance?
     if( NULL == this){
-        DBG("This null???\n"); //WTF?
+        ERR("This null???\n"); //WTF?
         return CAMIO_EINVALID;
     }
     if( NULL == buffer_o){
-        DBG("Buffer chain pointer null\n"); //WTF?
+        ERR("Buffer chain pointer null\n"); //WTF?
         return CAMIO_EINVALID;
     }
     if( NULL != *buffer_o){
-        DBG("Buffer chain not null. You should release this before getting a new one, otherwise dangling pointers!\n");
+        ERR("Buffer chain not null. You should release this before getting a new one, otherwise dangling pointers!\n");
         return CAMIO_EINVALID;
     }
     delim_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
@@ -365,24 +365,24 @@ static camio_error_t delim_read_release(camio_stream_t* this, camio_rd_buffer_t*
 
     //Basic sanity checks -- TODO DELIM: Should these be made into (compile time optional?) asserts for runtime performance?
     if( NULL == this){
-        DBG("This null???\n"); //WTF?
+        ERR("This null???\n"); //WTF?
         return CAMIO_EINVALID;
     }
     delim_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
 
 
     if( NULL == buffer){
-        DBG("Buffer chain pointer null\n"); //WTF?
+        ERR("Buffer chain pointer null\n"); //WTF?
         return CAMIO_EINVALID;
     }
 
     if( NULL == *buffer){
-        DBG("Buffer chain null\n"); //WTF?
+        ERR("Buffer null\n"); //WTF?
         return CAMIO_EINVALID;
     }
 
     if(!priv->read_registered){
-        DBG("WFT? Why are you trying to release something if you haven't read anyhting?\n");
+        ERR("WFT? Why are you trying to release something if you haven't read anyhting?\n");
         return CAMIO_EINVALID;
     }
 
@@ -406,13 +406,14 @@ static camio_error_t delim_read_release(camio_stream_t* this, camio_rd_buffer_t*
 
     //If there is nothing left over, give up and bug out
     if(data_next >= mem_end){
-        DBG("There's no data left. We're done!\n");
+        DBG("There's no data left. We're done for now!\n");
         if(priv->rd_base_buff){
             DBG("Releasing underlying fast_path buffer\n");
             //The result is directly from the underlying stream, so we should release it now.
             camio_read_release(priv->base,&priv->rd_base_buff);
         }
-        delim_read_close(this);
+        priv->rd_working_buff.data_start = NULL;
+        priv->rd_working_buff.data_len   = 0;
         goto reset_and_exit;
     }
 
@@ -434,7 +435,7 @@ static camio_error_t delim_read_release(camio_stream_t* this, camio_rd_buffer_t*
     //beginning of the working buffer. First make sure that the buffer is big enough
     camio_error_t err = grow_working_buff(priv);
     if (err){
-        DBG("Could not grow working buff\n");
+        ERR("Could not grow working buff\n");
         return err;
     }
 
@@ -468,12 +469,12 @@ static camio_error_t delim_write_ready(camio_muxable_t* this)
 {
     //Basic sanity checks -- TODO DELIM: Should these be made into (compile time optional?) asserts for runtime performance?
     if( NULL == this){
-        DBG("This is null???\n"); //WTF?
+        ERR("This is null???\n"); //WTF?
         return CAMIO_EINVALID;
     }
 
     if( this->mode != CAMIO_MUX_MODE_WRITE){
-        DBG("Wrong kind of muxable!\n"); //WTF??
+        ERR("Wrong kind of muxable!\n"); //WTF??
         return CAMIO_EINVALID;
     }
 
@@ -488,7 +489,7 @@ static camio_error_t delim_write_acquire(camio_stream_t* this, camio_wr_buffer_t
 {
     //Basic sanity checks -- TODO DELIM: Should these be made into (compile time optional?) asserts for runtime performance?
     if( NULL == this){
-        DBG("This null???\n"); //WTF?
+        ERR("This null???\n"); //WTF?
         return CAMIO_EINVALID;
     }
     delim_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
@@ -501,7 +502,7 @@ static camio_error_t delim_write_request(camio_stream_t* this, camio_write_req_t
 {
     //Basic sanity checks -- TODO DELIM: Should these be made into (compile time optional?) asserts for runtime performance?
     if( NULL == this){
-        DBG("This is null???\n"); //WTF?
+        ERR("This is null???\n"); //WTF?
         return CAMIO_EINVALID;
     }
     delim_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
@@ -514,7 +515,7 @@ static camio_error_t delim_write_release(camio_stream_t* this, camio_wr_buffer_t
     DBG("Doing delimiter write release\n");
     //Basic sanity checks -- TODO DELIM: Should these be made into (compile time optional?) asserts for runtime performance?
     if( NULL == this){
-        DBG("This null???\n"); //WTF?
+        ERR("This null???\n"); //WTF?
         return CAMIO_EINVALID;
     }
     delim_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
@@ -533,7 +534,7 @@ static void delim_destroy(camio_stream_t* this)
 {
     //Basic sanity checks -- TODO DELIM: Should these be made into (compile time optional?) asserts for runtime performance?
     if( NULL == this){
-        DBG("This null???\n"); //WTF?
+        ERR("This null???\n"); //WTF?
         return;
     }
     delim_read_close(this);
@@ -561,7 +562,7 @@ camio_error_t delim_stream_construct(
 
     //Basic sanity checks -- TODO DELIM: Should these be made into (compile time optional?) asserts for runtime performance?
     if( NULL == this){
-        DBG("This null???\n"); //WTF?
+        ERR("This null???\n"); //WTF?
         return CAMIO_EINVALID;
     }
     delim_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
@@ -583,7 +584,7 @@ camio_error_t delim_stream_construct(
     priv->rd_working_buff.__internal.__mem_len   = DELIM_BUFFER_DEFAULT_SIZE;
     priv->rd_working_buff.data_start   = priv->rd_working_buff.__internal.__mem_start;
     if(!priv->rd_working_buff.__internal.__mem_start){
-        DBG("Could not allocate memory for backing buffer\n");
+        ERR("Could not allocate memory for backing buffer\n");
         return CAMIO_ENOMEM;
     }
 
