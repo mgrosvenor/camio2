@@ -30,8 +30,6 @@
 /**************************************************************************************************************************
  * PER STREAM STATE
  **************************************************************************************************************************/
-#define CAMIO_UDP_MAX_ADDR_STR 1024
-#define CAMIO_UDP_MAX_PROT_STR 10
 typedef struct mfio_priv_s {
 
     mfio_params_t* params;  //Parameters used when a connection happens

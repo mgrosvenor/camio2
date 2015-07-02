@@ -15,7 +15,7 @@
 #include <src/buffers/buffer_malloc_linear.h>
 #include <deps/chaste/utils/util.h>
 
-#include "../../camio_debug.h"
+#include <src/camio_debug.h>
 
 #include "tcp_stream.h"
 
