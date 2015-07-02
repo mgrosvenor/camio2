@@ -423,12 +423,6 @@ static camio_error_t delim_read_release(camio_stream_t* this, camio_rd_buffer_t*
         return CAMIO_ENOERROR;
     }
 
-    printf("Data offset = %lli, mem_len=%lli, detla=%lli\n",
-            data_offset,
-            priv->rd_result_buff.__internal.__mem_len,
-            priv->rd_result_buff.__internal.__mem_len - data_offset
-    );
-    printf("There is %lli bytes remaining in the result buffer\n", data_remain);
     //Nope. No success with the delimiter. Looks like we have to move stuff arround. Move waht we have right back to the
     //beginning of the working buffer. First make sure that the buffer is big enough
     camio_error_t err = grow_working_buff(priv);

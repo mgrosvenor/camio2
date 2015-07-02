@@ -68,12 +68,12 @@ camio_error_t spin_select(camio_mux_t* this, /*struct timespec timeout,*/ camio_
     DBG("Selecting over %i items\n", muxables->count);
 
     while(1){
-        priv->idx %= muxables->count; //Adjust for overflow
+        //priv->idx %= muxables->count; //Adjust for overflow
         camio_muxable_t* muxable = muxables->off(muxables,priv->idx);
         camio_error_t err = muxable->vtable.ready(muxable);
         if(err == CAMIO_EREADY){
             DBG("Found ready item at index %i\n", priv->idx);
-            priv->idx += 1;//Make sure we look at the next transport first
+            priv->idx = priv->idx >= muxables->count - 1 ? 0 : priv->idx + 1;//Make sure we look at the next transport first
             *muxable_o = muxable;
             *which_o = muxable->id;
             return CAMIO_ENOERROR;
@@ -86,7 +86,8 @@ camio_error_t spin_select(camio_mux_t* this, /*struct timespec timeout,*/ camio_
             return err;
         }
 
-        priv->idx += 1;
+        priv->idx = priv->idx >= muxables->count - 1 ? 0 : priv->idx + 1;
+
     }
 
     //Unreachable
