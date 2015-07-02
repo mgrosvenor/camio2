@@ -103,6 +103,7 @@ static camio_error_t resolve_bind_connect(char* address, char* prot, ch_bool do_
     }
     if (s < 0) {
         DBG("Socket failed: %s\n", cause);
+        (void)cause; //For when debug is compiled out
         return CAMIO_EINVALID;
     }
 
