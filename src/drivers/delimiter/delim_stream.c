@@ -56,7 +56,7 @@ typedef struct delim_stream_priv_s {
 static void delim_read_close(camio_stream_t* this){
     delim_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
     if(!priv->is_rd_closed){
-        free(priv->rd_working_buff.buffer_start);
+        free(priv->rd_working_buff.__internal.__mem_start);
         reset_buffer(&priv->rd_working_buff);
         reset_buffer(&priv->rd_result_buff);
         priv->is_rd_closed = true;
@@ -142,23 +142,23 @@ static camio_error_t delim_read_peek( camio_stream_t* this)
     }
 
     //Just check that this is true. If it's not, the following code's assumptions will be violated.
-    if(priv->rd_working_buff.data_start != priv->rd_working_buff.buffer_start){
+    if(priv->rd_working_buff.data_start != priv->rd_working_buff.__internal.__mem_start){
         DBG("Invariant violation. Assumptions will be broken!\n");
         return CAMIO_EINVALID;
     }
 
     //OK. Let's put the data somewhere that we can work with it later. First make sure we have enough space
     //     ( The amount of free space in the buffer)                          <  (Extra space needed         )
-    while( (priv->rd_working_buff.buffer_len - priv->rd_working_buff.data_len) < (priv->rd_base_buff->data_len)  ){
-        DBG("Growing working buffer from %lu to %lu\n", priv->rd_working_buff.buffer_len, priv->rd_working_buff.buffer_len * 2 );
-        priv->rd_working_buff.buffer_len *= 2;
-        priv->rd_working_buff.buffer_start = realloc(priv->rd_working_buff.buffer_start, priv->rd_working_buff.buffer_len);
-        priv->rd_working_buff.data_start   = priv->rd_working_buff.buffer_start;
+    while( (priv->rd_working_buff.__internal.__mem_len - priv->rd_working_buff.data_len) < (priv->rd_base_buff->data_len)  ){
+        DBG("Growing working buffer from %lu to %lu\n", priv->rd_working_buff.__internal.__mem_len, priv->rd_working_buff.__internal.__mem_len * 2 );
+        priv->rd_working_buff.__internal.__mem_len *= 2;
+        priv->rd_working_buff.__internal.__mem_start = realloc(priv->rd_working_buff.__internal.__mem_start, priv->rd_working_buff.__internal.__mem_len);
+        priv->rd_working_buff.data_start   = priv->rd_working_buff.__internal.__mem_start;
     }
 
     //TODO XXX, can potentially avoid this if the delimiter says that data in read_buffer includes a complete packet but have
     //to deal with a partial fragment(s) left over in the buffer.
-    void* new_data_dst = (char*)priv->rd_working_buff.buffer_start + priv->rd_working_buff.data_len;
+    void* new_data_dst = (char*)priv->rd_working_buff.__internal.__mem_start + priv->rd_working_buff.data_len;
     DBG("Adding %lu bytes at %p (offset=%lu)\n", priv->rd_base_buff->data_len, new_data_dst, priv->rd_working_buff.data_len);
     memcpy(new_data_dst, priv->rd_base_buff->data_start, priv->rd_base_buff->data_len);
     priv->rd_working_buff.data_len += priv->rd_base_buff->data_len;
@@ -527,8 +527,8 @@ static void delim_destroy(camio_stream_t* this)
     delim_read_close(this);
 
     delim_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
-    if(priv->rd_working_buff.buffer_start){
-        free(priv->rd_working_buff.buffer_start);
+    if(priv->rd_working_buff.__internal.__mem_start){
+        free(priv->rd_working_buff.__internal.__mem_start);
     }
 
     camio_stream_destroy(priv->base);
@@ -567,10 +567,10 @@ camio_error_t delim_stream_construct(
     this->wr_muxable.vtable.ready      = delim_write_ready;
     this->wr_muxable.fd                = base_stream->wr_muxable.fd;
 
-    priv->rd_working_buff.buffer_start = calloc(1,DELIM_BUFFER_DEFAULT_SIZE);
-    priv->rd_working_buff.buffer_len   = DELIM_BUFFER_DEFAULT_SIZE;
-    priv->rd_working_buff.data_start   = priv->rd_working_buff.buffer_start;
-    if(!priv->rd_working_buff.buffer_start){
+    priv->rd_working_buff.__internal.__mem_start = calloc(1,DELIM_BUFFER_DEFAULT_SIZE);
+    priv->rd_working_buff.__internal.__mem_len   = DELIM_BUFFER_DEFAULT_SIZE;
+    priv->rd_working_buff.data_start   = priv->rd_working_buff.__internal.__mem_start;
+    if(!priv->rd_working_buff.__internal.__mem_start){
         DBG("Could not allocate memory for backing buffer\n");
         return CAMIO_ENOMEM;
     }

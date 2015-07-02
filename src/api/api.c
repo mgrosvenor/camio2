@@ -118,14 +118,18 @@ inline camio_error_t camio_copy_rw(
         return CAMIO_NOTIMPLEMENTED;
     }
 
+    camio_wr_buffer_t* wr_buff =  *wr_buffer;
+    camio_wr_buffer_t* rd_buff =  *rd_buffer;
+
 
     //TODO XXX this is temporary until the actual copy function is implemented. The real copy should check if the source and
-    //         dst buffers are actually different taking into account bindings etc.
-    DBG("Copying %lli bytes from %p to %p\n",(*rd_buffer)->data_len,(*rd_buffer)->data_start, (*wr_buffer)->buffer_start);
-    memcpy( (*wr_buffer)->buffer_start, (*rd_buffer)->data_start, copy_len);
-    (*wr_buffer)->data_start = (*wr_buffer)->buffer_start;
-    (*wr_buffer)->data_len = (*rd_buffer)->data_len;
-    DBG("Done Copying %lli bytes from %p to %p\n",(*rd_buffer)->data_len,(*rd_buffer)->data_start, (*wr_buffer)->buffer_start);
+    //         dst buffers are actually different taking into account bindings etc. Check that the buffers are real, and have
+    //         real memory associated with them etc etc.
+    DBG("Copying %lli bytes from %p to %p\n",rd_buff->data_len,rd_buff->data_start, wr_buff->__internal.__mem_start);
+    memcpy( wr_buff->__internal.__mem_start, rd_buff->data_start, copy_len);
+    wr_buff->data_start = wr_buff->__internal.__mem_start;
+    wr_buff->data_len   = copy_len;
+    DBG("Done copying\n");
 
     return CAMIO_ENOERROR;
 }

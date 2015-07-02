@@ -14,18 +14,18 @@
 //Reset the buffers internal pointers to point to nothing
 void reset_buffer(camio_buffer_t* dst)
 {
-    dst->buffer_start       = NULL;
-    dst->buffer_len         = 0;
-    dst->data_start         = NULL;
-    dst->data_len           = 0;
+    dst->__internal.__mem_start = NULL;
+    dst->__internal.__mem_len   = 0;
+    dst->data_start             = NULL;
+    dst->data_len               = 0;
 }
 
 
 //Assign the pointers from one buffer to another
 void assign_buffer(camio_buffer_t* dst, camio_buffer_t* src, void* data_start, ch_word data_len)
 {
-    dst->buffer_start       = src->buffer_start;
-    dst->buffer_len         = src->buffer_len;
-    dst->data_start         = data_start;
-    dst->data_len           = data_len;
+    dst->__internal.__mem_start = src->__internal.__mem_start;
+    dst->__internal.__mem_len   = src->__internal.__mem_len;
+    dst->data_start             = data_start;
+    dst->data_len               = data_len;
 }

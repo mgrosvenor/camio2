@@ -32,10 +32,10 @@ void buffer_malloc_linear_DBG(buffer_malloc_linear_t* buff){
 
 static void init_buffer_hdr(camio_stream_t* parent, camio_buffer_t* buffer_hdr, char* buffer_data, ch_word buffer_size,
         ch_word buffer_id, ch_bool readonly){
-    buffer_hdr->buffer_len                     = buffer_size;
-    buffer_hdr->buffer_start                   = buffer_data;
+    buffer_hdr->__internal.__mem_len           = buffer_size;
+    buffer_hdr->__internal.__mem_start         = buffer_data;
     buffer_hdr->__internal.__buffer_id         = buffer_id;
-    buffer_hdr->__internal.__buffer_parent     = parent;
+    buffer_hdr->__internal.__parent     = parent;
     buffer_hdr->__internal.__do_auto_release   = false;
     buffer_hdr->__internal.__in_use            = false;
     buffer_hdr->__internal.__pool_id           = 0;

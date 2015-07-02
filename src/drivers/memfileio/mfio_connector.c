@@ -65,15 +65,15 @@ static camio_error_t mfio_connect_peek(camio_connector_t* this)
     //Get the file size
     struct stat st;
     stat(priv->params->hierarchical.str, &st);
-    priv->mmap_buff.buffer_len = st.st_size;
+    priv->mmap_buff.__internal.__mem_len = st.st_size;
 
-    if(priv->mmap_buff.buffer_len)
+    if(priv->mmap_buff.__internal.__mem_len)
     {
-        DBG("Mapping new file with size %lli\n", priv->mmap_buff.buffer_len);
+        DBG("Mapping new file with size %lli\n", priv->mmap_buff.__internal.__mem_len);
 
         //Map the whole thing into memory
-        priv->mmap_buff.buffer_start = mmap( NULL, priv->mmap_buff.buffer_len, PROT_READ, MAP_SHARED, priv->base_fd, 0);
-        if(priv->mmap_buff.buffer_start == MAP_FAILED){
+        priv->mmap_buff.__internal.__mem_start = mmap( NULL, priv->mmap_buff.__internal.__mem_len, PROT_READ, MAP_SHARED, priv->base_fd, 0);
+        if(priv->mmap_buff.__internal.__mem_start == MAP_FAILED){
             DBG("Could not memory map blob file \"%s\". Error=%s\n", priv->params->hierarchical, strerror(errno));
             return CAMIO_ECHECKERRORNO; //TODO XXX better errors
         }

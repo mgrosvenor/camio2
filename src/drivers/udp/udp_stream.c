@@ -92,7 +92,7 @@ static camio_error_t udp_read_peek( camio_stream_t* this)
     }
 
     req->dst_offset_hint = MIN(CAMIO_UDP_BUFFER_SIZE, req->dst_offset_hint); //Make sure we don't overflow the buffer
-    char* read_buffer = (char*)priv->rd_buffer->buffer_start + req->dst_offset_hint; //Do the offset that we need
+    char* read_buffer = (char*)priv->rd_buffer->__internal.__mem_start + req->dst_offset_hint; //Do the offset that we need
     ch_word read_size = CAMIO_UDP_BUFFER_SIZE - req->dst_offset_hint; //Also make sure we don't overflow
     read_size = MIN(read_size,req->read_size_hint);
 
@@ -266,6 +266,12 @@ static camio_error_t udp_read_release(camio_stream_t* this, camio_rd_buffer_t** 
         return CAMIO_EINVALID;
     }
 
+    if((*buffer)->__internal.__parent != this){
+        //TODO XXX could add this feature but it would be non-trivial
+        DBG("Cannot release a buffer that does not belong to us!\n");
+        return CAMIO_EINVALID;
+    }
+
     camio_error_t err = buffer_malloc_linear_release(priv->rd_buff_pool,buffer);
     if(err){ return err; }
 
@@ -308,7 +314,7 @@ static camio_error_t udp_write_acquire(camio_stream_t* this, camio_wr_buffer_t**
     camio_error_t err = buffer_malloc_linear_acquire(priv->wr_buff_pool,buffer_o);
     if(err){ return err; }
 
-    DBG("Returning new buffer of size %lli at %p\n", (*buffer_o)->buffer_len, (*buffer_o)->buffer_start);
+    DBG("Returning new buffer of size %lli at %p\n", (*buffer_o)->__internal.__mem_len, (*buffer_o)->__internal.__mem_start);
     return CAMIO_ENOERROR;
 }
 
@@ -348,6 +354,11 @@ static camio_error_t udp_write_try(camio_stream_t* this)
         camio_write_req_t* req = priv->write_req + i;
         camio_buffer_t* buff   = req->buffer;
         DBG("Trying to writing %li bytes from %p to %i\n", buff->data_len,buff->data_start, priv->wr_fd);
+
+        if(req->buffer->__internal.__parent != this){
+            DBG("Warning -- detected request to write from buffer not belonging to this stream\n");
+        }
+
         ch_word bytes = write(priv->wr_fd,buff->data_start,buff->data_len);
         if(bytes < 0){
             if(errno == EWOULDBLOCK || errno == EAGAIN){
@@ -434,7 +445,13 @@ static camio_error_t udp_write_release(camio_stream_t* this, camio_wr_buffer_t**
         return CAMIO_EINVALID;
     }
 
-    DBG("Removing data buffer %p staring at %p\n", buffer, (*buffer)->buffer_start);
+    if((*buffer)->__internal.__parent != this){
+        //TODO XXX could add this feature but it would be non-trivial
+        DBG("Cannot release a buffer that does not belong to us!\n");
+        return CAMIO_EINVALID;
+    }
+
+    DBG("Releasing data buffer %p staring at %p\n", buffer, (*buffer)->__internal.__mem_start);
     camio_error_t err = buffer_malloc_linear_release(priv->wr_buff_pool,buffer);
     if(err){
         DBG("Unexpected release error %lli\n", err);

@@ -239,7 +239,6 @@ static camio_error_t ttt_read_release(camio_stream_t* this, camio_rd_buffer_t** 
         return CAMIO_EINVALID;
     }
     ttt_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
-    (void)priv;
 
     if( NULL == buffer){
         DBG("Buffer chain pointer null\n"); //WTF?

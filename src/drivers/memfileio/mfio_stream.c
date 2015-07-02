@@ -20,6 +20,9 @@
 
 #include <fcntl.h>
 #include <errno.h>
+#include <sys/mman.h>
+#include <memory.h>
+
 
 /**************************************************************************************************************************
  * PER STREAM STATE
@@ -27,18 +30,19 @@
 typedef struct mfio_stream_priv_s {
     camio_connector_t connector;
 
-    camio_buffer_t mmap_rd_buff;   //A place to keep the underlying data
-    camio_buffer_t mmap_wr_buff;
+    //To manage read buffer/requests --TODO should harmonize the naming convention. read vs rd etc
     ch_bool is_rd_closed;
-    ch_bool is_wr_closed;
-
-    //The current read buffer
+    camio_buffer_t mmap_rd_buff;
     ch_bool read_registered;    //Has a read been registered?
-    ch_bool read_ready;         //Is the stream ready for writing (for edge triggered multiplexers)
+    ch_bool read_ready;         //Is the stream ready for reading? (for edge triggered multiplexers)
     camio_read_req_t* read_req;  //Read request vector to put data into when there is new data
     ch_word read_req_len;       //size of the request vector
     ch_word read_req_curr;      //This will be needed later
 
+    //To manage write buffer/requests
+    ch_bool is_wr_closed;
+    camio_buffer_t mmap_wr_buff;
+    ch_bool write_acquired;       //Has a write alreay been acquired?
     ch_bool write_registered;     //Has a write been registered?
     ch_bool write_ready;          //Is the stream ready for writing (for edge triggered multiplexers)
     camio_write_req_t* write_req;  //Write request vector to take data out of when there is new data.
@@ -71,7 +75,7 @@ static camio_error_t mfio_read_peek( camio_stream_t* this)
         return CAMIO_ECLOSED;
     }
 
-    camio_read_req_t* req = priv->read_req;
+    camio_read_req_t* req = &priv->read_req[0]; //Assume that req_len == 1
 
     //WARNING: Code below here assumes that req len == 1!!
     if( req->src_offset_hint != CAMIO_READ_REQ_SRC_OFFSET_NONE){
@@ -86,20 +90,20 @@ static camio_error_t mfio_read_peek( camio_stream_t* this)
         return CAMIO_EINVALID;
     }
     if(req->read_size_hint == CAMIO_READ_REQ_SIZE_ANY){
-        req->read_size_hint = priv->mmap_rd_buff.buffer_len;
+        req->read_size_hint = priv->mmap_rd_buff.__internal.__mem_len;
     }
-    if(req->read_size_hint > priv->mmap_rd_buff.buffer_len){
+    if(req->read_size_hint > priv->mmap_rd_buff.__internal.__mem_len){
         //TODO XXX: Could realloc buffer here to be the right size...
-        req->read_size_hint = priv->mmap_rd_buff.buffer_len;
+        req->read_size_hint = priv->mmap_rd_buff.__internal.__mem_len;
     }
 
     char* new_data_start         = (char*)priv->mmap_rd_buff.data_start + priv->mmap_rd_buff.data_len;
-    const ch_word current_offset = (char*)priv->mmap_rd_buff.data_start - (char*)priv->mmap_rd_buff.data_start;
-    const ch_word max_read_size  = priv->mmap_rd_buff.buffer_len - current_offset;
+    const ch_word current_offset = (char*)priv->mmap_rd_buff.data_start - (char*)priv->mmap_rd_buff.__internal.__mem_start;
+    const ch_word max_read_size  = priv->mmap_rd_buff.__internal.__mem_len - current_offset;
     ch_word read_size = MIN(max_read_size,req->read_size_hint);
 
     //Check if we're at the end of the buffer
-    if( current_offset >= priv->mmap_rd_buff.buffer_len  || priv->is_rd_closed){
+    if( current_offset >= priv->mmap_rd_buff.__internal.__mem_len  || priv->is_rd_closed){
         mfio_read_close(this);
         DBG("Have run out of data. Cannot keep reading, the stream is closed\n");
         return CAMIO_ECLOSED; //Nothing more to read
@@ -107,6 +111,7 @@ static camio_error_t mfio_read_peek( camio_stream_t* this)
 
     priv->mmap_rd_buff.data_start = new_data_start;
     priv->mmap_rd_buff.data_len   = read_size;
+    priv->read_ready              = true;
 
     DBG("Success - got %lli bytes from MFIO peek\n", priv->mmap_rd_buff.data_len );
     return CAMIO_ENOERROR;
@@ -135,7 +140,7 @@ static camio_error_t mfio_read_ready(camio_muxable_t* this)
     }
 
     //Check if there is data already waiting to be dispatched
-    if(priv->rd_buffer){
+    if(priv->read_ready){
         DBG("There is data already waiting!\n");
         return CAMIO_EREADY;
     }
@@ -172,28 +177,10 @@ static camio_error_t mfio_read_request( camio_stream_t* this, camio_read_req_t* 
         DBG("Stream currently only supports read requests of size 1\n"); //TODO this should be coded in the features struct
         return CAMIO_EINVALID;
     }
-    //WARNING: Code below here assumes that req len == 1!!
-
-    if( req_vec->src_offset_hint != 0){
-        DBG("This is MFIO, you're not allowed to have a source offset!\n"); //WTF?
-        return CAMIO_EINVALID;
-    }
-    if( req_vec->dst_offset_hint > CAMIO_MFIO_BUFFER_SIZE){
-        DBG("You're trying to set a buffer offset (%i) which is greater than the buffer size (%i) ???\n",
-                req_vec->dst_offset_hint, CAMIO_MFIO_BUFFER_SIZE); //WTF?
-        return CAMIO_EINVALID;
-    }
 
     if(priv->read_registered){
         DBG("Already registered a read request. Currently this stream only handles one outstanding request at a time\n");
         return CAMIO_ETOOMANY; //TODO XXX better error code
-    }
-
-    if(req_vec->read_size_hint > 0){
-        if(req_vec->read_size_hint > CAMIO_MFIO_BUFFER_SIZE){
-            //TODO XXX: Could realloc buffer here to be the right size...
-            req_vec->read_size_hint = CAMIO_MFIO_BUFFER_SIZE;
-        }
     }
 
     //Sanity checks done, do some work now
@@ -227,8 +214,8 @@ static camio_error_t mfio_read_acquire( camio_stream_t* this,  camio_rd_buffer_t
 
     camio_error_t err = mfio_read_ready(&this->rd_muxable);
     if(err == CAMIO_EREADY){ //Whoo hoo! There's data!
-        *buffer_o = priv->rd_buffer;
-        DBG("Got new MFIO data of size %i\n", priv->rd_buffer->data_len);
+        *buffer_o = &priv->mmap_rd_buff;
+        DBG("Got new MFIO data of size %i\n", priv->mmap_rd_buff.data_len);
         return CAMIO_ENOERROR;
     }
 
@@ -250,7 +237,6 @@ static camio_error_t mfio_read_release(camio_stream_t* this, camio_rd_buffer_t**
         return CAMIO_EINVALID;
     }
     mfio_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
-    (void)priv;
 
     if( NULL == buffer){
         DBG("Buffer chain pointer null\n"); //WTF?
@@ -262,12 +248,15 @@ static camio_error_t mfio_read_release(camio_stream_t* this, camio_rd_buffer_t**
         return CAMIO_EINVALID;
     }
 
-    camio_error_t err = buffer_malloc_linear_release(priv->rd_buff_pool,buffer);
-    if(err){ return err; }
+    if((*buffer)->__internal.__parent != this){
+        //TODO XXX could add this feature but it would be non-trivial
+        DBG("Cannot release a buffer that does not belong to us!\n");
+        return CAMIO_EINVALID;
+    }
 
     *buffer               = NULL; //Remove dangling pointers!
-    priv->rd_buffer       = NULL; //Remove local reference to the buffer
     priv->read_registered = false; //unregister the outstanding read. And now we're done.
+    priv->read_ready      = false; //We're we've consumed the data now.
 
     return CAMIO_ENOERROR;
 }
@@ -278,9 +267,19 @@ static camio_error_t mfio_read_release(camio_stream_t* this, camio_rd_buffer_t**
 /**************************************************************************************************************************
  * WRITE FUNCTIONS
  **************************************************************************************************************************/
+static void mfio_write_close(camio_stream_t* this){
+    mfio_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
+    if(!priv->is_wr_closed){
+        reset_buffer(&priv->mmap_wr_buff);
+        priv->is_wr_closed = true;
+    }
+}
+
 
 static camio_error_t mfio_write_acquire(camio_stream_t* this, camio_wr_buffer_t** buffer_o)
 {
+    DBG("Doing write acquire\n");
+
     //Basic sanity checks -- TODO XXX: Should these be made into (compile time optional?) asserts for runtime performance?
     if( NULL == this){
         DBG("This null???\n"); //WTF?
@@ -298,11 +297,22 @@ static camio_error_t mfio_write_acquire(camio_stream_t* this, camio_wr_buffer_t*
         return CAMIO_EINVALID;
     }
 
-    DBG("Doing write acquire\n");
-    camio_error_t err = buffer_malloc_linear_acquire(priv->wr_buff_pool,buffer_o);
-    if(err){ return err; }
+    if( priv->write_acquired){
+        DBG("Write buffer already acquired. Can only do this once\n");
+        return CAMIO_ENOBUFFS;
+    }
 
-    DBG("Returning new buffer of size %lli at %p\n", (*buffer_o)->buffer_len, (*buffer_o)->buffer_start);
+    //Check if we're at the end of the buffer
+    const ch_word current_offset = (char*)priv->mmap_rd_buff.data_start - (char*)priv->mmap_rd_buff.__internal.__mem_start;
+    if( current_offset >= priv->mmap_wr_buff.__internal.__mem_len  || priv->is_wr_closed){
+        mfio_write_close(this);
+        DBG("Have run out of data. Cannot keep reading, the stream is closed\n");
+        return CAMIO_ECLOSED; //Nothing more to read
+    }
+
+    *buffer_o = &priv->mmap_wr_buff;
+    priv->write_acquired = true;
+    DBG("Returning new buffer of size %lli at %p\n", (*buffer_o)->data_start, (*buffer_o)->data_len);
     return CAMIO_ENOERROR;
 }
 
@@ -316,6 +326,11 @@ static camio_error_t mfio_write_request(camio_stream_t* this, camio_write_req_t*
     }
 
     mfio_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
+
+    if(req_vec_len != 1){
+        DBG("request length of %lli requested. This value is not currently supported\n", req_vec_len);
+        return CAMIO_NOTIMPLEMENTED;
+    }
 
     DBG("Got a write request vector with %lli items\n", req_vec_len);
     if(priv->write_registered){
@@ -338,33 +353,39 @@ static camio_error_t mfio_write_try(camio_stream_t* this)
 {
     mfio_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
 
-    for(int i = priv->write_req_curr; i < priv->write_req_len; i++){
-        camio_write_req_t* req = priv->write_req + i;
-        camio_buffer_t* buff   = req->buffer;
-        DBG("Trying to writing %li bytes from %p to %i\n", buff->data_len,buff->data_start, priv->fd);
-        ch_word bytes = write(priv->fd,buff->data_start,buff->data_len);
-        if(bytes < 0){
-            if(errno == EWOULDBLOCK || errno == EAGAIN){
-                return CAMIO_ETRYAGAIN;
-            }
-            else{
-                DBG("error %s\n",strerror(errno));
-                return CAMIO_ECHECKERRORNO;
-            }
-        }
+    camio_write_req_t* req = &priv->write_req[0];
 
-        buff->data_len -= bytes;
-        const char* data_start_new = (char*)buff->data_start + bytes;
-        buff->data_start = (void*)data_start_new;
-
-        if(buff->data_len != 0){
-            return CAMIO_ETRYAGAIN;
-        }
-
+    if(req->buffer->__internal.__parent != this){
+        //TODO XXX could add this feature but it would be non-trivial
+        DBG("This stream cannot support writing from an alternative source with zero copy\n");
+        return CAMIO_EINVALID;
     }
 
+    if( req->src_offset_hint != CAMIO_WRITE_REQ_SRC_OFFSET_NONE){
+        DBG("This stream currently does no support source offsets!\n");
+        //Fundamental question. If you support arbitrary offsets, then the stream has infinite length and will never close.
+        //is this ok? Is it a problem? If you do an offset read, surely all reads should be offset reads? This suggests that
+        //this stream can be in one of two modes. 1) auto increment mode and 2) offset mode and that these cannot be mixed.
+        return CAMIO_EINVALID;
+    }
+    if( req->dst_offset_hint != CAMIO_WRITE_REQ_DST_OFFSET_NONE){
+        DBG("This stream does not support source offsets. (It is a buffer donor!)\n");
+        return CAMIO_EINVALID;
+    }
+    if( req->buffer->data_len > req->buffer->__internal.__mem_len){
+        DBG("Warning: It's looks like you've overwritten the length of the underlying memory segment. "
+                "Data corruption is likely to have happened\n");
+        return CAMIO_ETOOMANY;
+    }
+
+    camio_buffer_t* buff   = req->buffer;
+    DBG("Trying to write %li bytes from %pi\n", buff->data_len,buff->data_start);
+    const char* data_start_new = (char*)buff->data_start + buff->data_len;
+    buff->data_start = (void*)data_start_new;
+    buff->data_len = buff->__internal.__mem_len - buff->data_len;
+
     //If we get here, we've successfully written all the records out. This means we're now ready to take more write requests
-    DBG("De registering write\n");
+    DBG("Deregistering write\n");
     priv->write_registered = false;
 
     return CAMIO_ENOERROR;
@@ -434,12 +455,16 @@ static camio_error_t mfio_write_release(camio_stream_t* this, camio_wr_buffer_t*
         return CAMIO_EINVALID;
     }
 
-    DBG("Removing data buffer %p staring at %p\n", buffer, (*buffer)->buffer_start);
-    camio_error_t err = buffer_malloc_linear_release(priv->wr_buff_pool,buffer);
-    if(err){
-        DBG("Unexpected release error %lli\n", err);
-        return err;
+    if((*buffer)->__internal.__parent != this){
+        //TODO XXX could add this feature but it would be non-trivial
+        DBG("Cannot release a buffer that does not belong to us!\n");
+        return CAMIO_EINVALID;
     }
+
+
+    DBG("Releaseing data buffer %p staring at %p\n", (*buffer), (*buffer)->__internal.__mem_start);
+
+    priv->write_acquired = false;
 
     *buffer = NULL; //Remove dangling pointers!
 
@@ -453,7 +478,6 @@ static camio_error_t mfio_write_release(camio_stream_t* this, camio_wr_buffer_t*
 /**************************************************************************************************************************
  * SETUP/CLEANUP FUNCTIONS
  **************************************************************************************************************************/
-
 static void mfio_destroy(camio_stream_t* this)
 {
     //Basic sanity checks -- TODO XXX: Should these be made into (compile time optional?) asserts for runtime performance?
@@ -463,10 +487,16 @@ static void mfio_destroy(camio_stream_t* this)
     }
     mfio_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
 
-    if(priv->mmap_rd_buff.buffer_start){
-        munmap(priv->mmap_rd_buff.buffer_start, priv->mmap_rd_buff.buffer_len);
-        priv->mmap_rd_buff.buffer_start = NULL;
-        priv->mmap_rd_buff.buffer_len   = 0;
+    if(priv->mmap_rd_buff.__internal.__mem_start){
+        munmap(priv->mmap_rd_buff.__internal.__mem_start, priv->mmap_rd_buff.__internal.__mem_len);
+        mfio_read_close(this);
+        mfio_write_close(this);
+    }
+
+    if(priv->mmap_wr_buff.__internal.__mem_start){
+        munmap(priv->mmap_wr_buff.__internal.__mem_start, priv->mmap_wr_buff.__internal.__mem_len);
+        mfio_read_close(this);
+        mfio_write_close(this);
     }
 
     if(this->rd_muxable.fd > -1){
@@ -476,14 +506,24 @@ static void mfio_destroy(camio_stream_t* this)
     }
 
     free(this);
-
 }
+
+void init_buffer(camio_buffer_t* buff, ch_bool read_only, camio_stream_t* parent)
+{
+    buff->__internal.__buffer_id = 0;
+    buff->__internal.__do_auto_release = false;
+    buff->__internal.__in_use = false;
+    buff->__internal.__parent = parent;
+    buff->__internal.__pool_id = 0;
+    buff->__internal.__read_only = read_only;
+}
+
 
 camio_error_t mfio_stream_construct(
     camio_stream_t* this,
     camio_connector_t* connector,
     int base_fd,
-    camio_buffer_t mmap_rd_buff
+    camio_buffer_t mmap_buff
 )
 {
     //Basic sanity checks -- TODO XXX: Should these be made into (compile time optional?) asserts for runtime performance?
@@ -494,7 +534,15 @@ camio_error_t mfio_stream_construct(
     mfio_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
 
     priv->connector = *connector; //Keep a copy of the connector state
-    priv->mmap_rd_buff = mmap_rd_buff;
+    //Set up the buffer states
+    init_buffer(&priv->mmap_rd_buff,true,this);
+    init_buffer(&priv->mmap_wr_buff,false,this);
+    //Both read and write side get a copy of the pointers to the underlying data
+    priv->mmap_rd_buff = mmap_buff;
+    priv->mmap_wr_buff = mmap_buff;
+    //Set up the write buffer to be the entirity of underlying memory
+    priv->mmap_wr_buff.data_start = priv->mmap_wr_buff.__internal.__mem_start;
+    priv->mmap_wr_buff.data_len   = priv->mmap_wr_buff.__internal.__mem_len;
 
     this->rd_muxable.mode              = CAMIO_MUX_MODE_READ;
     this->rd_muxable.parent.stream     = this;
@@ -507,7 +555,7 @@ camio_error_t mfio_stream_construct(
     this->wr_muxable.fd                = base_fd;
 
 
-    DBG("Done constructing MFIO stream with size=%lli\n", priv->mmap_rd_buff.buffer_len);
+    DBG("Done constructing MFIO stream with size=%lli\n", priv->mmap_rd_buff.__internal.__mem_len);
     return CAMIO_ENOERROR;
 }
 
