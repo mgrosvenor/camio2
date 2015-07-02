@@ -44,7 +44,7 @@ typedef struct delim_stream_priv_s {
     ch_bool is_rd_closed;
     ch_bool read_registered;
 
-    int (*delim_fn)(char* buffer, int len);
+    ch_word (*delim_fn)(char* buffer, ch_word len);
 
 } delim_stream_priv_t;
 
@@ -63,6 +63,24 @@ static void delim_read_close(camio_stream_t* this){
     }
 }
 
+static camio_error_t grow_working_buff(delim_stream_priv_t* priv) {
+    //     ( The amount of free space in the buffer)                                     <  (Extra space needed         )
+    while ((priv->rd_working_buff.__internal.__mem_len - priv->rd_working_buff.data_len) < (priv->rd_base_buff->data_len)) {
+        DBG("Growing working buffer from %lu to %lu\n", priv->rd_working_buff.__internal.__mem_len,
+                priv->rd_working_buff.__internal.__mem_len * 2);
+        priv->rd_working_buff.__internal.__mem_len *= 2;
+        priv->rd_working_buff.__internal.__mem_start = realloc(priv->rd_working_buff.__internal.__mem_start,
+                priv->rd_working_buff.__internal.__mem_len);
+
+        if(priv->rd_working_buff.__internal.__mem_start == NULL){
+            DBG("Ran out of memmory trying to grow working buff!\n");
+            return CAMIO_ENOMEM;
+        }
+        priv->rd_working_buff.data_start = priv->rd_working_buff.__internal.__mem_start;
+    }
+
+    return CAMIO_ENOERROR;
+}
 
 //See if there is something to read
 static camio_error_t delim_read_peek( camio_stream_t* this)
@@ -81,7 +99,7 @@ static camio_error_t delim_read_peek( camio_stream_t* this)
     if(priv->rd_working_buff.data_len > 0){
         const ch_word delimit_size = priv->delim_fn(priv->rd_working_buff.data_start, priv->rd_working_buff.data_len);
         if(delimit_size > 0 && delimit_size <= priv->rd_working_buff.data_len){
-            assign_buffer(&priv->rd_result_buff, &priv->rd_working_buff,priv->rd_working_buff.data_start, delimit_size );
+            buffer_slice(&priv->rd_result_buff, &priv->rd_working_buff,priv->rd_working_buff.data_start, delimit_size );
             DBG("Yay! Delimiter first time success with data of size %lli!\n", delimit_size);
             return CAMIO_ENOERROR;
         }
@@ -97,7 +115,7 @@ static camio_error_t delim_read_peek( camio_stream_t* this)
             return err;
         }
         //We have now registered a read request, only do this once otherwise the base stream might get confused.
-        DBG("Requested new data from base!\n");
+        DBG("Successfully requested new data from base!\n");
         priv->rd_base_registered = true;
     }
 
@@ -110,6 +128,7 @@ static camio_error_t delim_read_peek( camio_stream_t* this)
         DBG("Unexpected error from base ready()!\n");
         return err; //Damn, no data available. Come back later and try again.
     }
+    DBG("Data is ready to be read from base!\n");
 
     //Yes! We have some more data. Get at it.
     err = camio_read_acquire(priv->base,&priv->rd_base_buff);
@@ -117,7 +136,7 @@ static camio_error_t delim_read_peek( camio_stream_t* this)
         DBG("Could not do read acquire on base stream\n");
         return err;
     }
-    DBG("Read another %lli bytes from %p\n", priv->rd_base_buff->data_len, priv->rd_base_buff);
+    DBG("Read another %lli bytes from %p. Data starts at %p\n", priv->rd_base_buff->data_len, priv->rd_base_buff, priv->rd_base_buff->data_start);
     priv->rd_base_registered = false; //We got the data, next time we will need to register again.
 
     //Got some data, but is it just a closed stream?
@@ -128,53 +147,51 @@ static camio_error_t delim_read_peek( camio_stream_t* this)
         return CAMIO_ENOERROR;
     }
 
-    //We have real data and the working buffer is empty, try a fast path. If the data read exactly matches the data that
-    //we're looking for then there is no need to copy it into the working buffer.
+    // ---- Now the real work begins. We have new data. So can we delimit it?
+
+    //We have real data and the working buffer is empty, try a fast path. Maybe we won't need to copy into the working buffer
     if(priv->rd_working_buff.data_len == 0){
-        DBG("Trying empty buffer fast path...\n");
+        DBG("Trying empty working buffer fast path...\n");
         const ch_word delimit_size = priv->delim_fn(priv->rd_base_buff->data_start, priv->rd_base_buff->data_len);
-        if(delimit_size == priv->rd_base_buff->data_len){
-            assign_buffer(&priv->rd_result_buff,priv->rd_base_buff,priv->rd_base_buff->data_start, delimit_size);
-            DBG("Fast path exact match from delimiter of size %lli!\n", delimit_size);
+        if(delimit_size > 0) { //Success! There is a valid packet in the read buffer alone.
+            buffer_slice(&priv->rd_result_buff,priv->rd_base_buff,priv->rd_base_buff->data_start, delimit_size);
+            DBG("Fast path match from delimiter of size %lli!\n", delimit_size);
             return CAMIO_ENOERROR;
         }
-        DBG("Fast path fail. Try slow path...\n");
+        DBG("Datagram fast path fail. Try slow path...\n");
     }
 
-    //Just check that this is true. If it's not, the following code's assumptions will be violated.
+    //Just check that this is assumption true. If it's not, the following code will break!
     if(priv->rd_working_buff.data_start != priv->rd_working_buff.__internal.__mem_start){
         DBG("Invariant violation. Assumptions will be broken!\n");
         return CAMIO_EINVALID;
     }
 
-    //OK. Let's put the data somewhere that we can work with it later. First make sure we have enough space
-    //     ( The amount of free space in the buffer)                          <  (Extra space needed         )
-    while( (priv->rd_working_buff.__internal.__mem_len - priv->rd_working_buff.data_len) < (priv->rd_base_buff->data_len)  ){
-        DBG("Growing working buffer from %lu to %lu\n", priv->rd_working_buff.__internal.__mem_len, priv->rd_working_buff.__internal.__mem_len * 2 );
-        priv->rd_working_buff.__internal.__mem_len *= 2;
-        priv->rd_working_buff.__internal.__mem_start = realloc(priv->rd_working_buff.__internal.__mem_start, priv->rd_working_buff.__internal.__mem_len);
-        priv->rd_working_buff.data_start   = priv->rd_working_buff.__internal.__mem_start;
+    //Let's put the data somewhere that we can work with it later. First make sure we have enough space:
+    err = grow_working_buff(priv);
+    if (err){
+        DBG("Could not grow working buff\n");
+        return err;
     }
 
-    //TODO XXX, can potentially avoid this if the delimiter says that data in read_buffer includes a complete packet but have
-    //to deal with a partial fragment(s) left over in the buffer.
-    void* new_data_dst = (char*)priv->rd_working_buff.__internal.__mem_start + priv->rd_working_buff.data_len;
+    //Now copy the data over into the working buffer.
+    void* new_data_dst = (char*)priv->rd_working_buff.data_start + priv->rd_working_buff.data_len;
     DBG("Adding %lu bytes at %p (offset=%lu)\n", priv->rd_base_buff->data_len, new_data_dst, priv->rd_working_buff.data_len);
     memcpy(new_data_dst, priv->rd_base_buff->data_start, priv->rd_base_buff->data_len);
     priv->rd_working_buff.data_len += priv->rd_base_buff->data_len;
 
-    //Now that the data is copied, we don't need the buffer any more.
+    //Now that the data is copied, we don't need the read buffer any more.
     camio_read_release(priv->base,&priv->rd_base_buff);
 
-    //OK. Now that we've got some more data. Try one last time to delimit it.
+    //OK. Now that we've got some more data. Try one last time to delimit it again.
     const ch_word delimit_size = priv->delim_fn(priv->rd_working_buff.data_start, priv->rd_working_buff.data_len);
     if(delimit_size > 0 && delimit_size <= priv->rd_working_buff.data_len){
-        assign_buffer(&priv->rd_result_buff,&priv->rd_working_buff,priv->rd_working_buff.data_start, delimit_size);
+        buffer_slice(&priv->rd_result_buff,&priv->rd_working_buff,priv->rd_working_buff.data_start, delimit_size);
         DBG("Slow path  match from delimiter of size %lli!\n", delimit_size);
         return CAMIO_ENOERROR;
     }
 
-    return CAMIO_ETRYAGAIN; //We've got nothing
+    return CAMIO_ETRYAGAIN; //OK. Well we tried. Come back here and try again another time.
 }
 
 
@@ -368,77 +385,71 @@ static camio_error_t delim_read_release(camio_stream_t* this, camio_rd_buffer_t*
     priv->read_registered = false;
     *buffer = NULL; //Remove dangling pointer for the source
 
-    //Calculate this now, we'll need it later
-    char* result_head_next = (char*)priv->rd_result_buff.data_start + priv->rd_result_buff.data_len ;
+     //We arrived here because for one of two reasons
+    //  1) we read successfully delimited from the base stream. So we're still hanging on to the base stream buffer
+    //  2) we successfully delimited from the working buffer.
+    //  Regardless of how we got here, we have to decide if we're going to move data to the front of the buffer, or
+    //  if there is another packet waiting. So first, we figure out if the is any data left to delimit
 
-    //Handle case 1a) -- Data was returned pass through.
-    if(priv->rd_base_buff && priv->rd_result_buff.data_start == priv->rd_base_buff->data_start){
-        DBG("Doing case 1a\n");
-        //The result is directly from the underlying stream, so we should release it now.
-        camio_read_release(priv->base,&priv->rd_base_buff);
+    //Step 1 - figure out how much data is waiting to be consumed
+    void* data_next           = (char*)priv->rd_result_buff.data_start + priv->rd_result_buff.data_len ;
+    const ch_word data_offset = (char*)data_next - (char*)priv->rd_result_buff.__internal.__mem_start;
+    const void* mem_end       = (char*)priv->rd_result_buff.__internal.__mem_start + priv->rd_result_buff.__internal.__mem_len;
+    DBG("Data offset = %lli\n", data_offset);
+    const ch_word data_remain = priv->rd_result_buff.__internal.__mem_len - data_offset;
+    DBG("There is %lli bytes remaining in the result buffer\n", data_remain);
+
+    //If there is nothing left over, give up and bug out
+    if(data_next >= mem_end){
+        DBG("There's no data left. We're done!\n");
+        if(priv->rd_base_buff){
+            DBG("Releasing underlying fast_path buffer\n");
+            //The result is directly from the underlying stream, so we should release it now.
+            camio_read_release(priv->base,&priv->rd_base_buff);
+        }
         goto reset_and_exit;
     }
 
-    //Handle case 1b) -- New data was read and the delimiter was successful
-    if(priv->rd_working_buff.data_len >= priv->rd_result_buff.data_len ){
-        DBG("Doing case 1b -- releasing underlying buffer\n");
-        //This is how much is now left over
-        priv->rd_working_buff.data_len -= priv->rd_result_buff.data_len;
+    //OK. so there's some data hanging around, let's try to delimit it
 
-        //If there is nothing left over, give up and bug out
-        if(!priv->rd_working_buff.data_len){
-            DBG("There's no data left\n");
-            goto reset_and_exit;
-        }
+    const ch_word data_next_len = data_remain;
 
-        //Something is left over we can optimistically check if there happens to be another packet ready to go.
-        //The reduces the number of memmoves and significantly improves performance especially with TCP where the
-        //read size can be *huge*. (>4MB with TSO turned on)
-        const ch_word delimit_size = priv->delim_fn(result_head_next, priv->rd_working_buff.data_len);
-        if(delimit_size > 0 && delimit_size <= priv->rd_working_buff.data_len){
-            //Ready for the next round with data available! No memmove required!
-            DBG("Success in case 1b) no need to move data\n");
-            assign_buffer(&priv->rd_result_buff,&priv->rd_working_buff,result_head_next,delimit_size);
-            return CAMIO_ENOERROR;
-        }
-
-        //Nope, ok, bite the bullet and move stuff around. We'll need to call read() and get some more data at a later stage
-        DBG("case 1b) - doing mem move of %lu from %p to %p (total=%lu)\n",
-            priv->rd_working_buff.data_len,
-            result_head_next,
-            priv->rd_working_buff.data_start,
-            (char*)result_head_next - (char*)priv->rd_working_buff.data_start
-        );
-        memmove(priv->rd_working_buff.data_start, result_head_next, priv->rd_working_buff.data_len);
-        goto reset_and_exit; //goto is not strictly necessary, but this is what the program flow will do
+    const ch_word delimit_size = priv->delim_fn(data_next, data_next_len);
+    if(delimit_size > 0 && delimit_size <= data_next_len){
+        //Ready for the next round with data available! No memmove required!
+        DBG("Success! No memmove required this time!\n");
+        priv->rd_result_buff.data_start = data_next;
+        priv->rd_result_buff.data_len   = delimit_size;
+        return CAMIO_ENOERROR;
     }
 
-    //Handle case 2) -- There is some data leftover, but less than the last result buffer size.
-    else{
-        DBG("Doing case 2\n");
-        //Optimistically check if there is a new packet in this left over. Remember, packets are not all the same
-        //size, so a small packet could follow a big packet.
-        const ch_word delimit_size = priv->delim_fn(result_head_next, priv->rd_working_buff.data_len);
-        if(delimit_size > 0 && delimit_size <= priv->rd_working_buff.data_len){
-            //Ready for the next round with data available! No memmove required!
-            assign_buffer(&priv->rd_result_buff,&priv->rd_working_buff,result_head_next,delimit_size);
-            priv->read_registered   = false;
-            return CAMIO_ENOERROR;
-        }
-
-        //Nope, ok, bite the bullet and move stuff around. We'll need to call read() and get some more data
-        DBG("case 2) - doing mem move of %lu from %p to %p (total=%lu)\n",
-            priv->rd_working_buff.data_len,
-            result_head_next,
-            priv->rd_working_buff.data_start,
-            (char*)result_head_next - (char*)priv->rd_working_buff.data_start
-        );
-        memmove(priv->rd_working_buff.data_start, result_head_next, priv->rd_working_buff.data_len);
-        goto reset_and_exit; //goto is not strictly necessary, but this is what the program flow will do
+    printf("Data offset = %lli, mem_len=%lli, detla=%lli\n",
+            data_offset,
+            priv->rd_result_buff.__internal.__mem_len,
+            priv->rd_result_buff.__internal.__mem_len - data_offset
+    );
+    printf("There is %lli bytes remaining in the result buffer\n", data_remain);
+    //Nope. No success with the delimiter. Looks like we have to move stuff arround. Move waht we have right back to the
+    //beginning of the working buffer. First make sure that the buffer is big enough
+    camio_error_t err = grow_working_buff(priv);
+    if (err){
+        DBG("Could not grow working buff\n");
+        return err;
     }
 
-    //Ready for the next round, there is no new delimited packet available, so reset everything and get ready for a call to
-    //read more data
+    printf("Doing mem move of %lli from %p to %p\n", data_next_len, data_next,
+            priv->rd_working_buff.__internal.__mem_start );
+    memmove(priv->rd_working_buff.__internal.__mem_start, data_next, data_next_len);
+    priv->rd_working_buff.data_start = priv->rd_working_buff.__internal.__mem_start;
+    priv->rd_working_buff.data_len   = data_next_len;
+
+    //If we still have a base buffer at this point, we should get rid of it
+    if(priv->rd_base_buff){
+        DBG("Releasing underlying fast_path buffer\n");
+        //The result is directly from the underlying stream, so we should release it now.
+        camio_read_release(priv->base,&priv->rd_base_buff);
+    }
+
 reset_and_exit:
     DBG("Releasing result buffer and exiting\n");
     reset_buffer(&priv->rd_result_buff); //We're done with this buffer pointer for the moment until there's new data
@@ -542,7 +553,7 @@ camio_error_t delim_stream_construct(
     camio_stream_t* this,
     camio_connector_t* connector,
     camio_stream_t* base_stream,
-    int (*delim_fn)(char* buffer, int len)
+    ch_word(*delim_fn)(char* buffer, ch_word len)
 )
 {
     (void)connector; //Nothing to do with this

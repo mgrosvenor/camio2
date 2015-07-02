@@ -22,7 +22,7 @@
 
 typedef struct {
     char* base_uri; //URI for the base stream that this will be delimiting
-    int (*delim_fn)(char* buffer, int len); //Delimiting function
+    ch_word (*delim_fn)(char* buffer, ch_word len); //Delimiting function
 } delim_params_t;
 
 void delim_init();

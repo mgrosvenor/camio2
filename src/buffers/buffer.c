@@ -21,11 +21,20 @@ void reset_buffer(camio_buffer_t* dst)
 }
 
 
-//Assign the pointers from one buffer to another
-void assign_buffer(camio_buffer_t* dst, camio_buffer_t* src, void* data_start, ch_word data_len)
+////Assign the pointers from one buffer to another
+//void assign_buffer2(camio_buffer_t* dst, camio_buffer_t* src, void* data_start, ch_word data_len)
+//{
+//    dst->__internal.__mem_start = src->__internal.__mem_start;
+//    dst->__internal.__mem_len   = src->__internal.__mem_len;
+//    dst->data_start             = data_start;
+//    dst->data_len               = data_len;
+//}
+
+//Take a source buffer, and slice out a chunk content from it
+void buffer_slice(camio_buffer_t* dst, camio_buffer_t* src, void* content_start, ch_word content_len)
 {
-    dst->__internal.__mem_start = src->__internal.__mem_start;
-    dst->__internal.__mem_len   = src->__internal.__mem_len;
-    dst->data_start             = data_start;
-    dst->data_len               = data_len;
+    dst->__internal.__mem_start = src->data_start;
+    dst->__internal.__mem_len   = src->data_len;
+    dst->data_start             = content_start;
+    dst->data_len               = content_len;
 }

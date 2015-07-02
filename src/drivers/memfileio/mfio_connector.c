@@ -37,7 +37,8 @@ typedef struct mfio_priv_s {
     mfio_params_t* params;  //Parameters used when a connection happens
 
     bool is_connected;          //Has connect be called?
-    camio_buffer_t mmap_buff;   //Buffer descriptor for mmaped version of base_fd;
+    void* base_mem_start;             //Size and location of the mmaped region
+    ch_word base_mem_len;         //
     int base_fd;                //File descriptor for the backing buffer
 
 } mfio_connector_priv_t;
@@ -52,38 +53,42 @@ typedef struct mfio_priv_s {
 //Try to see if connecting is possible. With UDP, it is always possible.
 static camio_error_t mfio_connect_peek(camio_connector_t* this)
 {
+    DBG("Doing connect peek\n");
     mfio_connector_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
-
-    if(priv->is_connected){
-        return CAMIO_EALLREADYCONNECTED; // We're already connected!
-    }
 
     if(priv->base_fd > -1 ){
         return CAMIO_ENOERROR; //Ready to go, please call connect!
     }
 
+    //Open up the file and get it ready to connect
+    priv->base_fd = open(priv->params->hierarchical.str, O_RDWR);
+    if(priv->base_fd < 0){
+        DBG("Could not open file \"%s\". Error=%s\n", priv->params->hierarchical.str, strerror(errno));
+        return CAMIO_EINVALID;
+    }
+
     //Get the file size
     struct stat st;
     stat(priv->params->hierarchical.str, &st);
-    priv->mmap_buff.__internal.__mem_len = st.st_size;
+    priv->base_mem_len = st.st_size;
+    DBG("Got file size of %lli\n", priv->base_mem_len);
 
-    if(priv->mmap_buff.__internal.__mem_len)
-    {
-        DBG("Mapping new file with size %lli\n", priv->mmap_buff.__internal.__mem_len);
 
-        //Map the whole thing into memory
-        priv->mmap_buff.__internal.__mem_start = mmap( NULL, priv->mmap_buff.__internal.__mem_len, PROT_READ, MAP_SHARED, priv->base_fd, 0);
-        if(priv->mmap_buff.__internal.__mem_start == MAP_FAILED){
-            DBG("Could not memory map blob file \"%s\". Error=%s\n", priv->params->hierarchical, strerror(errno));
-            return CAMIO_ECHECKERRORNO; //TODO XXX better errors
-        }
+    DBG("Mapping new file with size %lli\n", priv->base_mem_len);
 
-        priv->is_connected = 1;
-        return CAMIO_ENOERROR;
+    //Map the whole thing into memory
+    priv->base_mem_start = mmap( NULL, priv->base_mem_len, PROT_READ | PROT_WRITE, MAP_SHARED, priv->base_fd, 0);
+    if(priv->base_mem_start == MAP_FAILED){
+        DBG("Could not memory map blob file \"%s\". Error=%s\n", priv->params->hierarchical, strerror(errno));
+        return CAMIO_ECHECKERRORNO; //TODO XXX better errors
     }
 
-    DBG("file has zero size\n");
-    return CAMIO_EINVALID;
+    DBG("Mapped file to address %p with size %lli\n", priv->base_mem_start, priv->base_mem_len);
+
+    //printf("%.*s\n",(int)priv->base_mem_len, priv->base_mem_start );
+
+    return CAMIO_ENOERROR;
+
 }
 
 static camio_error_t mfio_connector_ready(camio_muxable_t* this)
@@ -109,7 +114,8 @@ static camio_error_t mfio_connect(camio_connector_t* this, camio_stream_t** stre
     }
 
     if(priv->is_connected){
-        return CAMIO_EINVALID;//Only allow one connection
+        DBG("Already connected! Why are you calling this twice?\n");
+        return CAMIO_EALLREADYCONNECTED; // We're already connected!
     }
 
     //DBG("Done connecting, now constructing UDP stream...\n");
@@ -120,7 +126,7 @@ static camio_error_t mfio_connect(camio_connector_t* this, camio_stream_t** stre
     }
     *stream_o = stream;
 
-    err = mfio_stream_construct(stream, this, priv->base_fd, priv->mmap_buff);
+    err = mfio_stream_construct(stream, this, priv->base_fd, priv->base_mem_start, priv->base_mem_len);
     if(err){
        return err;
     }
@@ -153,12 +159,7 @@ static camio_error_t mfio_construct(camio_connector_t* this, void** params, ch_w
         return CAMIO_EINVALID; //TODO XXX : Need better error values
     }
 
-    //Open up the file and get it ready to connect
-    priv->base_fd = open(mfio_params->hierarchical.str, O_RDWR);
-    if(priv->base_fd < 0){
-        DBG("Could not open file \"%s\". Error=%s\n", mfio_params->hierarchical, strerror(errno));
-        return CAMIO_EINVALID;
-    }
+    priv->base_fd = -1;
 
     //Populate the rest of the muxable structure
     this->muxable.mode              = CAMIO_MUX_MODE_CONNECT;

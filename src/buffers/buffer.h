@@ -107,7 +107,8 @@ typedef camio_buffer_t camio_wr_buffer_t; //get from a read (rd) buffer to a wri
     }
 
 
-void assign_buffer(camio_buffer_t* dst, camio_buffer_t* src, void* data_start, ch_word data_len);
+//void assign_buffer(camio_buffer_t* dst, camio_buffer_t* src, void* data_start, ch_word data_len);
+void buffer_slice(camio_buffer_t* dst, camio_buffer_t* src, void* content_start, ch_word content_len);
 void reset_buffer(camio_buffer_t* dst);
 
 #endif /* BUFFER_H_ */

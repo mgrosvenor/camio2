@@ -58,8 +58,9 @@ typedef struct mfio_stream_priv_s {
 static void mfio_read_close(camio_stream_t* this){
     mfio_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
     if(!priv->is_rd_closed){
-        reset_buffer(&priv->mmap_rd_buff);
-        priv->is_rd_closed = true;
+        priv->mmap_rd_buff.data_start = NULL;
+        priv->mmap_rd_buff.data_len   = 0;
+        priv->is_rd_closed             = true;
     }
 }
 
@@ -97,7 +98,14 @@ static camio_error_t mfio_read_peek( camio_stream_t* this)
         req->read_size_hint = priv->mmap_rd_buff.__internal.__mem_len;
     }
 
-    char* new_data_start         = (char*)priv->mmap_rd_buff.data_start + priv->mmap_rd_buff.data_len;
+    DBG("mem_start=%p, data_start=%p, mem_len=%lli, data_len=%lli\n",
+            priv->mmap_rd_buff.__internal.__mem_start,
+            priv->mmap_rd_buff.data_start,
+            priv->mmap_rd_buff.__internal.__mem_len,
+            priv->mmap_rd_buff.data_len
+            );
+
+
     const ch_word current_offset = (char*)priv->mmap_rd_buff.data_start - (char*)priv->mmap_rd_buff.__internal.__mem_start;
     const ch_word max_read_size  = priv->mmap_rd_buff.__internal.__mem_len - current_offset;
     ch_word read_size = MIN(max_read_size,req->read_size_hint);
@@ -105,11 +113,11 @@ static camio_error_t mfio_read_peek( camio_stream_t* this)
     //Check if we're at the end of the buffer
     if( current_offset >= priv->mmap_rd_buff.__internal.__mem_len  || priv->is_rd_closed){
         mfio_read_close(this);
+        priv->read_ready = true;
         DBG("Have run out of data. Cannot keep reading, the stream is closed\n");
-        return CAMIO_ECLOSED; //Nothing more to read
+        return CAMIO_ENOERROR; //Nothing more to read
     }
 
-    priv->mmap_rd_buff.data_start = new_data_start;
     priv->mmap_rd_buff.data_len   = read_size;
     priv->read_ready              = true;
 
@@ -120,6 +128,8 @@ static camio_error_t mfio_read_peek( camio_stream_t* this)
 
 static camio_error_t mfio_read_ready(camio_muxable_t* this)
 {
+    DBG("Doing MFIO ready...\n");
+
     //Basic sanity checks -- TODO XXX: Should these be made into (compile time optional?) asserts for runtime performance?
     if( NULL == this){
         DBG("This is null???\n"); //WTF?
@@ -254,6 +264,9 @@ static camio_error_t mfio_read_release(camio_stream_t* this, camio_rd_buffer_t**
         return CAMIO_EINVALID;
     }
 
+    char* new_data_start  = (char*)priv->mmap_rd_buff.data_start + priv->mmap_rd_buff.data_len; //TODO BUG! Assumes that user has not played with this value...
+    priv->mmap_rd_buff.data_start = new_data_start;
+
     *buffer               = NULL; //Remove dangling pointers!
     priv->read_registered = false; //unregister the outstanding read. And now we're done.
     priv->read_ready      = false; //We're we've consumed the data now.
@@ -270,7 +283,8 @@ static camio_error_t mfio_read_release(camio_stream_t* this, camio_rd_buffer_t**
 static void mfio_write_close(camio_stream_t* this){
     mfio_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
     if(!priv->is_wr_closed){
-        reset_buffer(&priv->mmap_wr_buff);
+        priv->mmap_wr_buff.data_start = NULL;
+        priv->mmap_wr_buff.data_len   = 0;
         priv->is_wr_closed = true;
     }
 }
@@ -508,14 +522,20 @@ static void mfio_destroy(camio_stream_t* this)
     free(this);
 }
 
-void init_buffer(camio_buffer_t* buff, ch_bool read_only, camio_stream_t* parent)
+void init_buffer(camio_buffer_t* buff, ch_bool read_only, camio_stream_t* parent, void* base_mem_start, ch_word base_mem_len)
 {
-    buff->__internal.__buffer_id = 0;
-    buff->__internal.__do_auto_release = false;
-    buff->__internal.__in_use = false;
-    buff->__internal.__parent = parent;
-    buff->__internal.__pool_id = 0;
-    buff->__internal.__read_only = read_only;
+    buff->__internal.__mem_start        = base_mem_start;
+    buff->__internal.__mem_len          = base_mem_len;
+    buff->__internal.__buffer_id        = 0;
+    buff->__internal.__do_auto_release  = false;
+    buff->__internal.__in_use           = false;
+    buff->__internal.__parent           = parent;
+    buff->__internal.__pool_id          = 0;
+    buff->__internal.__read_only        = read_only;
+
+    buff->data_start = buff->__internal.__mem_start;
+    buff->data_len   = buff->__internal.__mem_len;
+
 }
 
 
@@ -523,7 +543,8 @@ camio_error_t mfio_stream_construct(
     camio_stream_t* this,
     camio_connector_t* connector,
     int base_fd,
-    camio_buffer_t mmap_buff
+    void* base_mem_start,
+    ch_word base_mem_len
 )
 {
     //Basic sanity checks -- TODO XXX: Should these be made into (compile time optional?) asserts for runtime performance?
@@ -535,14 +556,8 @@ camio_error_t mfio_stream_construct(
 
     priv->connector = *connector; //Keep a copy of the connector state
     //Set up the buffer states
-    init_buffer(&priv->mmap_rd_buff,true,this);
-    init_buffer(&priv->mmap_wr_buff,false,this);
-    //Both read and write side get a copy of the pointers to the underlying data
-    priv->mmap_rd_buff = mmap_buff;
-    priv->mmap_wr_buff = mmap_buff;
-    //Set up the write buffer to be the entirity of underlying memory
-    priv->mmap_wr_buff.data_start = priv->mmap_wr_buff.__internal.__mem_start;
-    priv->mmap_wr_buff.data_len   = priv->mmap_wr_buff.__internal.__mem_len;
+    init_buffer(&priv->mmap_rd_buff,true,this, base_mem_start, base_mem_len);
+    init_buffer(&priv->mmap_wr_buff,false,this, base_mem_start, base_mem_len);
 
     this->rd_muxable.mode              = CAMIO_MUX_MODE_READ;
     this->rd_muxable.parent.stream     = this;

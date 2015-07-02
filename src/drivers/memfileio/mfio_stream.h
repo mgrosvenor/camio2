@@ -20,7 +20,8 @@ camio_error_t mfio_stream_construct(
     camio_stream_t* this,
     camio_connector_t* connector,
     int base_fd,
-    camio_buffer_t mmap_buff
+    void* base_mem_start,
+    ch_word base_mem_len
 );
 
 #endif /* SRC_DRIVERS_MFIO_MFIO_STREAM_H_ */
