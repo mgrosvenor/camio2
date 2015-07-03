@@ -156,16 +156,17 @@ camio_error_t camio_transport_params_new( ch_cstr uri_str, void** params_o, ch_w
     CH_LIST(KV)* uri_opts = uri->key_vals;
     DBG("Iterating over %i parameters...\n", params->count);
     //DBG("params->first=%p, params->end=%p, uri_opts=%p\n", params->first, params->end, uri_opts);
-    for( camio_transport_param_t* param = params->first;
-         param != params->end && uri_opts;
-         param = params->next(params,param) ){
+    for( camio_transport_param_t* param = params->first; param != params->end; param = params->next(params,param) ){
 
         //Search for the parameter name (ie key) in the key/value uri options list. This should answer the question,
         //"Was the parameter with a given name present in the URI supplied".
-        key_val kv = { .key = param->param_name, .key_len = strlen(param->param_name) };
-        CH_LIST_IT(KV) first = uri_opts->first(uri_opts);
-        CH_LIST_IT(KV) end   = uri_opts->end(uri_opts);
-        CH_LIST_IT(KV) found = uri_opts->find(uri_opts,&first, &end, kv);
+        CH_LIST_IT(KV) found = {0};
+        if(uri_opts){
+            key_val kv = { .key = param->param_name, .key_len = strlen(param->param_name) };
+            CH_LIST_IT(KV) first = uri_opts->first(uri_opts);
+            CH_LIST_IT(KV) end   = uri_opts->end(uri_opts);
+            found = uri_opts->find(uri_opts,&first, &end, kv);
+        }
 
         //We found it! OK. try to num parse it just in case its a number. If not, this will have no effect.
         num_result_t num_result = {0};
