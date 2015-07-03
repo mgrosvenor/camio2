@@ -13,9 +13,10 @@
 
 #include <src/transports/stream.h>
 #include <src/transports/connector.h>
+#include "udp_transport.h"
 
 NEW_STREAM_DECLARE(udp);
 
-camio_error_t udp_stream_construct(camio_stream_t* this, camio_connector_t* connector, int rd_fd, int wr_fd);
+camio_error_t udp_stream_construct(camio_stream_t* this, camio_connector_t* connector, udp_params_t* params, int rd_fd, int wr_fd);
 
 #endif /* SRC_DRIVERS_UDP_UDP_STREAM_H_ */

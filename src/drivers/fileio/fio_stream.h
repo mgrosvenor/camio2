@@ -14,8 +14,10 @@
 #include <src/transports/stream.h>
 #include <src/transports/connector.h>
 
+#include "fio_transport.h"
+
 NEW_STREAM_DECLARE(fio);
 
-camio_error_t fio_stream_construct(camio_stream_t* this, camio_connector_t* connector, int fd);
+camio_error_t fio_stream_construct(camio_stream_t* this, camio_connector_t* connector, fio_params_t* params, int fd);
 
 #endif /* SRC_DRIVERS_FIO_FIO_STREAM_H_ */

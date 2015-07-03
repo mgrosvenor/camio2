@@ -22,6 +22,8 @@ typedef struct tcp_global_s{
 typedef struct {
     len_string_t hierarchical;
     int64_t listen;
+    ch_word rd_buff_sz;
+    ch_word wr_buff_sz;
 } tcp_params_t;
 
 void tcp_init();

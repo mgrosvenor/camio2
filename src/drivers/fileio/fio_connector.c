@@ -107,7 +107,7 @@ static camio_error_t fio_connect(camio_connector_t* this, camio_stream_t** strea
     }
     *stream_o = stream;
 
-    err = fio_stream_construct(stream, this, priv->base_fd);
+    err = fio_stream_construct(stream, this, priv->params, priv->base_fd);
     if(err){
        return err;
     }

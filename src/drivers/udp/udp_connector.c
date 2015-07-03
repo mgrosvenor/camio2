@@ -181,7 +181,7 @@ static camio_error_t udp_connect(camio_connector_t* this, camio_stream_t** strea
     }
     *stream_o = stream;
 
-    err = udp_stream_construct(stream, this, priv->rd_fd, priv->wr_fd);
+    err = udp_stream_construct(stream, this, priv->params, priv->rd_fd, priv->wr_fd);
     if(err){
        return err;
     }

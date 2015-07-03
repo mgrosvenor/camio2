@@ -13,9 +13,10 @@
 
 #include <src/transports/stream.h>
 #include <src/transports/connector.h>
+#include "tcp_transport.h"
 
 NEW_STREAM_DECLARE(tcp);
 
-camio_error_t tcp_stream_construct(camio_stream_t* this, camio_connector_t* connector, int fd);
+camio_error_t tcp_stream_construct(camio_stream_t* this, camio_connector_t* connector, tcp_params_t* params, int fd);
 
 #endif /* SRC_DRIVERS_TCP_TCP_STREAM_H_ */

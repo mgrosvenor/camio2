@@ -13,8 +13,8 @@
 
 #include <src/drivers/tcp/tcp_connector.h>
 #include <src/drivers/tcp/tcp_transport.h>
-#include "../../camio.h"
-#include "../../camio_debug.h"
+#include <src/camio.h>
+#include <src/camio_debug.h>
 #include <src/types/transport_params_vec.h>
 
 static const char* const scheme = "tcp";
@@ -46,6 +46,8 @@ void tcp_init()
     }
 
     add_param_optional(params,"listen",tcp_params_t,listen, 0);
+    add_param_optional(params,"rd_buff_sz",tcp_params_t,rd_buff_sz, 4 * 1024 * 1024);
+    add_param_optional(params,"wr_buff_sz",tcp_params_t,wr_buff_sz, 4 * 1024 * 1024);
     const ch_word hier_offset = offsetof(tcp_params_t,hierarchical);
     DBG("Hierarchical offset=%i...Done\n", hier_offset);
 

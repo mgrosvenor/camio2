@@ -26,6 +26,8 @@ typedef struct {
     len_string_t wr_address;
     len_string_t rd_protocol;
     len_string_t wr_protocol;
+    ch_word rd_buff_sz;
+    ch_word wr_buff_sz;
 } udp_params_t;
 
 void udp_init();

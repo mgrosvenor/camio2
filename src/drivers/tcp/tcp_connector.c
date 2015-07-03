@@ -248,7 +248,7 @@ static camio_error_t tcp_connect(camio_connector_t* this, camio_stream_t** strea
     }
     *stream_o = stream;
 
-    err = tcp_stream_construct(stream, this, priv->con_fd_tmp);
+    err = tcp_stream_construct(stream, this,priv->params, priv->con_fd_tmp);
     if(err){
        return err;
     }

@@ -23,6 +23,8 @@ typedef struct fio_global_s{
 
 typedef struct {
     len_string_t hierarchical;
+    ch_word rd_buff_sz;
+    ch_word wr_buff_sz;
 } fio_params_t;
 
 void fio_init();

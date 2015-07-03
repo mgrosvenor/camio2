@@ -23,7 +23,6 @@
 /**************************************************************************************************************************
  * PER STREAM STATE
  **************************************************************************************************************************/
-#define CAMIO_FIO_BUFFER_SIZE (16 * 1024)
 //Current (simple) FIO recv only does one buffer at a time, this could change with vectored I/O in the future.
 #define CAMIO_FIO_BUFFER_COUNT (1)
 
@@ -32,6 +31,8 @@ typedef struct fio_stream_priv_s {
 
     //The actual underlying file descriptor that we're going to work with. Default is -1
     int fd;
+    ch_word rd_buff_sz;
+    ch_word wr_buff_sz;
 
     //Buffer pools for data -- This is really a place holder for vectored I/O in the future
     buffer_malloc_linear_t* rd_buff_pool;
@@ -80,22 +81,22 @@ static camio_error_t fio_read_peek( camio_stream_t* this)
         DBG("This is FIO, you're not allowed to have a source offset!\n"); //WTF?
         return CAMIO_EINVALID;
     }
-    if( req->dst_offset_hint > CAMIO_FIO_BUFFER_SIZE){
+    if( req->dst_offset_hint > priv->rd_buff_sz){
         DBG("You're trying to set a buffer offset (%i) which is greater than the buffer size (%i) ???\n",
-                req->dst_offset_hint, CAMIO_FIO_BUFFER_SIZE); //WTF?
+                req->dst_offset_hint, priv->rd_buff_sz); //WTF?
         return CAMIO_EINVALID;
     }
     if(req->read_size_hint == CAMIO_READ_REQ_SIZE_ANY){
-        req->read_size_hint = CAMIO_FIO_BUFFER_SIZE;
+        req->read_size_hint = priv->rd_buff_sz;
     }
-    if(req->read_size_hint > CAMIO_FIO_BUFFER_SIZE){
+    if(req->read_size_hint > priv->rd_buff_sz){
         //TODO XXX: Could realloc buffer here to be the right size...
-        req->read_size_hint = CAMIO_FIO_BUFFER_SIZE;
+        req->read_size_hint = priv->rd_buff_sz;
     }
 
-    req->dst_offset_hint = MIN(CAMIO_FIO_BUFFER_SIZE, req->dst_offset_hint); //Make sure we don't overflow the buffer
+    req->dst_offset_hint = MIN(priv->rd_buff_sz, req->dst_offset_hint); //Make sure we don't overflow the buffer
     char* read_buffer = (char*)priv->rd_buffer->__internal.__mem_start + req->dst_offset_hint; //Do the offset that we need
-    ch_word read_size = CAMIO_FIO_BUFFER_SIZE - req->dst_offset_hint; //Also make sure we don't overflow
+    ch_word read_size = priv->rd_buff_sz - req->dst_offset_hint; //Also make sure we don't overflow
     read_size = MIN(read_size,req->read_size_hint);
 
     ch_word bytes = read(priv->fd, read_buffer, read_size);
@@ -455,8 +456,6 @@ static camio_error_t fio_write_release(camio_stream_t* this, camio_wr_buffer_t**
 
 
 
-
-
 /**************************************************************************************************************************
  * SETUP/CLEANUP FUNCTIONS
  **************************************************************************************************************************/
@@ -488,7 +487,7 @@ static void fio_destroy(camio_stream_t* this)
 
 }
 
-camio_error_t fio_stream_construct(camio_stream_t* this, camio_connector_t* connector, int fd)
+camio_error_t fio_stream_construct(camio_stream_t* this, camio_connector_t* connector, fio_params_t* params, int fd)
 {
     //Basic sanity checks -- TODO XXX: Should these be made into (compile time optional?) asserts for runtime performance?
     if( NULL == this){
@@ -497,8 +496,10 @@ camio_error_t fio_stream_construct(camio_stream_t* this, camio_connector_t* conn
     }
     fio_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
 
-    priv->connector = *connector; //Keep a copy of the connector state
-    priv->fd = fd;
+    priv->connector     = *connector; //Keep a copy of the connector state
+    priv->fd            = fd;
+    priv->rd_buff_sz    = params->rd_buff_sz;
+    priv->wr_buff_sz    = params->wr_buff_sz;
 
     //Make sure the file descriptors are in non-blocking mode
     int flags = fcntl(priv->fd, F_GETFL, 0);
@@ -506,12 +507,12 @@ camio_error_t fio_stream_construct(camio_stream_t* this, camio_connector_t* conn
     //posix_fadvise64(priv->fd, 0, 0, POSIX_FADV_SEQUENTIAL);
 
     camio_error_t error = CAMIO_ENOERROR;
-    error = buffer_malloc_linear_new(this,CAMIO_FIO_BUFFER_SIZE,CAMIO_FIO_BUFFER_COUNT,true,&priv->rd_buff_pool);
+    error = buffer_malloc_linear_new(this,priv->rd_buff_sz,CAMIO_FIO_BUFFER_COUNT,true,&priv->rd_buff_pool);
     if(error){
         DBG("No memory for linear read buffer!\n");
         return CAMIO_ENOMEM;
     }
-    error = buffer_malloc_linear_new(this,CAMIO_FIO_BUFFER_SIZE,CAMIO_FIO_BUFFER_COUNT,false,&priv->wr_buff_pool);
+    error = buffer_malloc_linear_new(this,priv->wr_buff_sz,CAMIO_FIO_BUFFER_COUNT,false,&priv->wr_buff_pool);
     if(error){
         DBG("No memory for linear write buffer!\n");
         return CAMIO_ENOMEM;

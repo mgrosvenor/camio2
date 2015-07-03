@@ -25,7 +25,6 @@
 /**************************************************************************************************************************
  * PER STREAM STATE
  **************************************************************************************************************************/
-#define CAMIO_UDP_BUFFER_SIZE (64 * 1024) //TODO XXX -- this should be converted to a stream option
 //Current (simple) UDP recv only does one buffer at a time, this could change with vectored I/O in the future.
 #define CAMIO_UDP_BUFFER_COUNT (1)
 
@@ -35,6 +34,8 @@ typedef struct udp_stream_priv_s {
     //These are the actual underlying file descriptors that we're going to work with. Defualt is -1
     int rd_fd;
     int wr_fd;
+    ch_word rd_buff_sz;
+    ch_word wr_buff_sz;
 
     //Buffer pools for data -- This is really a place holder for vectored I/O in the future
     buffer_malloc_linear_t* rd_buff_pool;
@@ -71,29 +72,29 @@ static camio_error_t udp_read_peek( camio_stream_t* this)
     udp_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
     camio_error_t err = buffer_malloc_linear_acquire(priv->rd_buff_pool,&priv->rd_buffer);
     if(err){
-        DBG("Could not acquire read buffer Have you called release?!\n");
+        ERR("Could not acquire read buffer Have you called release?!\n");
         return err;
     }
 
     //TODO XXX: Should convert this logic to use recvmesg instead, and put meta-data in meta struct, including overflow
     //          errors etc.
     camio_read_req_t * req = priv->read_req;
-    if( req->dst_offset_hint > CAMIO_UDP_BUFFER_SIZE){
-        DBG("You're trying to set a buffer offset (%i) which is greater than the buffer size (%i) ???\n",
-                req->dst_offset_hint, CAMIO_UDP_BUFFER_SIZE); //WTF?
+    if( req->dst_offset_hint > priv->rd_buff_sz){
+        ERR("You're trying to set a buffer offset (%i) which is greater than the buffer size (%i) ???\n",
+                req->dst_offset_hint, priv->rd_buff_sz); //WTF?
         return CAMIO_EINVALID;
     }
     if(req->read_size_hint == CAMIO_READ_REQ_SIZE_ANY){
-        req->read_size_hint = CAMIO_UDP_BUFFER_SIZE;
+        req->read_size_hint = priv->rd_buff_sz;
     }
-    if(req->read_size_hint > CAMIO_UDP_BUFFER_SIZE){
+    if(req->read_size_hint > priv->rd_buff_sz){
         //TODO XXX: Could realloc buffer here to be the right size...
-        req->read_size_hint = CAMIO_UDP_BUFFER_SIZE;
+        req->read_size_hint = priv->rd_buff_sz;
     }
 
-    req->dst_offset_hint = MIN(CAMIO_UDP_BUFFER_SIZE, req->dst_offset_hint); //Make sure we don't overflow the buffer
+    req->dst_offset_hint = MIN(priv->rd_buff_sz, req->dst_offset_hint); //Make sure we don't overflow the buffer
     char* read_buffer = (char*)priv->rd_buffer->__internal.__mem_start + req->dst_offset_hint; //Do the offset that we need
-    ch_word read_size = CAMIO_UDP_BUFFER_SIZE - req->dst_offset_hint; //Also make sure we don't overflow
+    ch_word read_size = priv->rd_buff_sz - req->dst_offset_hint; //Also make sure we don't overflow
     read_size = MIN(read_size,req->read_size_hint);
 
     ch_word bytes = read(priv->rd_fd, read_buffer, read_size);
@@ -105,7 +106,7 @@ static camio_error_t udp_read_peek( camio_stream_t* this)
             return CAMIO_ETRYAGAIN;
         }
         else{
-            DBG("Something else went wrong, check errno value\n");
+            ERR("Something else went wrong, check errno value: %s\n", strerror(errno));
             return CAMIO_ECHECKERRORNO;
         }
     }
@@ -120,6 +121,7 @@ static camio_error_t udp_read_peek( camio_stream_t* this)
 
 static camio_error_t udp_read_ready(camio_muxable_t* this)
 {
+   // DBG("Doing read ready\n");
     //Basic sanity checks -- TODO XXX: Should these be made into (compile time optional?) asserts for runtime performance?
     if( NULL == this){
         DBG("This is null???\n"); //WTF?
@@ -157,7 +159,7 @@ static camio_error_t udp_read_ready(camio_muxable_t* this)
         return CAMIO_ENOTREADY;
     }
 
-    DBG("Something bad happened!\n");
+    ERR("Something bad happened! %lli\n", err);
     return err;
 
 
@@ -177,16 +179,16 @@ static camio_error_t udp_read_request(camio_stream_t* this, camio_read_req_t* re
         DBG("Stream currently only supports read requests of size 1\n"); //TODO this should be coded in the features struct
         return CAMIO_EINVALID;
     }
-    priv->read_req_len = req_vec_len;
+
     //WARNING: Code below here assumes that req len == 1!!
 
     if( req_vec->src_offset_hint != CAMIO_READ_REQ_SRC_OFFSET_NONE){
         DBG("This is UDP, you're not allowed to have a source offset!\n"); //WTF?
         return CAMIO_EINVALID;
     }
-    if( req_vec->dst_offset_hint > CAMIO_UDP_BUFFER_SIZE){
+    if( req_vec->dst_offset_hint > priv->rd_buff_sz){
         DBG("You're trying to set a buffer offset (%i) which is greater than the buffer size (%i) ???\n",
-                req_vec->dst_offset_hint, CAMIO_UDP_BUFFER_SIZE); //WTF?
+                req_vec->dst_offset_hint, priv->rd_buff_sz); //WTF?
         return CAMIO_EINVALID;
     }
 
@@ -196,14 +198,16 @@ static camio_error_t udp_read_request(camio_stream_t* this, camio_read_req_t* re
     }
 
     if(req_vec->read_size_hint > 0){
-        if(req_vec->read_size_hint > CAMIO_UDP_BUFFER_SIZE){
+        if(req_vec->read_size_hint > priv->rd_buff_sz){
             //TODO XXX: Could realloc buffer here to be the right size...
-            req_vec->read_size_hint = CAMIO_UDP_BUFFER_SIZE;
+            req_vec->read_size_hint = priv->rd_buff_sz;
         }
     }
 
     //Sanity checks done, do some work now
-    priv->read_registered = true;
+    priv->read_registered   = true;
+    priv->read_req_len      = req_vec_len;
+    priv->read_req          = req_vec;
 
     DBG("Doing UDP read register...Done!..Successful\n");
     return CAMIO_ENOERROR;
@@ -504,7 +508,7 @@ static void udp_destroy(camio_stream_t* this)
 
 }
 
-camio_error_t udp_stream_construct(camio_stream_t* this, camio_connector_t* connector, int rd_fd, int wr_fd)
+camio_error_t udp_stream_construct(camio_stream_t* this, camio_connector_t* connector, udp_params_t* params, int rd_fd, int wr_fd)
 {
     //Basic sanity checks -- TODO XXX: Should these be made into (compile time optional?) asserts for runtime performance?
     if( NULL == this){
@@ -516,6 +520,8 @@ camio_error_t udp_stream_construct(camio_stream_t* this, camio_connector_t* conn
     priv->connector = *connector; //Keep a copy of the connector state
     priv->rd_fd = rd_fd;
     priv->wr_fd = wr_fd;
+    priv->rd_buff_sz    = params->rd_buff_sz;
+    priv->wr_buff_sz    = params->wr_buff_sz;
 
     //Make sure the file descriptors are in non-blocking mode
     int flags = fcntl(priv->rd_fd, F_GETFL, 0);
@@ -524,12 +530,12 @@ camio_error_t udp_stream_construct(camio_stream_t* this, camio_connector_t* conn
     fcntl(priv->wr_fd, F_SETFL, flags | O_NONBLOCK);
 
     camio_error_t error = CAMIO_ENOERROR;
-    error = buffer_malloc_linear_new(this,CAMIO_UDP_BUFFER_SIZE,CAMIO_UDP_BUFFER_COUNT,true,&priv->rd_buff_pool);
+    error = buffer_malloc_linear_new(this,priv->rd_buff_sz,CAMIO_UDP_BUFFER_COUNT,true,&priv->rd_buff_pool);
     if(error){
         DBG("No memory for linear read buffer!\n");
         return CAMIO_ENOMEM;
     }
-    error = buffer_malloc_linear_new(this,CAMIO_UDP_BUFFER_SIZE,CAMIO_UDP_BUFFER_COUNT,false,&priv->wr_buff_pool);
+    error = buffer_malloc_linear_new(this,priv->wr_buff_sz,CAMIO_UDP_BUFFER_COUNT,false,&priv->wr_buff_pool);
     if(error){
         DBG("No memory for linear write buffer!\n");
         return CAMIO_ENOMEM;

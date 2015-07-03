@@ -32,6 +32,9 @@
 typedef struct tcp_stream_priv_s {
     camio_connector_t connector;
 
+    ch_word rd_buff_sz;
+    ch_word wr_buff_sz;
+
     //The actual underlying file descriptor that we're going to work with. Default is -1
     int fd;
 
@@ -82,22 +85,22 @@ static camio_error_t tcp_read_peek( camio_stream_t* this)
         DBG("This is TCP, you're not allowed to have a source offset!\n"); //WTF?
         return CAMIO_EINVALID;
     }
-    if( req->dst_offset_hint > CAMIO_TCP_BUFFER_SIZE){
+    if( req->dst_offset_hint > priv->rd_buff_sz){
         DBG("You're trying to set a buffer offset (%i) which is greater than the buffer size (%i) ???\n",
-                req->dst_offset_hint, CAMIO_TCP_BUFFER_SIZE); //WTF?
+                req->dst_offset_hint, priv->rd_buff_sz); //WTF?
         return CAMIO_EINVALID;
     }
     if(req->read_size_hint == CAMIO_READ_REQ_SIZE_ANY){
-        req->read_size_hint = CAMIO_TCP_BUFFER_SIZE;
+        req->read_size_hint = priv->rd_buff_sz;
     }
-    if(req->read_size_hint > CAMIO_TCP_BUFFER_SIZE){
+    if(req->read_size_hint > priv->rd_buff_sz){
         //TODO XXX: Could realloc buffer here to be the right size...
-        req->read_size_hint = CAMIO_TCP_BUFFER_SIZE;
+        req->read_size_hint = priv->rd_buff_sz;
     }
 
-    req->dst_offset_hint = MIN(CAMIO_TCP_BUFFER_SIZE, req->dst_offset_hint); //Make sure we don't overflow the buffer
+    req->dst_offset_hint = MIN(priv->rd_buff_sz, req->dst_offset_hint); //Make sure we don't overflow the buffer
     char* read_buffer = (char*)priv->rd_buffer->__internal.__mem_start + req->dst_offset_hint; //Do the offset that we need
-    ch_word read_size = CAMIO_TCP_BUFFER_SIZE - req->dst_offset_hint; //Also make sure we don't overflow
+    ch_word read_size = priv->rd_buff_sz - req->dst_offset_hint; //Also make sure we don't overflow
     read_size = MIN(read_size,req->read_size_hint);
 
     ch_word bytes = read(priv->fd, read_buffer, read_size);
@@ -491,7 +494,7 @@ static void tcp_destroy(camio_stream_t* this)
 
 }
 
-camio_error_t tcp_stream_construct(camio_stream_t* this, camio_connector_t* connector, int fd)
+camio_error_t tcp_stream_construct(camio_stream_t* this, camio_connector_t* connector, tcp_params_t* params, int fd)
 {
     //Basic sanity checks -- TODO XXX: Should these be made into (compile time optional?) asserts for runtime performance?
     if( NULL == this){
@@ -500,20 +503,22 @@ camio_error_t tcp_stream_construct(camio_stream_t* this, camio_connector_t* conn
     }
     tcp_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
 
-    priv->connector = *connector; //Keep a copy of the connector state
-    priv->fd = fd;
+    priv->connector     = *connector; //Keep a copy of the connector state
+    priv->fd            = fd;
+    priv->rd_buff_sz    = params->rd_buff_sz;
+    priv->wr_buff_sz    = params->wr_buff_sz;
 
     //Make sure the file descriptors are in non-blocking mode
     int flags = fcntl(priv->fd, F_GETFL, 0);
     fcntl(priv->fd, F_SETFL, flags | O_NONBLOCK);
 
     camio_error_t error = CAMIO_ENOERROR;
-    error = buffer_malloc_linear_new(this,CAMIO_TCP_BUFFER_SIZE,CAMIO_TCP_BUFFER_COUNT,true,&priv->rd_buff_pool);
+    error = buffer_malloc_linear_new(this,priv->rd_buff_sz,CAMIO_TCP_BUFFER_COUNT,true,&priv->rd_buff_pool);
     if(error){
         DBG("No memory for linear read buffer!\n");
         return CAMIO_ENOMEM;
     }
-    error = buffer_malloc_linear_new(this,CAMIO_TCP_BUFFER_SIZE,CAMIO_TCP_BUFFER_COUNT,false,&priv->wr_buff_pool);
+    error = buffer_malloc_linear_new(this,priv->wr_buff_sz,CAMIO_TCP_BUFFER_COUNT,false,&priv->wr_buff_pool);
     if(error){
         DBG("No memory for linear write buffer!\n");
         return CAMIO_ENOMEM;
@@ -528,7 +533,6 @@ camio_error_t tcp_stream_construct(camio_stream_t* this, camio_connector_t* conn
     this->wr_muxable.parent.stream     = this;
     this->wr_muxable.vtable.ready      = tcp_write_ready;
     this->wr_muxable.fd                = priv->fd;
-
 
     DBG("Done constructing TCP stream with read_fd=%i and write_fd=%i\n", fd, fd);
     return CAMIO_ENOERROR;
