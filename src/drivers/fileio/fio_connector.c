@@ -35,7 +35,8 @@ typedef struct fio_priv_s {
     fio_params_t* params;  //Parameters used when a connection happens
 
     bool is_connected;          //Has connect be called?
-    int base_fd;                //File descriptor for the backing buffer
+    int base_rd_fd;             //File descriptor for reading
+    int base_wr_fd;             //File descriptor for writing
 
 } fio_connector_priv_t;
 
@@ -52,21 +53,45 @@ static camio_error_t fio_connect_peek(camio_connector_t* this)
     DBG("Doing connect peek\n");
     fio_connector_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
 
-    if(priv->base_fd > -1 ){
+    if(priv->base_rd_fd > -1 && priv->base_wr_fd > -1){
         return CAMIO_ENOERROR; //Ready to go, please call connect!
     }
 
     //Open up the file and get it ready to connect
-    priv->base_fd = open(priv->params->hierarchical.str, O_RDONLY);
-    if(priv->base_fd < 0){
-        DBG("Could not open file \"%s\". Error=%s\n", priv->params->hierarchical.str, strerror(errno));
+    //This is the mode that the user has requested
+    int mode = O_RDWR;
+        mode = priv->params->rd_only ? O_RDONLY : mode;
+        mode = priv->params->wr_only ? O_WRONLY : mode;
+
+     //But ... if the read file is already open, then write only is the only possibility
+    if(priv->base_rd_fd > -1){
+        mode = O_WRONLY;
+    }
+    //And ... if the write file is already open, then read only is the only possibility
+    if(priv->base_wr_fd > -1){
+        mode = O_RDONLY;
+    }
+
+    //OK, now open the file
+    int tmp_fd = open(priv->params->hierarchical.str, mode);
+    if(tmp_fd < 0){
+        ERR("Could not open file \"%s\". Error=%s\n", priv->params->hierarchical.str, strerror(errno));
         return CAMIO_EINVALID;
     }
 
-    //Get the file size
-    struct stat st;
-    stat(priv->params->hierarchical.str, &st);
-    DBG("Got file size of %lli\n", st.st_size);
+    //And assign the descriptors
+    if(priv->base_rd_fd < 0){
+        priv->base_rd_fd = tmp_fd;
+    }
+    if(priv->base_wr_fd < 0){
+        priv->base_wr_fd = tmp_fd;
+    }
+
+
+//    //Get the file size
+//    struct stat st;
+//    stat(priv->params->hierarchical.str, &st);
+//    DBG("Got file size of %lli\n", st.st_size);
 
     return CAMIO_ENOERROR;
 
@@ -95,7 +120,7 @@ static camio_error_t fio_connect(camio_connector_t* this, camio_stream_t** strea
     }
 
     if(priv->is_connected){
-        DBG("Already connected! Why are you calling this twice?\n");
+        ERR("Already connected! Why are you calling this twice?\n");
         return CAMIO_EALLREADYCONNECTED; // We're already connected!
     }
 
@@ -107,7 +132,7 @@ static camio_error_t fio_connect(camio_connector_t* this, camio_stream_t** strea
     }
     *stream_o = stream;
 
-    err = fio_stream_construct(stream, this, priv->params, priv->base_fd);
+    err = fio_stream_construct(stream, this, priv->params, priv->base_rd_fd, priv->base_wr_fd);
     if(err){
        return err;
     }
@@ -134,13 +159,38 @@ static camio_error_t fio_construct(camio_connector_t* this, void** params, ch_wo
     fio_params_t* fio_params = (fio_params_t*)(*params);
     priv->params = fio_params;
 
-    //We require a hierarchical part!
-    if(fio_params->hierarchical.str_len == 0){
-        DBG("Expecting a hierarchical part in the FIO URI, but none was given. e.g /dir/myfile.blob\n");
-        return CAMIO_EINVALID; //TODO XXX : Need better error values
+    //We must have a file descriptor or a file name
+    if(fio_params->hierarchical.str_len == 0 && fio_params->rd_fd < 0 && fio_params->wr_fd < 0){
+        ERR("Expecting either a file name or a file descriptor. You have supplied neither try fio:filename\n");
+        return CAMIO_EINVALID;
+    }
+    if(fio_params->hierarchical.str_len > 0 && fio_params->rd_fd >-1 && fio_params->wr_fd >-1){
+        ERR("Expecting either a file name or a file descriptor. You have supplied both!");
+        return CAMIO_EINVALID;
     }
 
-    priv->base_fd = -1;
+    if(fio_params->rd_only && fio_params->wr_only){
+        ERR("File I/O cannot be read only and write only at the same time\n");
+        return CAMIO_EINVALID;
+    }
+
+    //If the user has passed in a file descriptor, let's use that, otherwise we'll use the file name later in connect
+    priv->base_rd_fd = -1;
+    priv->base_wr_fd = -1;
+    if(fio_params->rd_fd > -1){
+        if(fio_params->wr_only){
+            ERR("A read file descriptor is supplied, but write only is set.\n");
+            return CAMIO_EINVALID;
+        }
+        priv->base_rd_fd = fio_params->rd_fd;
+    }
+    if(fio_params->wr_fd > -1){
+        if(fio_params->rd_only){
+            ERR("A write file descriptor is supplied, but read only is set.\n");
+            return CAMIO_EINVALID;
+        }
+        priv->base_wr_fd = fio_params->wr_fd;
+    }
 
     //Populate the rest of the muxable structure
     this->muxable.mode              = CAMIO_MUX_MODE_CONNECT;

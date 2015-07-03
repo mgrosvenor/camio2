@@ -48,7 +48,11 @@ void fio_init()
 
     //add_param_optional(params,"ra",fio_params_t,rd_address,"");
     add_param_optional(params,"rd_buff_sz",fio_params_t,rd_buff_sz, 32 * 1024);
-    add_param_optional(params,"we_buff_sz",fio_params_t,rd_buff_sz, 32 * 1024);
+    add_param_optional(params,"wr_buff_sz",fio_params_t,rd_buff_sz, 32 * 1024);
+    add_param_optional(params,"rd_fd",fio_params_t,rd_fd, -1);
+    add_param_optional(params,"wr_fd",fio_params_t,wr_fd, -1);
+    add_param_optional(params,"RO",fio_params_t,rd_only, 0); //read only
+    add_param_optional(params,"WO",fio_params_t,wr_only, 0); //write only
     const ch_word hier_offset = offsetof(fio_params_t,hierarchical);
     DBG("Hierarchical offset=%i...Done\n", hier_offset);
 

@@ -25,6 +25,10 @@ typedef struct {
     len_string_t hierarchical;
     ch_word rd_buff_sz;
     ch_word wr_buff_sz;
+    ch_word rd_fd;
+    ch_word wr_fd;
+    ch_word rd_only;
+    ch_word wr_only;
 } fio_params_t;
 
 void fio_init();

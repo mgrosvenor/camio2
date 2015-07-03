@@ -18,6 +18,6 @@
 
 NEW_STREAM_DECLARE(fio);
 
-camio_error_t fio_stream_construct(camio_stream_t* this, camio_connector_t* connector, fio_params_t* params, int fd);
+camio_error_t fio_stream_construct(camio_stream_t* this, camio_connector_t* connector, fio_params_t* params, int rd_fd, int wr_fd);
 
 #endif /* SRC_DRIVERS_FIO_FIO_STREAM_H_ */

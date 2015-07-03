@@ -29,8 +29,9 @@
 typedef struct fio_stream_priv_s {
     camio_connector_t connector;
 
-    //The actual underlying file descriptor that we're going to work with. Default is -1
-    int fd;
+    //The actual underlying file descriptors that we're going to work with. Default is -1
+    int rd_fd;
+    int wr_fd;
     ch_word rd_buff_sz;
     ch_word wr_buff_sz;
 
@@ -99,7 +100,7 @@ static camio_error_t fio_read_peek( camio_stream_t* this)
     ch_word read_size = priv->rd_buff_sz - req->dst_offset_hint; //Also make sure we don't overflow
     read_size = MIN(read_size,req->read_size_hint);
 
-    ch_word bytes = read(priv->fd, read_buffer, read_size);
+    ch_word bytes = read(priv->rd_fd, read_buffer, read_size);
     if(bytes < 0){ //Shit, got an error. Maybe there just isn't any data?
         buffer_malloc_linear_release(priv->rd_buff_pool,&priv->rd_buffer); //TODO, could remove this step and reuse buffer..
         priv->rd_buffer = NULL;
@@ -337,13 +338,13 @@ static camio_error_t fio_write_try(camio_stream_t* this)
     for(int i = priv->write_req_curr; i < priv->write_req_len; i++){
         camio_write_req_t* req = priv->write_req + i;
         camio_buffer_t* buff   = req->buffer;
-        DBG("Trying to writing %li bytes from %p to %i\n", buff->data_len,buff->data_start, priv->fd);
+        DBG("Trying to writing %li bytes from %p to %i\n", buff->data_len,buff->data_start, priv->wr_fd);
 
         if(req->buffer->__internal.__parent != this){
             DBG("Warning -- detected request to write from buffer not belonging to this stream\n");
         }
 
-        ch_word bytes = write(priv->fd,buff->data_start,buff->data_len);
+        ch_word bytes = write(priv->wr_fd,buff->data_start,buff->data_len);
         if(bytes < 0){
             if(errno == EWOULDBLOCK || errno == EAGAIN){
                 return CAMIO_ETRYAGAIN;
@@ -469,11 +470,15 @@ static void fio_destroy(camio_stream_t* this)
     }
     fio_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
 
-    if(priv->fd > -1){
-        close(priv->fd);
-        priv->fd = -1; //Make this reentrant safe
+    if(priv->rd_fd > -1){
+        close(priv->rd_fd);
+        priv->rd_fd = -1; //Make this reentrant safe
     }
 
+    if(priv->wr_fd > -1){
+        close(priv->wr_fd);
+        priv->wr_fd = -1; //Make this reentrant safe
+    }
 
     if(priv->rd_buff_pool){
         buffer_malloc_linear_destroy(&priv->rd_buff_pool);
@@ -487,7 +492,7 @@ static void fio_destroy(camio_stream_t* this)
 
 }
 
-camio_error_t fio_stream_construct(camio_stream_t* this, camio_connector_t* connector, fio_params_t* params, int fd)
+camio_error_t fio_stream_construct(camio_stream_t* this, camio_connector_t* connector, fio_params_t* params, int rd_fd, int wr_fd)
 {
     //Basic sanity checks -- TODO XXX: Should these be made into (compile time optional?) asserts for runtime performance?
     if( NULL == this){
@@ -497,14 +502,16 @@ camio_error_t fio_stream_construct(camio_stream_t* this, camio_connector_t* conn
     fio_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
 
     priv->connector     = *connector; //Keep a copy of the connector state
-    priv->fd            = fd;
+    priv->rd_fd         = rd_fd;
+    priv->wr_fd         = wr_fd;
     priv->rd_buff_sz    = params->rd_buff_sz;
     priv->wr_buff_sz    = params->wr_buff_sz;
 
     //Make sure the file descriptors are in non-blocking mode
-    int flags = fcntl(priv->fd, F_GETFL, 0);
-    fcntl(priv->fd, F_SETFL, flags | O_NONBLOCK);
-    //posix_fadvise64(priv->fd, 0, 0, POSIX_FADV_SEQUENTIAL);
+    int flags = fcntl(priv->rd_fd, F_GETFL, 0);
+    fcntl(priv->rd_fd, F_SETFL, flags | O_NONBLOCK);
+    flags = fcntl(priv->wr_fd, F_GETFL, 0);
+    fcntl(priv->wr_fd, F_SETFL, flags | O_NONBLOCK);
 
     camio_error_t error = CAMIO_ENOERROR;
     error = buffer_malloc_linear_new(this,priv->rd_buff_sz,CAMIO_FIO_BUFFER_COUNT,true,&priv->rd_buff_pool);
@@ -521,15 +528,15 @@ camio_error_t fio_stream_construct(camio_stream_t* this, camio_connector_t* conn
     this->rd_muxable.mode              = CAMIO_MUX_MODE_READ;
     this->rd_muxable.parent.stream     = this;
     this->rd_muxable.vtable.ready      = fio_read_ready;
-    this->rd_muxable.fd                = priv->fd;
+    this->rd_muxable.fd                = priv->rd_fd;
 
     this->wr_muxable.mode              = CAMIO_MUX_MODE_WRITE;
     this->wr_muxable.parent.stream     = this;
     this->wr_muxable.vtable.ready      = fio_write_ready;
-    this->wr_muxable.fd                = priv->fd;
+    this->wr_muxable.fd                = priv->wr_fd;
 
 
-    DBG("Done constructing FIO stream with read_fd=%i and write_fd=%i\n", fd, fd);
+    DBG("Done constructing FIO stream with read_fd=%i and write_fd=%i\n", priv->rd_fd, priv->wr_fd);
     return CAMIO_ENOERROR;
 }
 

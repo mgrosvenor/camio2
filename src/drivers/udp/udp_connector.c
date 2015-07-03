@@ -70,7 +70,7 @@ static camio_error_t resolve_bind_connect(char* address, char* prot, ch_bool do_
     hints.ai_socktype = SOCK_DGRAM; //This could be more general in the future if the code is moved out of the UDP stream
     error = getaddrinfo(address, prot, &hints, &res0);
     if (error) {
-        DBG("Getaddrinfo() failed: %s\n", gai_strerror(error));
+        ERR("Getaddrinfo() failed: %s\n", gai_strerror(error));
         return CAMIO_EBADOPT;
     }
     s = -1;
@@ -102,7 +102,7 @@ static camio_error_t resolve_bind_connect(char* address, char* prot, ch_bool do_
         break;  /* okay we got one */
     }
     if (s < 0) {
-        DBG("Socket failed: %s\n", cause);
+        ERR("Socket failed: %s\n", cause);
         (void)cause; //For when debug is compiled out
         return CAMIO_EINVALID;
     }
@@ -149,10 +149,6 @@ static camio_error_t udp_connect_peek(udp_connector_priv_t* priv)
 static camio_error_t udp_connector_ready(camio_muxable_t* this)
 {
     udp_connector_priv_t* priv = CONNECTOR_GET_PRIVATE(this->parent.connector);
-//    if(priv->is_connected){
-//        return CAMIO_ENOTREADY;//Only allow one connection
-//    }
-
     if(priv->rd_fd > -1 || priv->wr_fd > -1){
         return CAMIO_EREADY;
     }
@@ -204,7 +200,7 @@ static camio_error_t udp_construct(camio_connector_t* this, void** params, ch_wo
     udp_connector_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
     //Basic sanity check that the params is the right one.
     if(params_size != sizeof(udp_params_t)){
-        DBG("Bad parameters structure passed\n");
+        ERR("Bad parameters structure passed\n");
         return CAMIO_EINVALID; //TODO XXX : Need better error values
     }
     udp_params_t* udp_params = (udp_params_t*)(*params);
@@ -221,7 +217,7 @@ static camio_error_t udp_construct(camio_connector_t* this, void** params, ch_wo
         udp_params->wr_address.str_len  &&
         udp_params->wr_protocol.str_len &&
         udp_params->hierarchical.str_len ){
-        DBG("A hierarchical part was supplied, but is not needed because options were supplied too.\n");
+        ERR("A hierarchical part was supplied, but is not needed because options were supplied too.\n");
         return CAMIO_EINVALID; //TODO XXX : Need better error values
     }
 
@@ -233,7 +229,7 @@ static camio_error_t udp_construct(camio_connector_t* this, void** params, ch_wo
 
         //We do require a hierarchical part!
         if(udp_params->hierarchical.str_len == 0){
-            DBG("Expecting a hierarchical part in the UDP URI, but none was given. e.g udp:localhost:2000\n");
+            ERR("Expecting a hierarchical part in the UDP URI, but none was given. e.g udp:localhost:2000\n");
             return CAMIO_EINVALID; //TODO XXX : Need better error values
         }
 
@@ -263,7 +259,7 @@ static camio_error_t udp_construct(camio_connector_t* this, void** params, ch_wo
 
         //Copy the protocols if we have them
         if( (udp_params->rd_protocol.str_len == 0 || udp_params->wr_protocol.str_len == 0) && protocol_mark == NULL){
-            DBG("Expecting a protocol mark in the UDP URI, but none was given. e.g udp:localhost:2000\n");
+            ERR("Expecting a protocol mark in the UDP URI, but none was given. e.g udp:localhost:2000\n");
             return CAMIO_EINVALID; //TODO XXX : Need better error values
         }
 

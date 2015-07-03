@@ -81,11 +81,11 @@ static camio_error_t resolve_bind_connect(char* address, char* prot, ch_bool do_
     hints.ai_socktype = SOCK_STREAM; //This could be more general in the future if the code is moved out of the TCP stream
     error = getaddrinfo(address, prot, &hints, &res_head);
     if (error) {
-        DBG("Getaddrinfo() failed: %s\n", gai_strerror(error));
+        ERR("Getaddrinfo() failed: %s\n", gai_strerror(error));
         return CAMIO_EBADOPT;
     }
     if(!res_head){//Not sure if this is even possible given the error check above?
-        DBG("Resolving address resulted in no options. Bad address??\n");
+        ERR("Resolving address resulted in no options. Bad address??\n");
         return CAMIO_EBADOPT;
     }
 
@@ -135,7 +135,7 @@ static camio_error_t resolve_bind_connect(char* address, char* prot, ch_bool do_
         //Other errors probably are fatal
         const char* error_str = tcp_error_strs[error];
         (void)error_str;
-        DBG("Creating socket failed: %s\n", error_str);
+        ERR("Creating socket failed: %s\n", error_str);
         return CAMIO_EINVALID; //OK. We were not ready to connect for some reason. TODO XXX better error code here
     }
 
@@ -172,7 +172,7 @@ static camio_error_t tcp_connect_peek(camio_connector_t* this)
         //Mark the socket as listening if needed
         if(priv->params->listen){
            if(listen(this->muxable.fd,1024)){
-               DBG("Failed to listen with error %s\n", strerror(errno));
+               ERR("Failed to listen with error %s\n", strerror(errno));
                return CAMIO_ECHECKERRORNO;
            }
         }
@@ -193,7 +193,7 @@ static camio_error_t tcp_connect_peek(camio_connector_t* this)
             return CAMIO_ETRYAGAIN;
         }
         else{
-            DBG("Something else went wrong, check errno value (%s)\n",strerror(errno));
+            ERR("Something else went wrong, check errno value (%s)\n",strerror(errno));
             return CAMIO_ECHECKERRORNO;
         }
     }
@@ -209,12 +209,12 @@ static camio_error_t tcp_connector_ready(camio_muxable_t* this)
     tcp_connector_priv_t* priv = CONNECTOR_GET_PRIVATE(this->parent.connector);
 
     if(priv->connected_client){
-        DBG("Already connected!\n");
+        ERR("Already connected!\n");
         return CAMIO_ENOTREADY;
     }
 
     if(priv->con_fd_tmp > -1){
-        DBG("Ready to connect, FD is > -1\n");
+        ERR("Ready to connect, FD is > -1\n");
         return CAMIO_EREADY;
     }
 
@@ -277,7 +277,7 @@ static camio_error_t tcp_construct(camio_connector_t* this, void** params, ch_wo
     tcp_connector_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
     //Basic sanity check that the params is the right one.
     if(params_size != sizeof(tcp_params_t)){
-        DBG("Bad parameters structure passed\n");
+        ERR("Bad parameters structure passed\n");
         return CAMIO_EINVALID; //TODO XXX : Need better error values
     }
     tcp_params_t* tcp_params = (tcp_params_t*)(*params);
@@ -289,7 +289,7 @@ static camio_error_t tcp_construct(camio_connector_t* this, void** params, ch_wo
 
     //We require a hierarchical part!
     if(tcp_params->hierarchical.str_len == 0){
-        DBG("Expecting a hierarchical part in the TCP URI, but none was given. e.g tcp:localhost:2000\n");
+        ERR("Expecting a hierarchical part in the TCP URI, but none was given. e.g tcp:localhost:2000\n");
         return CAMIO_EINVALID; //TODO XXX : Need better error values
     }
 
