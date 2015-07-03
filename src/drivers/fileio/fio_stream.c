@@ -503,7 +503,7 @@ camio_error_t fio_stream_construct(camio_stream_t* this, camio_connector_t* conn
     //Make sure the file descriptors are in non-blocking mode
     int flags = fcntl(priv->fd, F_GETFL, 0);
     fcntl(priv->fd, F_SETFL, flags | O_NONBLOCK);
-    posix_fadvise64(priv->fd, 0, 0, POSIX_FADV_SEQUENTIAL);
+    //posix_fadvise64(priv->fd, 0, 0, POSIX_FADV_SEQUENTIAL);
 
     camio_error_t error = CAMIO_ENOERROR;
     error = buffer_malloc_linear_new(this,CAMIO_FIO_BUFFER_SIZE,CAMIO_FIO_BUFFER_COUNT,true,&priv->rd_buff_pool);

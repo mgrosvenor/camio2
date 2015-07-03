@@ -53,12 +53,18 @@ int main(int argc, char** argv)
     camio_error_t err = camio_mux_new(CAMIO_MUX_HINT_PERFORMANCE, &mux);
 
 
+    //    //Construct a delimiter
+    //    ch_word id;
+    //    err = camio_transport_get_id("delim",&id);
+    //    delim_params_t delim_params = { .base_uri = uri, .delim_fn = delimit };
+    //    ch_word params_size = sizeof(delim_params_t);
+    //    void* params = &delim_params;
+
     //Construct a delimiter
-    ch_word id;
-    err = camio_transport_get_id("delim",&id);
-    delim_params_t delim_params = { .base_uri = uri, .delim_fn = delimit };
-    ch_word params_size = sizeof(delim_params_t);
-    void* params = &delim_params;
+    ch_word id = -1;
+    void* params = NULL;
+    ch_word params_size = 0;
+    err = camio_transport_params_new(uri,&params,&params_size, &id);
 
     //Use the parameters structure to construct a new connector object
     camio_connector_t* connector = NULL;
@@ -117,8 +123,19 @@ int main(int argc, char** argv)
                     return -1; //The connection is dead!
                 }
 
-                DBG("Incrementing line count - currently %lli\n", line_count);
-                line_count++;
+                ch_word len = rd_buffer->data_len;
+                char* data = rd_buffer->data_start;
+                while(len){
+                    ch_word bytes = delimit(data,len);
+                    if(bytes > 0){
+                        len -= bytes;
+                        data += bytes;
+                        DBG("Incrementing line count - currently %lli\n", line_count);
+                        line_count++;
+                        continue;
+                    }
+                    break;
+                }
 
                 //And we're done with the read buffer now, release it
                 err = camio_read_release(io_stream, &rd_buffer);
