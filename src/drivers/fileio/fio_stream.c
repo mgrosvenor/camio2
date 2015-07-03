@@ -122,7 +122,7 @@ static camio_error_t fio_read_peek( camio_stream_t* this)
 
 static camio_error_t fio_read_ready(camio_muxable_t* this)
 {
-/*    //Basic sanity checks -- TODO XXX: Should these be made into (compile time optional?) asserts for runtime performance?
+    //Basic sanity checks -- TODO XXX: Should these be made into (compile time optional?) asserts for runtime performance?
     if( NULL == this){
         DBG("This is null???\n"); //WTF?
         return CAMIO_EINVALID;
@@ -132,7 +132,7 @@ static camio_error_t fio_read_ready(camio_muxable_t* this)
         DBG("Wrong kind of muxable!\n"); //WTF??
         return CAMIO_EINVALID;
     }
-*/
+
     //OK now the fun begins
     fio_stream_priv_t* priv = STREAM_GET_PRIVATE(this->parent.stream);
 
@@ -167,12 +167,12 @@ static camio_error_t fio_read_ready(camio_muxable_t* this)
 
 static camio_error_t fio_read_request( camio_stream_t* this, camio_read_req_t* req_vec, ch_word req_vec_len )
 {
-  /*  DBG("Doing FIO read request...!\n");
+    DBG("Doing FIO read request...!\n");
     //Basic sanity checks -- TODO XXX: Should these be made into (compile time optional?) asserts for runtime performance?
     if( NULL == this){
         DBG("This null???\n"); //WTF?
         return CAMIO_EINVALID;
-    } */
+    }
     fio_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
 
     if(req_vec_len != 1){
@@ -200,7 +200,7 @@ static camio_error_t fio_read_acquire( camio_stream_t* this,  camio_rd_buffer_t*
 {
 
     //Basic sanity checks -- TODO XXX: Should these be made into (compile time optional?) asserts for runtime performance?
-    /*if( NULL == this){
+    if( NULL == this){
         DBG("This null???\n"); //WTF?
         return CAMIO_EINVALID;
     }
@@ -211,7 +211,7 @@ static camio_error_t fio_read_acquire( camio_stream_t* this,  camio_rd_buffer_t*
     if( NULL != *buffer_o){
         DBG("Buffer chain not null. You should release this before getting a new one, otherwise dangling pointers!\n");
         return CAMIO_EINVALID;
-    }*/
+    }
     fio_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
 
     camio_error_t err = fio_read_ready(&this->rd_muxable);
@@ -234,10 +234,10 @@ static camio_error_t fio_read_acquire( camio_stream_t* this,  camio_rd_buffer_t*
 static camio_error_t fio_read_release(camio_stream_t* this, camio_rd_buffer_t** buffer)
 {
     //Basic sanity checks -- TODO XXX: Should these be made into (compile time optional?) asserts for runtime performance?
-    /*if( NULL == this){
+    if( NULL == this){
         DBG("This null???\n"); //WTF?
         return CAMIO_EINVALID;
-    }*/
+    }
     fio_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
 
     if( NULL == buffer){

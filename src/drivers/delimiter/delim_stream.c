@@ -203,7 +203,7 @@ static camio_error_t delim_read_peek( camio_stream_t* this)
 static camio_error_t delim_read_ready(camio_muxable_t* this)
 {
     DBG("Checking if delimiter is ready\n");
-/*
+
     //Basic sanity checks -- TODO DELIM: Should these be made into (compile time optional?) asserts for runtime performance?
     if( NULL == this){
         ERR("This is null???\n"); //WTF?
@@ -213,7 +213,7 @@ static camio_error_t delim_read_ready(camio_muxable_t* this)
     if( this->mode != CAMIO_MUX_MODE_READ){
         ERR("Wrong kind of muxable!\n"); //WTF??
         return CAMIO_EINVALID;
-    }*/
+    }
 
     //OK now the fun begins
     delim_stream_priv_t* priv = STREAM_GET_PRIVATE(this->parent.stream);
@@ -290,7 +290,7 @@ static camio_error_t delim_read_acquire( camio_stream_t* this,  camio_rd_buffer_
 {
     DBG("Acquiring buffer\n");
 
-/*    //Basic sanity checks -- TODO DELIM: Should these be made into (compile time optional?) asserts for runtime performance?
+    //Basic sanity checks -- TODO DELIM: Should these be made into (compile time optional?) asserts for runtime performance?
     if( NULL == this){
         ERR("This null???\n"); //WTF?
         return CAMIO_EINVALID;
@@ -302,7 +302,7 @@ static camio_error_t delim_read_acquire( camio_stream_t* this,  camio_rd_buffer_
     if( NULL != *buffer_o){
         ERR("Buffer chain not null. You should release this before getting a new one, otherwise dangling pointers!\n");
         return CAMIO_EINVALID;
-    }*/
+    }
     delim_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
     if(priv->is_rd_closed){
         reset_buffer(&priv->rd_result_buff);
@@ -362,7 +362,7 @@ static camio_error_t delim_read_acquire( camio_stream_t* this,  camio_rd_buffer_
 static camio_error_t delim_read_release(camio_stream_t* this, camio_rd_buffer_t** buffer)
 {
     DBG("Releasing read\n");
-/*
+
     //Basic sanity checks -- TODO DELIM: Should these be made into (compile time optional?) asserts for runtime performance?
     if( NULL == this){
         ERR("This null???\n"); //WTF?
@@ -378,7 +378,7 @@ static camio_error_t delim_read_release(camio_stream_t* this, camio_rd_buffer_t*
     if( NULL == *buffer){
         ERR("Buffer null\n"); //WTF?
         return CAMIO_EINVALID;
-    }*/
+    }
 
     delim_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
     if(!priv->read_registered){
