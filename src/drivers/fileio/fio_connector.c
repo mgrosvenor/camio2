@@ -27,21 +27,6 @@
 #include "fio_stream.h"
 
 
-/**************************************************************************************************************************
- * PER STREAM STATE
- **************************************************************************************************************************/
-typedef struct fio_priv_s {
-
-    fio_params_t* params;  //Parameters used when a connection happens
-
-    bool is_connected;          //Has connect be called?
-    int base_rd_fd;             //File descriptor for reading
-    int base_wr_fd;             //File descriptor for writing
-
-} fio_connector_priv_t;
-
-
-
 
 /**************************************************************************************************************************
  * Connect functions
@@ -55,6 +40,17 @@ static camio_error_t fio_connect_peek(camio_connector_t* this)
 
     if(priv->base_rd_fd > -1 && priv->base_wr_fd > -1){
         return CAMIO_ENOERROR; //Ready to go, please call connect!
+    }
+
+
+    if(priv->base_wr_fd < 0  && priv->base_rd_fd > -1 &&  priv->params->rd_only){
+        //This is a read only stream and it's fully populated
+        return CAMIO_ENOERROR;
+    }
+
+    if(priv->base_rd_fd < 0  && priv->base_wr_fd > -1 &&  priv->params->wr_only){
+        //This is a write only stream and it's fully populated
+        return CAMIO_ENOERROR;
     }
 
     //Open up the file and get it ready to connect
@@ -73,6 +69,7 @@ static camio_error_t fio_connect_peek(camio_connector_t* this)
     }
 
     //OK, now open the file
+
     int tmp_fd = open(priv->params->hierarchical.str, mode);
     if(tmp_fd < 0){
         ERR("Could not open file \"%s\". Error=%s\n", priv->params->hierarchical.str, strerror(errno));
@@ -97,7 +94,7 @@ static camio_error_t fio_connect_peek(camio_connector_t* this)
 
 }
 
-static camio_error_t fio_connector_ready(camio_muxable_t* this)
+camio_error_t fio_connector_ready(camio_muxable_t* this)
 {
     if(this->fd > -1){
         return CAMIO_EREADY;
@@ -111,7 +108,7 @@ static camio_error_t fio_connector_ready(camio_muxable_t* this)
     return CAMIO_EREADY;
 }
 
-static camio_error_t fio_connect(camio_connector_t* this, camio_stream_t** stream_o )
+camio_error_t fio_connect(camio_connector_t* this, camio_stream_t** stream_o )
 {
     fio_connector_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
     camio_error_t err = fio_connect_peek(this);
@@ -147,7 +144,7 @@ static camio_error_t fio_connect(camio_connector_t* this, camio_stream_t** strea
  * Setup and teardown
  **************************************************************************************************************************/
 
-static camio_error_t fio_construct(camio_connector_t* this, void** params, ch_word params_size)
+camio_error_t fio_construct(camio_connector_t* this, void** params, ch_word params_size)
 {
 
     fio_connector_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
@@ -158,6 +155,15 @@ static camio_error_t fio_construct(camio_connector_t* this, void** params, ch_wo
     }
     fio_params_t* fio_params = (fio_params_t*)(*params);
     priv->params = fio_params;
+    DBG("Constucting with params hier=%.*s rd_rf=%lli wr_fd=%lli rd_sz=%lli wr_sz=%lli ro=%lli wo=%lli\n",
+       fio_params->hierarchical.str_len,
+       fio_params->hierarchical.str,
+       fio_params->rd_fd,
+       fio_params->wr_fd,
+       fio_params->rd_buff_sz,
+       fio_params->wr_buff_sz,
+       fio_params->rd_only,
+       fio_params->wr_only);
 
     //We must have a file descriptor or a file name
     if(fio_params->hierarchical.str_len == 0 && fio_params->rd_fd < 0 && fio_params->wr_fd < 0){
@@ -202,7 +208,7 @@ static camio_error_t fio_construct(camio_connector_t* this, void** params, ch_wo
 }
 
 
-static void fio_destroy(camio_connector_t* this)
+void fio_destroy(camio_connector_t* this)
 {
     DBG("Destorying fio connector\n");
     fio_connector_priv_t* priv = CONNECTOR_GET_PRIVATE(this);

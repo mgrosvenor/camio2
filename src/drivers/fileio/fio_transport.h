@@ -13,8 +13,6 @@
 
 #include <src/types/len_string.h>
 
-#include "fio_connector.h"
-
 typedef struct fio_global_s{
     ch_bool is_init;
     //int fio_fd;

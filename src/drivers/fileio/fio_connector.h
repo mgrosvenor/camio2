@@ -11,8 +11,24 @@
 #ifndef SRC_DRIVERS_FIO_FIO_CONNECTOR_H_
 #define SRC_DRIVERS_FIO_FIO_CONNECTOR_H_
 
-#include "../../transports/connector.h"
+#include <src/transports/connector.h>
+#include "fio_transport.h"
+
 
 NEW_CONNECTOR_DECLARE(fio);
+
+/**************************************************************************************************************************
+ * PER STREAM STATE
+ **************************************************************************************************************************/
+typedef struct fio_priv_s {
+
+    fio_params_t* params;  //Parameters used when a connection happens
+
+    bool is_connected;          //Has connect be called?
+    int base_rd_fd;             //File descriptor for reading
+    int base_wr_fd;             //File descriptor for writing
+
+} fio_connector_priv_t;
+
 
 #endif /* SRC_DRIVERS_FIO_FIO_CONNECTOR_H_ */

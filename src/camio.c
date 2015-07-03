@@ -159,7 +159,6 @@ camio_error_t camio_transport_params_new( ch_cstr uri_str, void** params_o, ch_w
     for( camio_transport_param_t* param = params->first;
          param != params->end && uri_opts;
          param = params->next(params,param) ){
-        DBG("1\n");
 
         //Search for the parameter name (ie key) in the key/value uri options list. This should answer the question,
         //"Was the parameter with a given name present in the URI supplied".
@@ -168,7 +167,6 @@ camio_error_t camio_transport_params_new( ch_cstr uri_str, void** params_o, ch_w
         CH_LIST_IT(KV) end   = uri_opts->end(uri_opts);
         CH_LIST_IT(KV) found = uri_opts->find(uri_opts,&first, &end, kv);
 
-        DBG("1\n");
         //We found it! OK. try to num parse it just in case its a number. If not, this will have no effect.
         num_result_t num_result = {0};
         ch_cstr value           = NULL;
@@ -177,11 +175,10 @@ camio_error_t camio_transport_params_new( ch_cstr uri_str, void** params_o, ch_w
             value = found.value->value;
             value_len = found.value->value_len;
             DBG("param found param=%s value=%.*s offset=%lli. Parsing as a number now.\n", param->param_name, value_len, value, param->param_struct_offset);
-            num_result  = parse_number(value, 0); //Just try to parse this as a number in casenum_result.type
+            num_result  = parse_nnumber(value, 0, value_len); //Just try to parse this as a number in casenum_result.type
             DBG("num_result.type=%i\n", num_result.type);
         }
 
-        DBG("1\n");
         //Some sanity checking...
         if(found.value && param->found){ //Oh shit, we already did this before! Can only assign once!
             DBG("Parameter with name %s already found. You can only assign once!\n", param->param_name);
@@ -189,13 +186,12 @@ camio_error_t camio_transport_params_new( ch_cstr uri_str, void** params_o, ch_w
             goto exit_params;
         }
 
-        DBG("1\n");
         if(!found.value && param->opt_mode == CAMIO_TRANSPORT_PARAMS_MODE_REQUIRED){ //Oh shit this was required!
             DBG("Parameter with name %s is required but not supplied!\n", param->param_name);
             result = CAMIO_EINVALID; //TODO XXX make a better return value
             goto exit_params;
         }
-        DBG("1\n");
+
         //Assuming there is either an option int the URI, or a default value, where will we place the result?
         void* params_struct_value = &params_struct[param->param_struct_offset];
 

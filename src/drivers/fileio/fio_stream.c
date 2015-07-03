@@ -66,7 +66,7 @@ typedef struct fio_stream_priv_s {
 static camio_error_t fio_read_peek( camio_stream_t* this)
 {
     //This is not a public function, can assume that preconditions have been checked.
-    DBG("Doing read peek\n");
+    //DBG("Doing read peek\n");
     fio_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
     camio_error_t err = buffer_malloc_linear_acquire(priv->rd_buff_pool,&priv->rd_buffer);
     if(err){
