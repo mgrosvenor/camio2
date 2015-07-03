@@ -19,7 +19,7 @@ USE_CAMIO;
 
 
 //A simple new line delimiter
-ch_word delimit(char* buffer, ch_word len)
+static inline ch_word delimit(char* buffer, ch_word len)
 {
     DBG("Running delimiter on buffer=%p with len=%i\n", buffer,len);
 
@@ -28,6 +28,7 @@ ch_word delimit(char* buffer, ch_word len)
         DBG("Failed, could not find a new line\n");
         return -1;
     }
+
 
     const ch_word offset = result - (char*)buffer + 1;
     DBG("Success result =%p, offset=%lli\n", result,offset);

@@ -57,7 +57,7 @@ static camio_error_t fio_connect_peek(camio_connector_t* this)
     }
 
     //Open up the file and get it ready to connect
-    priv->base_fd = open(priv->params->hierarchical.str, O_RDWR);
+    priv->base_fd = open(priv->params->hierarchical.str, O_RDONLY);
     if(priv->base_fd < 0){
         DBG("Could not open file \"%s\". Error=%s\n", priv->params->hierarchical.str, strerror(errno));
         return CAMIO_EINVALID;
