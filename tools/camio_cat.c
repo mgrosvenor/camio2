@@ -19,7 +19,7 @@ USE_CAMIO;
 
 
 #define DELIM_LEN 8
-int delimit(char* buffer, int len)
+ch_word delimit(char* buffer, ch_word len)
 {
     DBG("Running delimiter on buffer=%p with len=%i\n", buffer,len);
     (void)buffer;
@@ -35,22 +35,39 @@ int delimit(char* buffer, int len)
 
 int main(int argc, char** argv)
 {
-    //We don't use these for the test ... yet
-    (void)argc;
-    (void)argv;
-    char* uri = "tcp:localhost:2000?listen=1";
+    if(argc < 2){
+        printf("Usage: camio_cat <input>");
+        exit(-1);
+    }
+
+    char* uri = argv[1];;
 
     //Create a new multiplexer for streams to go into
     camio_mux_t* mux = NULL;
     camio_error_t err = camio_mux_new(CAMIO_MUX_HINT_PERFORMANCE, &mux);
+    if(err){
+        ERR("Could not make new multiplexer\n", uri);
+        return CAMIO_EINVALID; //TODO XXX put a better error here
+    }
 
 
-    //Construct a delimiter
+
+/*    //Construct a delimiter
     ch_word id;
     err = camio_transport_get_id("delim",&id);
     delim_params_t delim_params = { .base_uri = uri, .delim_fn = delimit };
     ch_word params_size = sizeof(delim_params_t);
-    void* params = &delim_params;
+    void* params = &delim_params; */
+
+    //Construct a regular stream
+    ch_word id = -1;
+    void* params = NULL;
+    ch_word params_size = 0;
+    err = camio_transport_params_new(uri,&params,&params_size, &id);
+    if(err){
+        ERR("Invalid transport specification %s\n", uri);
+        return CAMIO_EINVALID; //TODO XXX put a better error here
+    }
 
     //Use the parameters structure to construct a new connector object
     camio_connector_t* connector = NULL;
@@ -81,8 +98,16 @@ int main(int argc, char** argv)
     camio_rd_buffer_t* wr_buffer = NULL;
     camio_muxable_t* muxable     = NULL;
     ch_word which                = -1;
-    camio_read_req_t  rd_req = { 0 };
-    camio_write_req_t wr_req = { 0 };
+    camio_read_req_t  rd_req = {
+        .src_offset_hint = CAMIO_READ_REQ_SRC_OFFSET_NONE,
+        .dst_offset_hint = CAMIO_READ_REQ_DST_OFFSET_NONE,
+        .read_size_hint  = CAMIO_READ_REQ_SIZE_ANY
+    };
+    camio_write_req_t  wr_req = {
+        .src_offset_hint = CAMIO_WRITE_REQ_SRC_OFFSET_NONE,
+        .dst_offset_hint = CAMIO_WRITE_REQ_DST_OFFSET_NONE,
+    };
+    
     err = camio_read_request(io_stream,&rd_req,1); //kick the process off -- tell the read stream that we would like some data,
     if(err){ DBG("Got a read request error %i\n", err); return -1; }
 

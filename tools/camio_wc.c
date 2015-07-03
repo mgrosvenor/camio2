@@ -65,6 +65,10 @@ int main(int argc, char** argv)
     void* params = NULL;
     ch_word params_size = 0;
     err = camio_transport_params_new(uri,&params,&params_size, &id);
+    if(err){
+        ERR("Invalid transport specification %s\n", uri);
+        return CAMIO_EINVALID; //TODO XXX put a better error here
+    }
 
     //Use the parameters structure to construct a new connector object
     camio_connector_t* connector = NULL;
