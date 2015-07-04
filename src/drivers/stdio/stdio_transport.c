@@ -38,17 +38,17 @@ static camio_error_t construct(void** params, ch_word params_size, camio_connect
 void stdio_init()
 {
     DBG("*** Initializing stdio...\n");
-    CH_VECTOR(CAMIO_TRANSPORT_PARAMS_VEC)* params = CH_VECTOR_NEW(CAMIO_TRANSPORT_PARAMS_VEC,256,NULL);
+    CH_VECTOR(CAMIO_TRANSPORT_PARAMS_VEC)* params = CH_VECTOR_NEW(CAMIO_TRANSPORT_PARAMS_VEC,256,
+            CH_VECTOR_CMP(CAMIO_TRANSPORT_PARAMS_VEC));
     if(!params){
         return; // No memory. Can't register this transport
     }
 
-    add_param_optional(params,"rd_buff_sz",stdio_params_t,rd_buff_sz, 32 * 1024);
-    add_param_optional(params,"wr_buff_sz",stdio_params_t,wr_buff_sz, 32 * 1024);
+    add_param_optional(params,"rd_buff_sz",stdio_params_t,rd_buff_sz, 16 * 1024);
+    add_param_optional(params,"wr_buff_sz",stdio_params_t,wr_buff_sz, 16 * 1024);
     add_param_optional(params,"RO",stdio_params_t,rd_only, 0); //read only
     add_param_optional(params,"WO",stdio_params_t,wr_only, 0); //write only
     const ch_word hier_offset = offsetof(stdio_params_t,__hierarchical__);
-    DBG("Hierarchical offset=%i...Done\n", hier_offset);
 
     register_new_transport(scheme,strlen(scheme),hier_offset,construct,sizeof(stdio_params_t),params,0);
     DBG("Initializing stdio...Done\n");

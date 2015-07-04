@@ -40,16 +40,16 @@ void tcp_init()
 {
 
     DBG("Initializing TCP...\n");
-    CH_VECTOR(CAMIO_TRANSPORT_PARAMS_VEC)* params = CH_VECTOR_NEW(CAMIO_TRANSPORT_PARAMS_VEC,256,NULL);
+    CH_VECTOR(CAMIO_TRANSPORT_PARAMS_VEC)* params = CH_VECTOR_NEW(CAMIO_TRANSPORT_PARAMS_VEC,256,
+            CH_VECTOR_CMP(CAMIO_TRANSPORT_PARAMS_VEC));
     if(!params){
         return; // No memory. Can't register this transport
     }
 
     add_param_optional(params,"listen",tcp_params_t,listen, 0);
-    add_param_optional(params,"rd_buff_sz",tcp_params_t,rd_buff_sz, 4 * 1024 * 1024);
-    add_param_optional(params,"wr_buff_sz",tcp_params_t,wr_buff_sz, 4 * 1024 * 1024);
+    add_param_optional(params,"rd_buff_sz",tcp_params_t,rd_buff_sz, 16 * 1024);
+    add_param_optional(params,"wr_buff_sz",tcp_params_t,wr_buff_sz, 16 * 1024);
     const ch_word hier_offset = offsetof(tcp_params_t,hierarchical);
-    DBG("Hierarchical offset=%i...Done\n", hier_offset);
 
     register_new_transport(scheme,strlen(scheme),hier_offset,construct,sizeof(tcp_params_t),params,0);
     DBG("Initializing TCP...Done\n");

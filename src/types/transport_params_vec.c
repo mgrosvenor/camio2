@@ -16,11 +16,10 @@
 define_ch_vector(CAMIO_TRANSPORT_PARAMS_VEC,camio_transport_param_t)
 
 //Don't bother to define this yet.
-//define_ch_vector_compare(CAMIO_TRANSPORT_PARAMS_VEC,camio_transport_opt_t)
-//{
-//    return
-//}
-
+define_ch_vector_compare(CAMIO_TRANSPORT_PARAMS_VEC,camio_transport_param_t)
+{
+    return strcmp(lhs->param_name, rhs->param_name);
+}
 
 //These applications of the macro expand out the actual option adder functions
 define_add_param(int64_t, CAMIO_TRANSPORT_PARAMS_TYPE_INT64)
