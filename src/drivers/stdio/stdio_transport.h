@@ -25,11 +25,11 @@ typedef struct stdio_global_s{
 //Just redefine the file io params as stdio
 typedef struct {
     len_string_t __hierarchical__; //This is not used
-    ch_word rd_buff_sz;
-    ch_word wr_buff_sz;
-    ch_word rd_only;
-    ch_word wr_only;
-    ch_word std_err; //Output to stderr
+    int64_t rd_buff_sz;
+    int64_t wr_buff_sz;
+    int64_t rd_only;
+    int64_t wr_only;
+    int64_t std_err; //Output to stderr
 } stdio_params_t;
 
 void stdio_init();

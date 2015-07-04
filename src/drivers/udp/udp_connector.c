@@ -62,7 +62,7 @@ static camio_error_t resolve_bind_connect(char* address, char* prot, ch_bool do_
 {
     struct addrinfo hints, *res, *res0;
     int s;
-    char* cause;
+    char* cause = "";
     int error;
 
     memset(&hints, 0, sizeof(hints));

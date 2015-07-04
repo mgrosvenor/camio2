@@ -21,12 +21,12 @@ typedef struct fio_global_s{
 
 typedef struct {
     len_string_t hierarchical;
-    ch_word rd_buff_sz;
-    ch_word wr_buff_sz;
-    ch_word rd_fd;
-    ch_word wr_fd;
-    ch_word rd_only;
-    ch_word wr_only;
+    int64_t rd_buff_sz;
+    int64_t wr_buff_sz;
+    int64_t rd_fd;
+    int64_t wr_fd;
+    int64_t rd_only;
+    int64_t wr_only;
 } fio_params_t;
 
 void fio_init();
