@@ -52,6 +52,8 @@ void udp_init()
     add_param_optional(params,"wp",udp_params_t,wr_protocol, "");
     add_param_optional(params,"rd_buff_sz",udp_params_t,rd_buff_sz, 64 * 1024);
     add_param_optional(params,"wr_buff_sz",udp_params_t,wr_buff_sz, 64 * 1024);
+    //TODO XXX -- add readonly and write only flags!
+    //TODO XXX -- add the rest of the UDP options here...
     const ch_word hier_offset = offsetof(udp_params_t,hierarchical);
 
     register_new_transport(scheme,strlen(scheme),hier_offset,construct,sizeof(udp_params_t),params,0);

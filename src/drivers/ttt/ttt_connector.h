@@ -11,7 +11,7 @@
 #ifndef SRC_DRIVERS_TTT_TTT_CONNECTOR_H_
 #define SRC_DRIVERS_TTT_TTT_CONNECTOR_H_
 
-#include "../../transports/connector.h"
+#include <src/transports/connector.h>
 
 NEW_CONNECTOR_DECLARE(ttt);
 

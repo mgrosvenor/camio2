@@ -41,14 +41,14 @@ void ttt_init()
 {
 
     DBG("Initializing ttt...\n");
-    CH_VECTOR(CAMIO_TRANSPORT_PARAMS_VEC)* params = CH_VECTOR_NEW(CAMIO_TRANSPORT_PARAMS_VEC,256,NULL);
+    CH_VECTOR(CAMIO_TRANSPORT_PARAMS_VEC)* params = CH_VECTOR_NEW(CAMIO_TRANSPORT_PARAMS_VEC,256,
+            CH_VECTOR_CMP(CAMIO_TRANSPORT_PARAMS_VEC));
     if(!params){
         return; // No memory. Can't register this transport
     }
 
     //add_param_optional(params,"ra",ttt_params_t,rd_address,"");
     const ch_word hier_offset = offsetof(ttt_params_t,hierarchical);
-    DBG("Hierarchical offset=%i...Done\n", hier_offset);
 
     register_new_transport(scheme,strlen(scheme),hier_offset,construct,sizeof(ttt_params_t),params,0);
     DBG("Initializing ttt...Done\n");

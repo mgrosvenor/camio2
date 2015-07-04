@@ -49,6 +49,7 @@ void tcp_init()
     add_param_optional(params,"listen",tcp_params_t,listen, 0);
     add_param_optional(params,"rd_buff_sz",tcp_params_t,rd_buff_sz, 16 * 1024);
     add_param_optional(params,"wr_buff_sz",tcp_params_t,wr_buff_sz, 16 * 1024);
+    //TODO XXX -- add the rest of the TCP options here...
     const ch_word hier_offset = offsetof(tcp_params_t,hierarchical);
 
     register_new_transport(scheme,strlen(scheme),hier_offset,construct,sizeof(tcp_params_t),params,0);
