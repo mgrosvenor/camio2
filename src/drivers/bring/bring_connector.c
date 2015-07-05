@@ -17,6 +17,8 @@
 #include <memory.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <semaphore.h>
+#include <sys/sem.h>
 
 #include <src/transports/connector.h>
 #include <src/camio.h>
@@ -36,7 +38,7 @@
 //Header structure -- There is one of these for every
 typedef struct bring_header_s {
     ch_word total_mem;              //Total amount of memory needed in the mmapped region
-    ch_word connected_offset;       //offset of the first 64bit aligned word after the bring header used to synchronize
+
     ch_word rd_mem_start_offset;    //location of the memory region for reads
     ch_word rd_mem_len;             //length of the read memory region
     ch_word rd_slots;               //number of slots in the read region
@@ -46,6 +48,7 @@ typedef struct bring_header_s {
     ch_word wr_mem_len;
     ch_word wr_slots;
     ch_word wr_slots_size;
+
 } bring_header_t;
 
 
@@ -60,6 +63,8 @@ typedef struct bring_priv_s {
     //Actual data structure
     volatile bring_header_t* bring_head;
 
+    sem_t* mutex;
+
 } bring_connector_priv_t;
 
 
@@ -67,6 +72,7 @@ typedef struct bring_priv_s {
 /**************************************************************************************************************************
  * Connect functions
  **************************************************************************************************************************/
+
 
 static camio_error_t bring_connect_peek_server(camio_connector_t* this, char* bring_file)
 {
@@ -81,6 +87,16 @@ static camio_error_t bring_connect_peek_server(camio_connector_t* this, char* br
         priv->params->slot_sz
     );
 
+    //Make a new named semaphore with the bring file name and initialize it to locked (0)
+    priv->mutex = sem_open(bring_file, O_CREAT | O_EXCL, 0666, 0);
+    if(priv->mutex == SEM_FAILED){
+        ERR("Could not open named semaphore \"%s\". Error=%s\n", bring_file, strerror(errno));
+        result = CAMIO_EINVALID;
+        goto error_no_cleanup;
+    }
+
+//--------------------------------------------------------------------------------------------------------------------------
+// START ATOMIC SECTION !!!
 
     //See if a bring file already exists, if so, get rid of it.
     int bring_fd = open(bring_file, O_RDONLY);
@@ -90,7 +106,7 @@ static camio_error_t bring_connect_peek_server(camio_connector_t* this, char* br
         if( unlink(bring_file) < 0){
             ERR("Could not remove stale bring file \"%s\". Error=%s\n", bring_file, strerror(errno));
             result = CAMIO_EINVALID;
-            goto free_filename_error;
+            goto error_no_cleanup;
         }
     }
 
@@ -98,7 +114,7 @@ static camio_error_t bring_connect_peek_server(camio_connector_t* this, char* br
     if(bring_fd < 0){
         ERR("Could not open file \"%s\". Error=%s\n", bring_file, strerror(errno));
         result = CAMIO_EINVALID;
-        goto free_filename_error;
+        goto error_no_cleanup;
 
     }
 
@@ -161,6 +177,15 @@ static camio_error_t bring_connect_peek_server(camio_connector_t* this, char* br
         result = CAMIO_EINVALID;
         goto  close_file_error;
     }
+    DBG("memory mapped at addres =%p\n", mem);
+    //Memory must be page aligned otherwise we're in trouble (TODO - could pass alignment though the file and check..)
+    if( ((uint64_t)mem) != (((uint64_t)mem) & ~0xFFF)){
+        ERR("Could not memory map bring file \"%s\". Error=%s\n", bring_file, strerror(errno));
+        result = CAMIO_EINVALID;
+        goto  close_file_error;
+    }
+
+
 
     //Pin the pages so that they don't get swapped out
     if(mlock(mem,bring_total_mem)){
@@ -172,8 +197,7 @@ static camio_error_t bring_connect_peek_server(camio_connector_t* this, char* br
     //Populate all the right offsets
     volatile bring_header_t* bring_head = (volatile void*)mem;;
     bring_head->total_mem             = bring_total_mem;
-    bring_head->connected_offset      = round_up(0 + sizeof(bring_header_t), sizeof(uint64_t) );
-    bring_head->rd_mem_start_offset   = round_up(bring_head->connected_offset + sizeof(uint64_t), getpagesize());
+    bring_head->rd_mem_start_offset   = round_up(0 + sizeof(bring_header_t) + sizeof(uint64_t), getpagesize());
     bring_head->rd_mem_len            = priv->params->expand ? round_up(mem_per_ring,getpagesize()) : mem_per_ring;
     bring_head->rd_slots_size         = slot_aligned_size;
     bring_head->rd_slots              = bring_head->rd_mem_len / bring_head->rd_slots_size;
@@ -191,7 +215,6 @@ static camio_error_t bring_connect_peek_server(camio_connector_t* this, char* br
     DBG("bring memory offsets\n");
     DBG("-------------------------\n");
     DBG("total_mem            %016llx (%lli)\n", bring_head->total_mem, bring_head->total_mem);
-    DBG("connected_offset     %016llx (%lli)\n", bring_head->connected_offset, bring_head->connected_offset);
     DBG("rd_slots             %016llx (%lli)\n", bring_head->rd_slots,  bring_head->rd_slots);
     DBG("rd_slots_size        %016llx (%lli)\n", bring_head->rd_slots_size, bring_head->rd_slots_size);
     DBG("rd_mem_start_offset  %016llx (%lli)\n", bring_head->rd_mem_start_offset, bring_head->rd_mem_start_offset);
@@ -212,13 +235,23 @@ static camio_error_t bring_connect_peek_server(camio_connector_t* this, char* br
         priv->bring_head->rd_slots_size - sizeof(bring_slot_header_t)
     );
 
-
+    priv->bring_fd = bring_fd;
     result = CAMIO_ENOERROR;
+
+// END ATOMIC SECTION!!!
+//---------------------------------------------------------------------------------------------------------------------------
+
+    //Finally, tell the client that we're ready to party
+    sem_post(priv->mutex);
+    sem_unlink(bring_file);
+
+    return result;
 
 close_file_error:
     close(bring_fd);
+    return result;
 
-free_filename_error:
+error_no_cleanup:
     return result;
 
 }
@@ -226,16 +259,124 @@ free_filename_error:
 static camio_error_t bring_connect_peek_client(camio_connector_t* this, char* bring_file)
 {
     DBG("Doing connect peek client on %s\n", bring_file);
-    (void)bring_file;
     camio_error_t result = CAMIO_ENOERROR;
     bring_connector_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
-    (void)priv;
+
+    //Try to open the semaphore
+    //Make a new named semaphore with the bring file name and initialize it to locked (0)
+    priv->mutex = sem_open(bring_file,0);
+    if(priv->mutex == SEM_FAILED){
+        if(errno == ENOENT){
+            return CAMIO_ETRYAGAIN; // The semaphore has not yet been created
+        }
+
+        //EEk some other error happened~
+        ERR("Could not open named semaphore \"%s\". Error=%s\n", bring_file, strerror(errno));
+        result = CAMIO_EINVALID;
+        goto error_no_cleanup;
+    }
+
+    //Wait until all of the init work is done:
+    if(sem_trywait(priv->mutex)){
+        if(errno == EAGAIN){
+            result = CAMIO_ETRYAGAIN;
+            goto error_no_cleanup;
+        }
+
+        ERR("Something funny happened on try wait. Error=%s\n", strerror(errno));
+        result = CAMIO_EINVALID;
+        goto error_no_cleanup;
+
+   }
+
+    //<<-------------- BEGIN ATOMIC SECTION ---------------->>>
+
+    //Now there is a bring file and it should have a header in it
+    int bring_fd = open(bring_file, O_RDWR);
+    if(bring_fd < 0){
+        ERR("Could not open named shared memory file \"%s\". Error=%s\n", bring_file, strerror(errno));
+        result = CAMIO_EINVALID;
+        goto error_release_semaphore;
+    }
+
+
+    bring_header_t header_tmp = {0};
+    size_t bytes = read(bring_fd,&header_tmp,sizeof(header_tmp));
+    if(bytes < sizeof(bring_header_t)){
+        ERR("Could not read header.\n");
+        result = CAMIO_EINVALID;
+        goto error_close_file;
+    }
+
+    bring_header_t* bring_head = &header_tmp;
+    (void)bring_head;
+    DBG("bring memory offsets\n");
+    DBG("-------------------------\n");
+    DBG("total_mem            %016llx (%lli)\n", bring_head->total_mem, bring_head->total_mem);
+    DBG("rd_slots             %016llx (%lli)\n", bring_head->rd_slots,  bring_head->rd_slots);
+    DBG("rd_slots_size        %016llx (%lli)\n", bring_head->rd_slots_size, bring_head->rd_slots_size);
+    DBG("rd_mem_start_offset  %016llx (%lli)\n", bring_head->rd_mem_start_offset, bring_head->rd_mem_start_offset);
+    DBG("rd_mem_len           %016llx (%lli)\n", bring_head->rd_mem_len, bring_head->rd_mem_len);
+
+    DBG("wr_slots             %016llx (%lli)\n", bring_head->wr_slots,  bring_head->wr_slots);
+    DBG("wr_slots_size        %016llx (%lli)\n", bring_head->wr_slots_size, bring_head->wr_slots_size);
+    DBG("wr_mem_start_offset  %016llx (%lli)\n", bring_head->wr_mem_start_offset,bring_head->wr_mem_start_offset);
+    DBG("wr_mem_len           %016llx (%lli)\n", bring_head->wr_mem_len, bring_head->wr_mem_len);
+    DBG("-------------------------\n");
+
+
+    void* mem = mmap( NULL, header_tmp.total_mem, PROT_READ | PROT_WRITE, MAP_SHARED, bring_fd, 0);
+    if(unlikely(mem == MAP_FAILED)){
+        ERR("Could not memory map bring file \"%s\". Error=%s\n", bring_file, strerror(errno));
+        result = CAMIO_EINVALID;
+        goto  error_close_file;
+    }
+
+    //Memory must be page aligned otherwise we're in trouble (TODO - could pass alignment though the file and check..)
+    DBG("memory mapped at addres =%p\n", mem);
+    if( ((uint64_t)mem) != (((uint64_t)mem) & ~0xFFF)){
+        ERR("Could not memory map bring file \"%s\". Error=%s\n", bring_file, strerror(errno));
+        result = CAMIO_EINVALID;
+        goto  error_close_file;
+    }
+
+    //Pin the pages so that they don't get swapped out
+    if(mlock(mem,header_tmp.total_mem)){
+        ERR("Could not lock memory map. Error=%s\n", strerror(errno));
+        result = CAMIO_EINVALID;
+        goto  error_unmap_file;
+    }
+
+    //Remove the filename from the filesystem. Since the and reader are both still connected
+    //to the file, the space will continue to be available until they both exit.
+    if(unlink(bring_file) < 0){
+        ERR("Could not remove bring file \"%s\". Error = \"%s\"", bring_file, strerror(errno));
+        result = CAMIO_EINVALID;
+        goto error_unlock_mem;
+    }
+
+    priv->bring_fd = bring_fd;
+    priv->bring_head = mem;
+
+error_unlock_mem:
+    munlock(mem, header_tmp.total_mem);
+
+error_unmap_file:
+    munmap(mem, header_tmp.total_mem);
+
+error_close_file:
+    close(bring_fd);
+
+error_release_semaphore:
+    sem_post(priv->mutex); //<<-------------- END ATOMIC
+
+error_no_cleanup:
     return result;
 }
 
 
 
-//Try to see if connecting is possible. With UDP, it is always possible.
+//Try to see if connecting is possible.
 static camio_error_t bring_connect_peek(camio_connector_t* this)
 {
     DBG("Doing connect peek\n");
@@ -247,17 +388,17 @@ static camio_error_t bring_connect_peek(camio_connector_t* this)
     }
 
     //Make null terminated file name
-    char* bring_file = (char*)calloc(priv->params->hierarchical.str_len + 1,1); //server to client
-    strncpy(bring_file,priv->params->hierarchical.str, priv->params->hierarchical.str_len);
+    char* bring_file_name = (char*)calloc(priv->params->hierarchical.str_len + 1,1);
+    strncpy(bring_file_name,priv->params->hierarchical.str, priv->params->hierarchical.str_len);
 
     if(priv->params->server){
-        result = bring_connect_peek_server(this,bring_file);
+        result = bring_connect_peek_server(this,bring_file_name);
     }
     else{
-        result = bring_connect_peek_client(this,bring_file);
+        result = bring_connect_peek_client(this,bring_file_name);
     }
 
-    free(bring_file);
+    free(bring_file_name);
     return result;
 
 }
@@ -269,11 +410,15 @@ static camio_error_t bring_connector_ready(camio_muxable_t* this)
     }
 
     camio_error_t err = bring_connect_peek(this->parent.connector);
+    if(err == CAMIO_ETRYAGAIN){
+        return CAMIO_ENOTREADY;
+    }
+
     if(err != CAMIO_ENOERROR){
         return err;
     }
 
-    return CAMIO_EREADY;
+        return CAMIO_EREADY;
 }
 
 static camio_error_t bring_connect(camio_connector_t* this, camio_stream_t** stream_o )
