@@ -68,16 +68,11 @@ typedef struct bring_priv_s {
  * Connect functions
  **************************************************************************************************************************/
 
-//Try to see if connecting is possible. With UDP, it is always possible.
-static camio_error_t bring_connect_peek(camio_connector_t* this)
+static camio_error_t bring_connect_peek_server(camio_connector_t* this, char* bring_file)
 {
-    DBG("Doing connect peek\n");
+    DBG("Doing connect peek server on %s\n", bring_file);
     camio_error_t result = CAMIO_ENOERROR;
     bring_connector_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
-
-    if(priv->bring_fd > -1 ){ //Ready to go! Call connect!
-        return CAMIO_ENOERROR;
-    }
 
     DBG("Making bring called %.*s with %lu slots of size %lu\n",
         priv->params->hierarchical.str_len,
@@ -86,9 +81,6 @@ static camio_error_t bring_connect_peek(camio_connector_t* this)
         priv->params->slot_sz
     );
 
-    //Make null terminated file name
-    char* bring_file = (char*)calloc(priv->params->hierarchical.str_len + 1,1); //server to client
-    strncpy(bring_file,priv->params->hierarchical.str, priv->params->hierarchical.str_len);
 
     //See if a bring file already exists, if so, get rid of it.
     int bring_fd = open(bring_file, O_RDONLY);
@@ -162,6 +154,7 @@ static camio_error_t bring_connect_peek(camio_connector_t* this)
 
     }
 
+    //Map the file into memory
     void* mem = mmap( NULL, bring_total_mem, PROT_READ | PROT_WRITE, MAP_SHARED, bring_fd, 0);
     if(unlikely(mem == MAP_FAILED)){
         ERR("Could not memory map bring file \"%s\". Error=%s\n", bring_file, strerror(errno));
@@ -169,16 +162,15 @@ static camio_error_t bring_connect_peek(camio_connector_t* this)
         goto  close_file_error;
     }
 
+    //Pin the pages so that they don't get swapped out
     if(mlock(mem,bring_total_mem)){
         ERR("Could not lock memory map. Error=%s\n", strerror(errno));
         result = CAMIO_EINVALID;
         goto  close_file_error;
     }
 
-    priv->bring_head = (volatile void*)mem;
-    volatile bring_header_t* bring_head = priv->bring_head;
-
-
+    //Populate all the right offsets
+    volatile bring_header_t* bring_head = (volatile void*)mem;;
     bring_head->total_mem             = bring_total_mem;
     bring_head->connected_offset      = round_up(0 + sizeof(bring_header_t), sizeof(uint64_t) );
     bring_head->rd_mem_start_offset   = round_up(bring_head->connected_offset + sizeof(uint64_t), getpagesize());
@@ -189,12 +181,13 @@ static camio_error_t bring_connect_peek(camio_connector_t* this)
     bring_head->wr_mem_len            = priv->params->expand ? round_up(mem_per_ring,getpagesize()) : mem_per_ring;
     bring_head->wr_slots_size         = slot_aligned_size;
     bring_head->wr_slots              = bring_head->wr_mem_len / bring_head->wr_slots_size;
+    priv->bring_head = bring_head;
 
+    //Here's some debug to figure out if the mappings are correct
     const ch_word rd_end_offset = bring_head->rd_mem_start_offset + bring_head->rd_mem_len -1;
     const ch_word wr_end_offset = bring_head->wr_mem_start_offset + bring_head->wr_mem_len -1;
     (void)rd_end_offset;
     (void)wr_end_offset;
-
     DBG("bring memory offsets\n");
     DBG("-------------------------\n");
     DBG("total_mem            %016llx (%lli)\n", bring_head->total_mem, bring_head->total_mem);
@@ -226,10 +219,46 @@ close_file_error:
     close(bring_fd);
 
 free_filename_error:
+    return result;
+
+}
+
+static camio_error_t bring_connect_peek_client(camio_connector_t* this, char* bring_file)
+{
+    DBG("Doing connect peek client on %s\n", bring_file);
+    (void)bring_file;
+    camio_error_t result = CAMIO_ENOERROR;
+    bring_connector_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
+    (void)priv;
+    return result;
+}
+
+
+
+//Try to see if connecting is possible. With UDP, it is always possible.
+static camio_error_t bring_connect_peek(camio_connector_t* this)
+{
+    DBG("Doing connect peek\n");
+    camio_error_t result = CAMIO_ENOERROR;
+    bring_connector_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
+
+    if(priv->bring_fd > -1 ){ //Ready to go! Call connect!
+        return CAMIO_ENOERROR;
+    }
+
+    //Make null terminated file name
+    char* bring_file = (char*)calloc(priv->params->hierarchical.str_len + 1,1); //server to client
+    strncpy(bring_file,priv->params->hierarchical.str, priv->params->hierarchical.str_len);
+
+    if(priv->params->server){
+        result = bring_connect_peek_server(this,bring_file);
+    }
+    else{
+        result = bring_connect_peek_client(this,bring_file);
+    }
 
     free(bring_file);
     return result;
-
 
 }
 
