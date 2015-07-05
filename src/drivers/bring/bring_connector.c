@@ -168,6 +168,13 @@ static camio_error_t bring_connect_peek(camio_connector_t* this)
         result = CAMIO_EINVALID;
         goto  close_file_error;
     }
+
+    if(mlock(mem,bring_total_mem)){
+        ERR("Could not lock memory map. Error=%s\n", strerror(errno));
+        result = CAMIO_EINVALID;
+        goto  close_file_error;
+    }
+
     priv->bring_head = (volatile void*)mem;
     volatile bring_header_t* bring_head = priv->bring_head;
 
@@ -222,6 +229,8 @@ free_filename_error:
 
     free(bring_file);
     return result;
+
+
 }
 
 static camio_error_t bring_connector_ready(camio_muxable_t* this)
