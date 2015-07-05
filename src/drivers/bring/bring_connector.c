@@ -16,36 +16,49 @@
 #include <sys/mman.h>
 #include <memory.h>
 #include <sys/stat.h>
+#include <unistd.h>
 
 #include <src/transports/connector.h>
 #include <src/camio.h>
 #include <src/camio_debug.h>
 
+#include <deps/chaste/utils/util.h>
+
 #include "bring_transport.h"
 #include "bring_connector.h"
 #include "bring_stream.h"
 
+#define getpagesize() sysconf(_SC_PAGESIZE)
 
 /**************************************************************************************************************************
  * PER STREAM STATE
  **************************************************************************************************************************/
+//Header structure -- There is one of these for every
+typedef struct bring_header_s {
+    ch_word total_mem;              //Total amount of memory needed in the mmapped region
+    ch_word connected_offset;       //offset of the first 64bit aligned word after the bring header used to synchronize
+    ch_word rd_mem_start_offset;    //location of the memory region for reads
+    ch_word rd_mem_len;             //length of the read memory region
+    ch_word rd_slots;               //number of slots in the read region
+    ch_word rd_slots_size;          //Size of each slot including the slot footer
+
+    ch_word wr_mem_start_offset;
+    ch_word wr_mem_len;
+    ch_word wr_slots;
+    ch_word wr_slots_size;
+} bring_header_t;
+
+
+
 typedef struct bring_priv_s {
 
-    bring_params_t* params;  //Parameters used when a connection happens
+    bring_params_t* params;     //Parameters used when a connection happens
 
-    //Read side
-    bool is_rd_connected;  //Has connect be called?
-    int rd_fd;             //File descriptor for the backing buffer
-    void* rd_mem_start;    //Size and location of the mmaped region
-    ch_word rd_mem_len;    //
+    bool is_connected;          //Has connect be called?
+    int bring_fd;               //File descriptor for the backing buffer
 
-    //Write side
-    bool is_wr_connected;  //Has connect be called?
-    int wr_fd;             //File descriptor for the backing buffer
-    void* wr_mem_start;    //Size and location of the mmaped region
-    ch_word wr_mem_len;    //
-
-
+    //Actual data structure
+    volatile bring_header_t* bring_head;
 
 } bring_connector_priv_t;
 
@@ -59,77 +72,156 @@ typedef struct bring_priv_s {
 static camio_error_t bring_connect_peek(camio_connector_t* this)
 {
     DBG("Doing connect peek\n");
+    camio_error_t result = CAMIO_ENOERROR;
     bring_connector_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
 
-    if(priv->rd_fd > -1  && priv->wr_fd > -1){
-        return CAMIO_ENOERROR; //Ready to go, please call connect!
+    if(priv->bring_fd > -1 ){ //Ready to go! Call connect!
+        return CAMIO_ENOERROR;
     }
 
-    volatile uint8_t* rd_bring = NULL;
+    DBG("Making bring called %.*s with %lu slots of size %lu\n",
+        priv->params->hierarchical.str_len,
+        priv->params->hierarchical.str,
+        priv->params->slots,
+        priv->params->slot_sz
+    );
 
-
-    if(unlikely(camio_descr_has_opts(descr->opt_head))){
-        eprintf_exit( "Option(s) supplied, but none expected\n");
-    }
-
-
-    //printf("Making bring ostream %s with %lu slots of size %lu\n", descr->query, priv->slot_count, priv->slot_size);
-
-
-    //Make a local copy of the filename in case the descr pointer goes away (probable)
-    size_t filename_len = strlen(descr->query);
-    priv->filename = malloc(filename_len + 1);
-    memcpy(priv->filename,descr->query, filename_len);
-    priv->filename[filename_len] = '\0'; //Make sure it's null terminated
-
+    //Make null terminated file name
+    char* bring_file = (char*)calloc(priv->params->hierarchical.str_len + 1,1); //server to client
+    strncpy(bring_file,priv->params->hierarchical.str, priv->params->hierarchical.str_len);
 
     //See if a bring file already exists, if so, get rid of it.
-    bring_fd = open(descr->query, O_RDONLY);
-    if(unlikely(bring_fd > 0)){
-        wprintf("Found stale bring file. Trying to remove it.\n");
+    int bring_fd = open(bring_file, O_RDONLY);
+    if(bring_fd > 0){
+        DBG("Found stale bring file. Trying to remove it.\n");
         close(bring_fd);
-        if( unlink(descr->query) < 0){
-            eprintf_exit("Could remove stale bring file \"%s\". Error=%s\n", descr->query, strerror(errno));
+        if( unlink(bring_file) < 0){
+            ERR("Could not remove stale bring file \"%s\". Error=%s\n", bring_file, strerror(errno));
+            result = CAMIO_EINVALID;
+            goto free_filename_error;
         }
     }
 
+    bring_fd = open(bring_file, O_RDWR | O_CREAT | O_TRUNC , (mode_t)(0666));
+    if(bring_fd < 0){
+        ERR("Could not open file \"%s\". Error=%s\n", bring_file, strerror(errno));
+        result = CAMIO_EINVALID;
+        goto free_filename_error;
 
-    bring_fd = open(descr->query, O_RDWR | O_CREAT | O_TRUNC , (mode_t)(0666));
-    if(unlikely(bring_fd < 0)){
-        eprintf_exit("Could not open file \"%s\". Error=%s\n", descr->query, strerror(errno));
     }
+
+    //Calculate the amount of memory we will need
+    //Each slot has a requested size, plus some header
+    const ch_word mem_per_slot      = priv->params->slot_sz + sizeof(bring_slot_header_t);
+    //Round up each slot so that it's a multiple of 64bits.
+    const ch_word slot_aligned_size = ((mem_per_slot + sizeof(int64_t) - 1 ) / sizeof(int64_t)) * sizeof(uint64_t);
+    //Figure out the total memory commitment for slots
+    const ch_word mem_per_ring      = slot_aligned_size * priv->params->slots;
+    //Allocate for both server-->client and client-->server connections
+    const ch_word total_ring_mem    = mem_per_ring * 2;
+    //Include the memory required for the headers -- Make sure there's a place for the synchronization pointer
+    const ch_word header_mem        = sizeof(bring_header_t) + sizeof(uint64_t) * 2;
+    //All memory required
+    const ch_word total_mem_req     = total_ring_mem + header_mem;
+    //Add some buffer so that we can align rd/wr rings to page sizes, which will align to a 64 bit boundary as well
+    const ch_word aligned_mem       = total_mem_req + getpagesize() * 2;
+    const ch_word bring_total_mem   = aligned_mem;
+
+    DBG("bring memory requirements\n");
+    DBG("-------------------------\n");
+    DBG("mem_per_slot   %lli\n", mem_per_slot);
+    DBG("slot_sligned   %lli\n", slot_aligned_size);
+    DBG("mem_per_ring   %lli\n", mem_per_ring);
+    DBG("total_ring_mem %lli\n", total_ring_mem);
+    DBG("header_mem     %lli\n", header_mem);
+    DBG("total_mem_req  %lli\n", total_mem_req);
+    DBG("aligned_mem    %lli\n", aligned_mem);
+    DBG("-------------------------\n");
+
 
     //Resize the file
-    if(lseek(bring_fd, CAMIO_BRING_MEM_SIZE -1, SEEK_SET) < 0){
-        eprintf_exit( "Could not resize file for shared region \"%s\". Error=%s\n", descr->query, strerror(errno));
+    if(lseek(bring_fd, bring_total_mem -1, SEEK_SET) < 0){
+        ERR( "Could not move to end of shared region \"%s\" to size=%lli. Error=%s\n",
+            bring_file,
+            bring_total_mem,
+            strerror(errno)
+        );
+        result = CAMIO_EINVALID;
+        goto close_file_error;
     }
 
-    if(write(bring_fd, "", 1) < 0){
-        eprintf_exit( "Could not resize file for shared region \"%s\". Error=%s\n", descr->query, strerror(errno));
+    //Stick some data in the file to make the sizing stick
+    if(write(bring_fd, "", 1) != 1){
+        ERR( "Could not write file in shared region \"%s\" at size=%lli. Error=%s\n",
+            bring_file,
+            bring_total_mem,
+            strerror(errno)
+        );
+        result = CAMIO_EINVALID;
+        goto close_file_error;
+
     }
 
-    bring = mmap( NULL, CAMIO_BRING_MEM_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, bring_fd, 0);
-    if(unlikely(bring == MAP_FAILED)){
-        eprintf_exit("Could not memory map bring file \"%s\". Error=%s\n", descr->query, strerror(errno));
+    void* mem = mmap( NULL, bring_total_mem, PROT_READ | PROT_WRITE, MAP_SHARED, bring_fd, 0);
+    if(unlikely(mem == MAP_FAILED)){
+        ERR("Could not memory map bring file \"%s\". Error=%s\n", bring_file, strerror(errno));
+        result = CAMIO_EINVALID;
+        goto  close_file_error;
     }
+    priv->bring_head = (volatile void*)mem;
+    volatile bring_header_t* bring_head = priv->bring_head;
 
-    //Initialize the bring with 0
-    memset((uint8_t*)bring, 0, CAMIO_BRING_MEM_SIZE);
+
+    bring_head->total_mem             = bring_total_mem;
+    bring_head->connected_offset      = round_up(0 + sizeof(bring_header_t), sizeof(uint64_t) );
+    bring_head->rd_mem_start_offset   = round_up(bring_head->connected_offset + sizeof(uint64_t), getpagesize());
+    bring_head->rd_mem_len            = priv->params->expand ? round_up(mem_per_ring,getpagesize()) : mem_per_ring;
+    bring_head->rd_slots_size         = slot_aligned_size;
+    bring_head->rd_slots              = bring_head->rd_mem_len / bring_head->rd_slots_size;
+    bring_head->wr_mem_start_offset   = round_up(bring_head->rd_mem_start_offset + bring_head->rd_mem_len, getpagesize());
+    bring_head->wr_mem_len            = priv->params->expand ? round_up(mem_per_ring,getpagesize()) : mem_per_ring;
+    bring_head->wr_slots_size         = slot_aligned_size;
+    bring_head->wr_slots              = bring_head->wr_mem_len / bring_head->wr_slots_size;
+
+    const ch_word rd_end_offset = bring_head->rd_mem_start_offset + bring_head->rd_mem_len -1;
+    const ch_word wr_end_offset = bring_head->wr_mem_start_offset + bring_head->wr_mem_len -1;
+    (void)rd_end_offset;
+    (void)wr_end_offset;
+
+    DBG("bring memory offsets\n");
+    DBG("-------------------------\n");
+    DBG("total_mem            %016llx (%lli)\n", bring_head->total_mem, bring_head->total_mem);
+    DBG("connected_offset     %016llx (%lli)\n", bring_head->connected_offset, bring_head->connected_offset);
+    DBG("rd_slots             %016llx (%lli)\n", bring_head->rd_slots,  bring_head->rd_slots);
+    DBG("rd_slots_size        %016llx (%lli)\n", bring_head->rd_slots_size, bring_head->rd_slots_size);
+    DBG("rd_mem_start_offset  %016llx (%lli)\n", bring_head->rd_mem_start_offset, bring_head->rd_mem_start_offset);
+    DBG("rd_mem_len           %016llx (%lli)\n", bring_head->rd_mem_len, bring_head->rd_mem_len);
+    DBG("rd_mem_end_offset    %016llx (%lli)\n", rd_end_offset, rd_end_offset);
+
+    DBG("wr_slots             %016llx (%lli)\n", bring_head->wr_slots,  bring_head->wr_slots);
+    DBG("wr_slots_size        %016llx (%lli)\n", bring_head->wr_slots_size, bring_head->wr_slots_size);
+    DBG("wr_mem_start_offset  %016llx (%lli)\n", bring_head->wr_mem_start_offset,bring_head->wr_mem_start_offset);
+    DBG("wr_mem_len           %016llx (%lli)\n", bring_head->wr_mem_len, bring_head->wr_mem_len);
+    DBG("wr_mem_end_offset    %016llx (%lli)\n", wr_end_offset, wr_end_offset);
+    DBG("-------------------------\n");
+
+    DBG("Done making bring called %s with %llu slots of size %llu, usable size %llu\n",
+        bring_file,
+        priv->bring_head->rd_slots,
+        priv->bring_head->rd_slots_size,
+        priv->bring_head->rd_slots_size - sizeof(bring_slot_header_t)
+    );
 
 
-    priv->bring_size = CAMIO_BRING_MEM_SIZE;
-    this->fd = bring_fd;
-    priv->bring = bring;
-    priv->curr = bring;
-    bring_ostream_created = 1; //Tell a waiting reader that everything is initilaised
-    priv->is_closed = 0;
+    result = CAMIO_ENOERROR;
 
-    DBG("Mapped file to address %p with size %lli\n", priv->base_mem_start, priv->base_mem_len);
+close_file_error:
+    close(bring_fd);
 
-    //printf("%.*s\n",(int)priv->base_mem_len, priv->base_mem_start );
+free_filename_error:
 
-    return CAMIO_ENOERROR;
-
+    free(bring_file);
+    return result;
 }
 
 static camio_error_t bring_connector_ready(camio_muxable_t* this)
@@ -167,7 +259,7 @@ static camio_error_t bring_connect(camio_connector_t* this, camio_stream_t** str
     }
     *stream_o = stream;
 
-    err = bring_stream_construct(stream, this, priv->base_fd, priv->base_mem_start, priv->base_mem_len);
+    err = bring_stream_construct(stream, this);
     if(err){
        return err;
     }
@@ -200,17 +292,20 @@ static camio_error_t bring_construct(camio_connector_t* this, void** params, ch_
         return CAMIO_EINVALID; //TODO XXX : Need better error values
     }
     //But only need a unique name. Not a full file path
-    if(memchr(bring_params->hierarchical.str, "/", bring_params->hierarchical.str_len)){
+    if(memchr(bring_params->hierarchical.str, '/', bring_params->hierarchical.str_len)){
         ERR("Found a / in the bring name.\n");
         return CAMIO_EINVALID;
     }
-    if(memchr(bring_params->hierarchical.str, "\\", bring_params->hierarchical.str_len)){
-        ERR("Found a / in the bring name.\n");
+    if(memchr(bring_params->hierarchical.str, '\\', bring_params->hierarchical.str_len)){
+        ERR("Found a \\ in the bring name.\n");
+        return CAMIO_EINVALID;
+    }
+    if(bring_params->rd_only && bring_params->wr_only){
+        ERR("Transport cannot be in both read and write mode at the same time!\n");
         return CAMIO_EINVALID;
     }
 
-    priv->rd_fd = -1;
-    priv->wr_fd = -1;
+    priv->bring_fd = -1;
 
     //Populate the rest of the muxable structure
     this->muxable.mode              = CAMIO_MUX_MODE_CONNECT;
@@ -224,7 +319,7 @@ static camio_error_t bring_construct(camio_connector_t* this, void** params, ch_
 
 static void bring_destroy(camio_connector_t* this)
 {
-    DBG("Destorying bring connector\n");
+    DBG("Destroying bring connector\n");
     bring_connector_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
 
     if(priv->params) { free(priv->params); }

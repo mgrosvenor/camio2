@@ -29,6 +29,7 @@ typedef struct {
     int64_t server;
     int64_t rd_only;
     int64_t wr_only;
+    int64_t expand;
 } bring_params_t;
 
 void bring_init();

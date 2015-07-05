@@ -67,36 +67,7 @@ static camio_error_t bring_read_peek( camio_stream_t* this)
     //This is not a public function, can assume that preconditions have been checked.
     DBG("Doing read peek\n");
     bring_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
-    camio_error_t err = buffer_malloc_linear_acquire(priv->rd_buff_pool,&priv->rd_buffer);
-    if(err){
-        DBG("Could not acquire read buffer Have you called release?!\n");
-        return err;
-    }
-
-    camio_read_req_t* req = priv->read_req;
-    req->dst_offset_hint = MIN(CAMIO_BRING_BUFFER_SIZE, req->dst_offset_hint); //Make sure we don't overflow the buffer
-    char* read_buffer = (char*)priv->rd_buffer->buffer_start + req->dst_offset_hint; //Do the offset that we need
-    ch_word read_size = CAMIO_BRING_BUFFER_SIZE - req->dst_offset_hint; //Also make sure we don't overflow
-    if(req->read_size_hint){
-        read_size = MIN(read_size,req->read_size_hint);
-    }
-    ch_word bytes = read(priv->fd, read_buffer, read_size);
-    if(bytes < 0){ //Shit, got an error. Maybe there just isn't any data?
-        buffer_malloc_linear_release(priv->rd_buff_pool,&priv->rd_buffer); //TODO, could remove this step and reuse buffer..
-        priv->rd_buffer = NULL;
-
-        if(errno == EWOULDBLOCK || errno == EAGAIN){
-            return CAMIO_ETRYAGAIN;
-        }
-        else{
-            DBG("Something else went wrong, check errno value\n");
-            return CAMIO_ECHECKERRORNO;
-        }
-    }
-
-    priv->rd_buffer->data_len = bytes;
-    priv->rd_buffer->data_start = read_buffer;
-    DBG("Got %lli bytes from BRING peek\n", priv->rd_buffer->data_len );
+    (void)priv;
 
     return CAMIO_ENOERROR;
 }
@@ -287,10 +258,9 @@ static camio_error_t bring_write_acquire(camio_stream_t* this, camio_wr_buffer_t
     }
 
     DBG("Doing write acquire\n");
-    camio_error_t err = buffer_malloc_linear_acquire(priv->wr_buff_pool,buffer_o);
-    if(err){ return err; }
+    (void)priv;
 
-    DBG("Returning new buffer of size %lli at %p\n", (*buffer_o)->buffer_len, (*buffer_o)->buffer_start);
+    //DBG("Returning new buffer of size %lli at %p\n", (*buffer_o)->buffer_len, (*buffer_o)->buffer_start);
     return CAMIO_ENOERROR;
 }
 
@@ -422,12 +392,7 @@ static camio_error_t bring_write_release(camio_stream_t* this, camio_wr_buffer_t
         return CAMIO_EINVALID;
     }
 
-    DBG("Removing data buffer %p staring at %p\n", buffer, (*buffer)->buffer_start);
-    camio_error_t err = buffer_malloc_linear_release(priv->wr_buff_pool,buffer);
-    if(err){
-        DBG("Unexpected release error %lli\n", err);
-        return err;
-    }
+    (void)priv;
 
     *buffer = NULL; //Remove dangling pointers!
 
@@ -469,7 +434,7 @@ static void bring_destroy(camio_stream_t* this)
 
 }
 
-camio_error_t bring_stream_construct(camio_stream_t* this, camio_connector_t* connector, int fd)
+camio_error_t bring_stream_construct(camio_stream_t* this, camio_connector_t* connector)
 {
     //Basic sanity checks -- TODO XXX: Should these be made into (compile time optional?) asserts for runtime performance?
     if( NULL == this){
@@ -479,23 +444,8 @@ camio_error_t bring_stream_construct(camio_stream_t* this, camio_connector_t* co
     bring_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
 
     priv->connector = *connector; //Keep a copy of the connector state
-    priv->fd = fd;
 
-    //Make sure the file descriptors are in non-blocking mode
-    int flags = fcntl(priv->fd, F_GETFL, 0);
-    fcntl(priv->fd, F_SETFL, flags | O_NONBLOCK);
-
-    camio_error_t error = CAMIO_ENOERROR;
-    error = buffer_malloc_linear_new(this,CAMIO_BRING_BUFFER_SIZE,CAMIO_BRING_BUFFER_COUNT,true,&priv->rd_buff_pool);
-    if(error){
-        DBG("No memory for linear read buffer!\n");
-        return CAMIO_ENOMEM;
-    }
-    error = buffer_malloc_linear_new(this,CAMIO_BRING_BUFFER_SIZE,CAMIO_BRING_BUFFER_COUNT,false,&priv->wr_buff_pool);
-    if(error){
-        DBG("No memory for linear write buffer!\n");
-        return CAMIO_ENOMEM;
-    }
+    (void)priv;
 
     this->rd_muxable.mode              = CAMIO_MUX_MODE_READ;
     this->rd_muxable.parent.stream     = this;
@@ -508,7 +458,7 @@ camio_error_t bring_stream_construct(camio_stream_t* this, camio_connector_t* co
     this->wr_muxable.fd                = priv->fd;
 
 
-    DBG("Done constructing BRING stream with read_fd=%i and write_fd=%i\n", fd, fd);
+    //DBG("Done constructing BRING stream with read_fd=%i and write_fd=%i\n", fd, fd);
     return CAMIO_ENOERROR;
 }
 

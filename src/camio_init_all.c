@@ -12,6 +12,7 @@
 #include <src/drivers/fileio/fio_transport.h>
 #include <src/drivers/memfileio/mfio_transport.h>
 #include <src/drivers/stdio/stdio_transport.h>
+#include <src/drivers/bring/bring_transport.h>
 
 #include "camio_debug.h"
 #include "camio_init_all.h"
@@ -39,6 +40,7 @@ camio_error_t camio_init_all_transports(){
     fio_init();
     mfio_init();
     stdio_init();
+    bring_init();
     //add more here
 
     DBG("Initializing transports...Done\n");

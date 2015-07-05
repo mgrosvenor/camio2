@@ -158,6 +158,10 @@ camio_error_t camio_transport_params_new( ch_cstr uri_str, void** params_o, ch_w
         for( CH_LIST_IT(KV) i = uri_opts->first(uri_opts); i.value ; uri_opts->next(uri_opts,&i) ){
             DBG("Looking for %.*s in allowed parameters\n", i.value->key_len, i.value->key);
             char* search_name = (char*)calloc(1,i.value->key_len + 1);//+1 for the null char
+            if(!search_name){
+                result = CAMIO_ENOMEM;
+                goto exit_params;
+            }
             strncpy(search_name, i.value->key, i.value->key_len);
             camio_transport_param_t search = {0};
             search.param_name = search_name;
@@ -251,7 +255,7 @@ camio_error_t camio_transport_params_new( ch_cstr uri_str, void** params_o, ch_w
                 if(found.value){ //We got a value, let's try to assign it
                     if(num_result.type == CH_UINT64) {  *param_ptr = (uint64_t)num_result.val_uint; }
                     else{ //Shit, the value has the wrong type!
-                        ERR("Expected a UINT64 but got \"%.*s\" ", value_len, value);
+                        ERR("%s expected an UINT64 but got \"%.*s\" type=%lli\n", param->param_name, value_len, value, num_result.type);
                         result = CAMIO_EINVALID; //TODO XXX make a better return value
                         goto exit_params;
                     }
@@ -270,7 +274,7 @@ camio_error_t camio_transport_params_new( ch_cstr uri_str, void** params_o, ch_w
                     if(      num_result.type == CH_UINT64)  { *param_ptr = (int64_t)num_result.val_uint; }
                     else if( num_result.type == CH_INT64)   { *param_ptr = (int64_t)num_result.val_int;  }
                     else{
-                        ERR("Expected an INT64 but got \"%.*s\" ", value_len, value);
+                        ERR("%s expected an INT64 but got \"%.*s\" type=%lli\n", param->param_name, value_len, value, num_result.type);
                         result = CAMIO_EINVALID; //TODO XXX make a better return value
                         goto exit_params;
                     }
@@ -290,7 +294,7 @@ camio_error_t camio_transport_params_new( ch_cstr uri_str, void** params_o, ch_w
                     else if( num_result.type == CH_INT64)   { *param_ptr = (double)num_result.val_int;  }
                     else if( num_result.type == CH_DOUBLE)  { *param_ptr = (double)num_result.val_dble; }
                     else{
-                        ERR("Expected a DOUBLE but got\" %.*s\" ", value_len, value);
+                        ERR("%s expected a DOUBLE but got \"%.*s\" type=%lli\n", param->param_name, value_len, value, num_result.type);
                         result = CAMIO_EINVALID; //TODO XXX make a better return value
                         goto exit_params;
                     }
