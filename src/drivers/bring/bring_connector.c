@@ -17,8 +17,7 @@
 #include <memory.h>
 #include <sys/stat.h>
 #include <unistd.h>
-#include <semaphore.h>
-#include <sys/sem.h>
+
 
 #include <src/transports/connector.h>
 #include <src/camio.h>
@@ -35,25 +34,6 @@
 /**************************************************************************************************************************
  * PER STREAM STATE
  **************************************************************************************************************************/
-//Header structure -- There is one of these for every
-#define BRING_MAGIC 0xCA10510
-typedef struct bring_header_s {
-    ch_word magic;                  //Is this memory ready yet?
-    ch_word total_mem;              //Total amount of memory needed in the mmapped region
-
-    ch_word rd_mem_start_offset;    //location of the memory region for reads
-    ch_word rd_mem_len;             //length of the read memory region
-    ch_word rd_slots;               //number of slots in the read region
-    ch_word rd_slots_size;          //Size of each slot including the slot footer
-
-    ch_word wr_mem_start_offset;
-    ch_word wr_mem_len;
-    ch_word wr_slots;
-    ch_word wr_slots_size;
-} bring_header_t;
-
-
-
 typedef struct bring_priv_s {
 
     bring_params_t* params;     //Parameters used when a connection happens
@@ -64,13 +44,7 @@ typedef struct bring_priv_s {
     //Actual data structure
     volatile bring_header_t* bring_head;
 
-    sem_t* mutex;
-    ch_bool server_init;
-    ch_bool client_init;
-
     char* bring_filen;
-    char* bring_sem_servn;
-    char* bring_sem_clientn;
 
 } bring_connector_priv_t;
 
@@ -79,39 +53,6 @@ typedef struct bring_priv_s {
 /**************************************************************************************************************************
  * Connect functions
  **************************************************************************************************************************/
-static camio_error_t bring_connect_peek_server_wait(camio_connector_t* this)
-{
-    bring_connector_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
-    DBG("Doing connect peek server on %s\n", priv->bring_sem_clientn);
-
-    //Make a new named semaphore with the bring file name and initialize it to locked (0)
-    priv->mutex = sem_open(priv->bring_sem_clientn,0);
-    if(priv->mutex == SEM_FAILED){
-        if(errno == ENOENT){
-            return CAMIO_ETRYAGAIN; // The semaphore has not yet been created
-        }
-
-        //EEk some other error happened~
-        ERR("Could not open named semaphore \"%s\". Error=%s\n", priv->bring_sem_clientn, strerror(errno));
-        return CAMIO_EINVALID;
-    }
-
-    //Wait until all of the init work is done:
-    if(sem_trywait(priv->mutex)){
-        if(errno == EAGAIN){
-            return CAMIO_ETRYAGAIN;
-        }
-
-        ERR("Something funny happened on try wait. Error=%s\n", strerror(errno));
-        return CAMIO_EINVALID;
-    }
-
-    priv->client_init = true;
-    sem_unlink(priv->bring_sem_clientn);
-    return CAMIO_ENOERROR;
-}
-
-
 static camio_error_t bring_connect_peek_server(camio_connector_t* this)
 {
 
@@ -125,17 +66,6 @@ static camio_error_t bring_connect_peek_server(camio_connector_t* this)
         priv->params->slots,
         priv->params->slot_sz
     );
-
-    //Make a new named semaphore with the bring file name and initialize it to locked (0)
-    priv->mutex = sem_open(priv->bring_sem_servn, O_CREAT | O_EXCL, 0666, 0);
-    if(priv->mutex == SEM_FAILED){
-        ERR("Could not open named semaphore \"%s\". Error=%s\n", priv->bring_sem_servn, strerror(errno));
-        result = CAMIO_EINVALID;
-        goto error_no_cleanup;
-    }
-
-//--------------------------------------------------------------------------------------------------------------------------
-// START ATOMIC SECTION !!!
 
     //See if a bring file already exists, if so, get rid of it.
     int bring_fd = open(priv->bring_filen, O_RDONLY);
@@ -161,7 +91,7 @@ static camio_error_t bring_connect_peek_server(camio_connector_t* this)
     //Each slot has a requested size, plus some header
     const ch_word mem_per_slot      = priv->params->slot_sz + sizeof(bring_slot_header_t);
     //Round up each slot so that it's a multiple of 64bits.
-    const ch_word slot_aligned_size = ((mem_per_slot + sizeof(int64_t) - 1 ) / sizeof(int64_t)) * sizeof(uint64_t);
+    const ch_word slot_aligned_size = round_up(mem_per_slot, sizeof(int64_t));
     //Figure out the total memory commitment for slots
     const ch_word mem_per_ring      = slot_aligned_size * priv->params->slots;
     //Allocate for both server-->client and client-->server connections
@@ -271,15 +201,16 @@ static camio_error_t bring_connect_peek_server(camio_connector_t* this)
     );
 
     priv->bring_fd = bring_fd;
-    result = CAMIO_ENOERROR;
 
-// END ATOMIC SECTION!!!
-//---------------------------------------------------------------------------------------------------------------------------
+    //Make sure all the memory writes are done
+    __sync_synchronize();
 
     //Finally, tell the client that we're ready to party
-    priv->server_init = true;
-    sem_post(priv->mutex);
+    priv->bring_head->magic = BRING_MAGIC_SERVER; //<--- This must be atomic
 
+    //Again, make sure all the memory writes are done
+    __sync_synchronize();
+    result = CAMIO_ENOERROR;
     return result;
 
 close_file_error:
@@ -296,51 +227,37 @@ static camio_error_t bring_connect_peek_client(camio_connector_t* this)
 
     camio_error_t result = CAMIO_ENOERROR;
     bring_connector_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
-    DBG("Doing connect peek client on %s\n", priv->bring_filen);
-
-    //Try to open the semaphore
-    //Make a new named semaphore with the bring file name and initialize it to locked (0)
-    priv->mutex = sem_open(priv->bring_sem_servn,0);
-    if(priv->mutex == SEM_FAILED){
-        if(errno == ENOENT){
-            return CAMIO_ETRYAGAIN; // The semaphore has not yet been created
-        }
-
-        //EEk some other error happened~
-        ERR("Could not open named semaphore \"%s\". Error=%s\n", priv->bring_sem_servn, strerror(errno));
-        result = CAMIO_EINVALID;
-        goto error_no_cleanup;
-    }
-
-    //Wait until all of the init work is done:
-    if(sem_trywait(priv->mutex)){
-        if(errno == EAGAIN){
-            result = CAMIO_ETRYAGAIN;
-            goto error_no_cleanup;
-        }
-
-        ERR("Something funny happened on try wait. Error=%s\n", strerror(errno));
-        result = CAMIO_EINVALID;
-        goto error_no_cleanup;
-
-   }
-
-    //<<-------------- BEGIN ATOMIC SECTION ---------------->>>
+    //DBG("Doing connect peek client on %s\n", priv->bring_filen);
 
     //Now there is a bring file and it should have a header in it
     int bring_fd = open(priv->bring_filen, O_RDWR);
     if(bring_fd < 0){
-        ERR("Could not open named shared memory file \"%s\". Error=%s\n", priv->bring_filen, strerror(errno));
-        result = CAMIO_EINVALID;
-        goto error_release_semaphore;
+        //ERR("Could not open named shared memory file \"%s\". Error=%s\n", priv->bring_filen, strerror(errno));
+        result = CAMIO_ETRYAGAIN;
+        goto error_no_cleanup;
     }
 
-
+    //This is a sort of nasty atomic access. Which doesn't leave crap lying around like POSIX semaphores do
     bring_header_t header_tmp = {0};
-    size_t bytes = read(bring_fd,&header_tmp,sizeof(header_tmp));
-    if(bytes < sizeof(bring_header_t)){
-        ERR("Could not read header.\n");
-        result = CAMIO_EINVALID;
+    size_t bytes = read(bring_fd,&header_tmp.magic,sizeof(ch_word));
+    if(bytes < sizeof(ch_word)){
+        ERR("Could not read header magic. Not enough bytes, expected %lli but got %lli\n", sizeof(header_tmp.magic), bytes);
+        result = CAMIO_ETRYAGAIN;
+        goto error_close_file;
+    }
+    if(header_tmp.magic != BRING_MAGIC_SERVER){
+        ERR("Bad magic! Expected 0x%016X but got 0x%016X\n", BRING_MAGIC_SERVER, header_tmp.magic);
+        result = CAMIO_ETRYAGAIN;
+        goto error_close_file;
+    }
+    header_tmp.magic = BRING_MAGIC_CLIENT;
+
+    //If we have the magic value, try to read the rest
+    const size_t size_no_magic =  sizeof(header_tmp) - sizeof(header_tmp.magic);
+    bytes = read(bring_fd,&header_tmp.total_mem, size_no_magic);
+    if(bytes < size_no_magic){
+        ERR("Could not read header. Not enough bytes, expected %lli but got %lli\n", size_no_magic, bytes);
+        result = CAMIO_ETRYAGAIN;
         goto error_close_file;
     }
 
@@ -358,7 +275,6 @@ static camio_error_t bring_connect_peek_client(camio_connector_t* this)
     DBG("wr_mem_start_offset  %016llx (%lli)\n", bring_head->wr_mem_start_offset,bring_head->wr_mem_start_offset);
     DBG("wr_mem_len           %016llx (%lli)\n", bring_head->wr_mem_len, bring_head->wr_mem_len);
     DBG("-------------------------\n");
-
 
     void* mem = mmap( NULL, header_tmp.total_mem, PROT_READ | PROT_WRITE, MAP_SHARED, bring_fd, 0);
     if(unlikely(mem == MAP_FAILED)){
@@ -402,20 +318,6 @@ error_unmap_file:
 error_close_file:
     close(bring_fd);
 
-error_release_semaphore:
-    priv->client_init = true; //We're done setting up the client side. Now tell the server we're ready
-    DBG("Client is up, telling the server...\n");
-    sem_post(priv->mutex); //<<-------------- END ATOMIC
-
-    priv->mutex = sem_open(priv->bring_sem_clientn, O_CREAT | O_EXCL, 0666, 1);
-    if(priv->mutex == SEM_FAILED){
-        ERR("Could not open named semaphore \"%s\". Error=%s\n", priv->bring_sem_clientn, strerror(errno));
-        result = CAMIO_EINVALID;
-        goto error_no_cleanup;
-    }
-
-    sem_unlink(priv->bring_sem_servn);
-
 error_no_cleanup:
     return result;
 }
@@ -425,13 +327,9 @@ error_no_cleanup:
 //Try to see if connecting is possible.
 static camio_error_t bring_connect_peek(camio_connector_t* this)
 {
-    DBG("Doing connect peek\n");
+    //DBG("Doing connect peek\n");
     camio_error_t result = CAMIO_ENOERROR;
     bring_connector_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
-
-    if(priv->params->server && priv->bring_fd > -1 && priv->server_init && !priv->client_init){ //Waiting for the client to report back;
-        return bring_connect_peek_server_wait(this);
-    }
 
     if(priv->bring_fd > -1 ){ //Ready to go! Call connect!
         return CAMIO_ENOERROR;
@@ -439,9 +337,6 @@ static camio_error_t bring_connect_peek(camio_connector_t* this)
 
     if(priv->params->server){
         result = bring_connect_peek_server(this);
-        if(!result){
-            result = bring_connect_peek_server_wait(this);
-        }
     }
     else{
         result = bring_connect_peek_client(this);
@@ -486,7 +381,7 @@ static camio_error_t bring_connect(camio_connector_t* this, camio_stream_t** str
     }
     *stream_o = stream;
 
-    err = bring_stream_construct(stream, this);
+    err = bring_stream_construct(stream, this, priv->bring_head, priv->params, priv->bring_fd);
     if(err){
        return err;
     }
@@ -537,20 +432,6 @@ static camio_error_t bring_construct(camio_connector_t* this, void** params, ch_
     priv->bring_filen = (char*)calloc(1,priv->params->hierarchical.str_len + 1);
     strncpy(priv->bring_filen,priv->params->hierarchical.str, priv->params->hierarchical.str_len);
 
-    int len = snprintf(NULL,0,"%s_server", priv->bring_filen);
-    DBG("len=%i\n", len);
-    priv->bring_sem_servn = (char*)calloc(1, len + 1);
-    len = sprintf(priv->bring_sem_servn,"%s_server", priv->bring_filen);
-    DBG("len=%i\n", len);
-
-    len = snprintf(NULL,0,"%s_client", priv->bring_filen);
-    DBG("len=%i\n", len);
-    priv->bring_sem_clientn = (char*)calloc(1, len + 1);
-    len = sprintf(priv->bring_sem_clientn,"%s_client", priv->bring_filen);
-    DBG("len=%i\n", len);
-
-    DBG("%s -> %s -> %s\n", priv->bring_filen, priv->bring_sem_servn, priv->bring_sem_clientn);
-
     //Populate the rest of the muxable structure
     this->muxable.mode              = CAMIO_MUX_MODE_CONNECT;
     this->muxable.parent.connector  = this;
@@ -567,8 +448,6 @@ static void bring_destroy(camio_connector_t* this)
     bring_connector_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
 
     if(priv->bring_filen)      { free(priv->bring_filen);       }
-    if(priv->bring_sem_servn)  { free(priv->bring_sem_servn);   }
-    if(priv->bring_sem_clientn){ free(priv->bring_sem_clientn); }
 
     if(priv->params) { free(priv->params); }
     DBG("Freed params\n");

@@ -53,7 +53,6 @@ void bring_init()
 
     add_param_optional(params,"slots",bring_params_t,slots, CAMIO_BRING_SLOT_COUNT_DEFAULT);
     add_param_optional(params,"slot_sz",bring_params_t,slot_sz,CAMIO_BRING_SLOT_SIZE_DEFAULT);
-    add_param_optional(params,"block",bring_params_t,blocking,1);  //Ring will stop if it is full
     add_param_optional(params,"server",bring_params_t,server, 0);
     add_param_optional(params,"expand",bring_params_t,expand, 1);
     const ch_word hier_offset = offsetof(bring_params_t,hierarchical);
