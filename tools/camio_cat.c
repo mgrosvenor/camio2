@@ -116,8 +116,10 @@ int main(int argc, char** argv)
                 }
 
                 camio_mux_insert(mux, &stream->rd_muxable, mux_id);
-                streams->push_back(streams,(void*)stream);
                 mux_id++;
+                camio_mux_insert(mux, &stream->wr_muxable, mux_id);
+                mux_id++;
+                streams->push_back(streams,(void*)stream);
 
                 DBG("req.off=%lli req.dst=%lli req.size=%lli\n",rd_req.src_offset_hint, rd_req.dst_offset_hint, rd_req.read_size_hint);
                 err = camio_read_request(stream,&rd_req,1); //Tell the read stream that we would like some more data..
@@ -201,5 +203,6 @@ int main(int argc, char** argv)
         }
     }
 
+    DBG("Terminating normally\n");
     return 0;
 }
