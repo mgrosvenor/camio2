@@ -202,14 +202,14 @@ static camio_error_t bring_connect_peek_server(camio_connector_t* this)
 
     priv->bring_fd = bring_fd;
 
-    //Make sure all the memory writes are done
-    __sync_synchronize();
-
     //Finally, tell the client that we're ready to party
-    priv->bring_head->magic = BRING_MAGIC_SERVER; //<--- This must be atomic
-
-    //Again, make sure all the memory writes are done
+    //1 - Make sure all the memory writes are done
     __sync_synchronize();
+    //2 - Do a word aligned single word write (atomic)
+    priv->bring_head->magic = BRING_MAGIC_SERVER;
+    //3 - Again, make sure all the memory writes are done
+    __sync_synchronize();
+
     result = CAMIO_ENOERROR;
     return result;
 

@@ -37,8 +37,6 @@ static inline ch_word delimit(char* buffer, ch_word len)
 
 }
 
-typedef enum { READ_STREAM } camio_cat_state_e;
-
 int main(int argc, char** argv)
 {
     //We don't use these for the test ... yet

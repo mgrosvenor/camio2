@@ -50,7 +50,8 @@ typedef enum camio_error_e {
     CAMIO_ENOTREADY,            //32
     CAMIO_EREADY,               //33
     CAMIO_ETOOMANY,             //34
-    CAMIO_ECLOSED               //35
+    CAMIO_ECLOSED,              //35
+    CAMIO_ENOMORE,              //36
 } camio_error_t;
 
 #endif /* CAMIO_ERRORS_H_ */

@@ -20,5 +20,7 @@
  */
 camio_error_t camio_stream_new(char* uri, camio_stream_t** stream);
 
+camio_error_t camio_connector_new(char* uri, camio_connector_t** connector_o);
+
 
 #endif /* API_EASY_H_ */

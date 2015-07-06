@@ -73,3 +73,24 @@ camio_error_t camio_stream_new(char* uri, camio_stream_t** stream)
    camio_connector_destroy(connector);
    return CAMIO_ENOERROR;
 }
+
+camio_error_t camio_connector_new(char* uri, camio_connector_t** connector_o)
+{
+    ch_word id = -1;
+    void* params = NULL;
+    ch_word params_size = 0;
+    camio_error_t err = camio_transport_params_new(uri,&params,&params_size, &id);
+    if(err){
+        ERR("Invalid transport specification %s\n", uri);
+        return CAMIO_EINVALID; //TODO XXX put a better error here
+    }
+
+    //Use the parameters structure to construct a new connector object
+    err = camio_transport_constr(id,&params,params_size,connector_o);
+    if(err){
+        DBG("Could not construct connector\n");
+        return CAMIO_EINVALID; //TODO XXX put a better error here
+    }
+
+    return CAMIO_ENOERROR;
+}

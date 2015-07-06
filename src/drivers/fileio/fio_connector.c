@@ -96,6 +96,11 @@ static camio_error_t fio_connect_peek(camio_connector_t* this)
 
 camio_error_t fio_connector_ready(camio_muxable_t* this)
 {
+    fio_connector_priv_t* priv = CONNECTOR_GET_PRIVATE(this->parent.connector);
+    if(priv->is_connected){
+        return CAMIO_ENOMORE; // We're already connected!
+    }
+
     if(this->fd > -1){
         return CAMIO_EREADY;
     }

@@ -24,6 +24,7 @@ typedef struct camio_mux_interface_s{
     camio_error_t (*insert)(camio_mux_t* this, camio_muxable_t* muxable, ch_word id);
     camio_error_t (*remove)(camio_mux_t* this, camio_muxable_t* muxable);
     camio_error_t (*select)(camio_mux_t* this, /*struct timespec timeout,*/ camio_muxable_t** muxable_o, ch_word* which_o);
+    ch_word (*count)(camio_mux_t* this);
     void (*destroy)(camio_mux_t* this);
 } camio_mux_interface_t;
 
@@ -62,6 +63,7 @@ typedef struct camio_mux_s {
             .remove     = NAME##_remove,\
             .select     = NAME##_select,\
             .destroy    = NAME##_destroy,\
+            .count      = NAME##_count,\
     };\
     \
     NEW_MUX_DECLARE(NAME)\

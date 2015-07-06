@@ -155,6 +155,11 @@ inline camio_error_t camio_mux_select(camio_mux_t* this,
     return this->vtable.select(this, /*timeout,*/ muxable_o, which_o);
 }
 
+ch_word camio_mux_count(camio_mux_t* this)
+{
+    return this->vtable.count(this);
+}
+
 
 inline void camio_mux_destroy(camio_mux_t* this)
 {

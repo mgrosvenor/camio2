@@ -227,6 +227,9 @@ camio_error_t camio_mux_select(camio_mux_t* this,
 );
 
 
+ch_word camio_mux_count(camio_mux_t* this);
+
+
 /**
  * Free resources associated with this selector
  */

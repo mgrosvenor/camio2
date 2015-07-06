@@ -106,4 +106,11 @@ void spin_destroy(camio_mux_t* this)
 }
 
 
+ch_word spin_count(camio_mux_t* this)
+{
+    mux_spin_priv_t* priv = MUX_GET_PRIVATE(this);
+    return priv->muxables->count;
+}
+
+
 NEW_MUX_DEFINE(spin,mux_spin_priv_t)
