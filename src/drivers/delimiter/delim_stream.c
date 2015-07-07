@@ -223,7 +223,7 @@ static camio_error_t delim_read_ready(camio_muxable_t* this)
     }
 
     if(!priv->read_registered){ //Even if there is data waiting, nobody want's it, so ignore for now.
-        ERR("Nobody wants the data\n");
+        DBG("Nobody asked for data, ignoring\n");
         return CAMIO_ENOTREADY;
     }
 
@@ -467,6 +467,7 @@ reset_and_exit:
  **************************************************************************************************************************/
 static camio_error_t delim_write_ready(camio_muxable_t* this)
 {
+    //DBG("Doing write ready\n");
     //Basic sanity checks -- TODO DELIM: Should these be made into (compile time optional?) asserts for runtime performance?
     if( NULL == this){
         ERR("This is null???\n"); //WTF?
@@ -478,6 +479,7 @@ static camio_error_t delim_write_ready(camio_muxable_t* this)
         return CAMIO_EINVALID;
     }
 
+
     //OK now the fun begins
     delim_stream_priv_t* priv = STREAM_GET_PRIVATE(this->parent.stream);
 
@@ -487,6 +489,8 @@ static camio_error_t delim_write_ready(camio_muxable_t* this)
 
 static camio_error_t delim_write_acquire(camio_stream_t* this, camio_wr_buffer_t** buffer_o)
 {
+    DBG("Doing write acquire\n");
+
     //Basic sanity checks -- TODO DELIM: Should these be made into (compile time optional?) asserts for runtime performance?
     if( NULL == this){
         ERR("This null???\n"); //WTF?

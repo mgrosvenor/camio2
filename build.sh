@@ -45,11 +45,10 @@ cake tools/camio_cat.c \
     --append-LINKFLAGS="$LINKFLAGS"\
     $@
 
-#cake tools/camio_perf/camio_perf.c \
-#    --append-CFLAGS="$INCLUDES $CFLAGS"\
-#    --append-LINKFLAGS="$LINKFLAGS"\
-#    $@
-#    --variant=release\
+cake tools/camio_perf/camio_perf.c \
+    --append-CFLAGS="$INCLUDES $CFLAGS"\
+    --append-LINKFLAGS="$LINKFLAGS"\
+    $@
 
 #cake tools/camio_wc.c \
 #    --append-CFLAGS="$INCLUDES $CFLAGS"\

@@ -209,8 +209,8 @@ static camio_error_t tcp_connector_ready(camio_muxable_t* this)
     tcp_connector_priv_t* priv = CONNECTOR_GET_PRIVATE(this->parent.connector);
 
     if(priv->connected_client){
-        ERR("Already connected!\n");
-        return CAMIO_ENOTREADY;
+        DBG("Already connected!\n");
+        return CAMIO_EALLREADYCONNECTED;
     }
 
     if(priv->con_fd_tmp > -1){

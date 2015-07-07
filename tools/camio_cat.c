@@ -55,8 +55,15 @@ int main(int argc, char** argv)
     ch_opt_parse(argc,argv);
 
     //Create a new multiplexer for streams to go into
-    camio_mux_t* mux = NULL;
-    camio_error_t err = camio_mux_new(CAMIO_MUX_HINT_PERFORMANCE, &mux);
+    camio_mux_t* rc_mux = NULL;
+    camio_error_t err = camio_mux_new(CAMIO_MUX_HINT_PERFORMANCE, &rc_mux);
+    if(err){
+        ERR("Could not make new multiplexer\n");
+        return CAMIO_EINVALID; //TODO XXX put a better error here
+    }
+
+    camio_mux_t* wr_mux = NULL;
+    err = camio_mux_new(CAMIO_MUX_HINT_PERFORMANCE, &wr_mux);
     if(err){
         ERR("Could not make new multiplexer\n");
         return CAMIO_EINVALID; //TODO XXX put a better error here
@@ -65,7 +72,7 @@ int main(int argc, char** argv)
 
     ch_word mux_id = 0;
     DBG("populating mux\n");
-    err = populate_mux(mux, options.inout, &mux_id);
+    err = populate_mux(rc_mux, options.inout, &mux_id);
     if(err){
         ERR("Error populating inout URIs \n");
         return CAMIO_EINVALID; //TODO XXX put a better error here
@@ -90,9 +97,9 @@ int main(int argc, char** argv)
 
     CH_VECTOR(voidp)* streams = CH_VECTOR_NEW(voidp,128,CH_VECTOR_CMP(voidp));
     ch_word outstanding_writes = 0;
-    while(camio_mux_count(mux)){
+    while(camio_mux_count(rc_mux)){
         //Block waiting for a stream to be ready
-        err = camio_mux_select(mux,&muxable,&which);
+        err = camio_mux_select(rc_mux,&muxable,&which);
         if(err != CAMIO_ENOERROR && err != CAMIO_ENOMORE){
             ERR("Unexpected error %lli on stream with id =%lli\n", err, which);
             continue;
@@ -105,7 +112,7 @@ int main(int argc, char** argv)
                 camio_stream_t* stream;
                 if(err == CAMIO_ENOMORE){ //This connector is done, remove it
                     DBG("The connection is closed, removing it\n");
-                    camio_mux_remove(mux,muxable);
+                    camio_mux_remove(rc_mux,muxable);
                     continue; //The connection is dead!
                 }
 
@@ -115,9 +122,9 @@ int main(int argc, char** argv)
                     continue;
                 }
 
-                camio_mux_insert(mux, &stream->rd_muxable, mux_id);
+                camio_mux_insert(rc_mux, &stream->rd_muxable, mux_id);
                 mux_id++;
-                camio_mux_insert(mux, &stream->wr_muxable, mux_id);
+                camio_mux_insert(wr_mux, &stream->wr_muxable, mux_id);
                 mux_id++;
                 streams->push_back(streams,(void*)stream);
 
@@ -145,7 +152,7 @@ int main(int argc, char** argv)
 
                 if(rd_buffer->data_len == 0){
                     DBG("The connection is closed, removing it\n");
-                    camio_mux_remove(mux,muxable);
+                    camio_mux_remove(rc_mux,muxable);
                     continue; //The connection is dead!
                 }
 
@@ -180,28 +187,44 @@ int main(int argc, char** argv)
                 if(err){ DBG("Got a read release error %i\n", err); return -1; }
                 DBG("Queued %lli write events\n", outstanding_writes);
 
+
+                //Now wait for all of the writes to complete
+                while(outstanding_writes){
+                    err = camio_mux_select(wr_mux,&muxable, &which);
+                    if(err){
+                        if(err == CAMIO_ETRYAGAIN){
+                            continue;
+                        }
+
+                        if(err != CAMIO_ECLOSED){
+                            ERR("Unexpected error %lli\n", err);
+                        }
+
+                        camio_mux_remove(wr_mux,muxable);
+                        outstanding_writes--;
+                    }
+
+                    DBG("Write event outstanding=%lli\n", outstanding_writes);
+                    camio_stream_t* stream = muxable->parent.stream;
+                    DBG("Handling write event\n");
+                    //Done with the write buffer, release it
+                    err = camio_write_release(stream,&wr_buffer);
+                    if(err){ DBG("Got a write release error %i\n", err);  }
+                    outstanding_writes--;
+                }
+
                 DBG("req.off=%lli req.dst=%lli req.size=%lli\n",rd_req.src_offset_hint, rd_req.dst_offset_hint, rd_req.read_size_hint);
                 err = camio_read_request(stream,&rd_req,1); //Tell the read stream that we would like some more data..
                 if(err){ DBG("Got a read request error %i\n", err); return -1; }
-
                 break;
-            }
 
-            case CAMIO_MUX_MODE_WRITE:{
-                DBG("Write event outstanding=%lli\n", outstanding_writes);
-                camio_stream_t* stream = muxable->parent.stream;
-                DBG("Handling write event\n");
-                //Done with the write buffer, release it
-                err = camio_write_release(stream,&wr_buffer);
-                if(err){ DBG("Got a write release error %i\n", err);  }
-                outstanding_writes--;
-
-                break;
             }
             default:
                 DBG("EeeK! Unknown mux type=%lli\n", muxable->mode);
         }
     }
+
+    //TODO should really do clean up here...
 
     DBG("Terminating normally\n");
     return 0;

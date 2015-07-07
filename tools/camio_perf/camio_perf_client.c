@@ -16,21 +16,108 @@
 #include <src/api/api_easy.h>
 #include <src/camio_debug.h>
 #include <src/drivers/delimiter/delim_transport.h>
+#include "camio_perf_packet.h"
 
 #include "options.h"
 extern struct options_t options;
 
 #define CONNECTOR_ID 0
 
-#define DELIM_LEN 8
-int delimit(char* buffer, int len)
+
+ch_word delimit(char* buffer, ch_word len)
 {
-    (void)buffer;
-    if(len < DELIM_LEN){
+    if((size_t)len < sizeof(camio_perf_packet_head_t)){
         return -1;
     }
 
-    return DELIM_LEN;
+    camio_perf_packet_head_t* head = (camio_perf_packet_head_t*)buffer;
+    if(len < head->size){
+        return -1;
+    }
+
+    return head->size;
+}
+
+camio_error_t connect_delim(ch_cstr client_stream_uri, camio_connector_t** connector) {
+
+    //Find the ID of the delim stream
+    ch_word id;
+    camio_error_t err = camio_transport_get_id("delim", &id);
+
+    //Fill in the delim stream paramters structure
+    delim_params_t delim_params = {
+            .base_uri = client_stream_uri,
+            .delim_fn = delimit
+    };
+    ch_word params_size = sizeof(delim_params_t);
+    void* params = &delim_params;
+
+    //Use the parameters structure to construct a new connector object
+    err = camio_transport_constr(id, &params, params_size, connector);
+    if (err) {
+        DBG("Could not construct connector\n");
+        return CAMIO_EINVALID; //TODO XXX put a better error here
+    }
+
+    //And we're done!
+    DBG("Got connector\n");
+    return CAMIO_ENOERROR;
+}
+
+static camio_write_req_t wreq;
+camio_error_t send_message(camio_buffer_t** buffer_o, camio_muxable_t* muxable, ch_word ts, ch_word seq)
+{
+    camio_error_t err = CAMIO_ENOERROR;
+    camio_buffer_t* wr_buffer = *buffer_o;
+    if(!wr_buffer){
+        //Get and init a buffer for writing stuff to. Hang on to it if possible
+        DBG("No write buffer, grabbing a new one parent=%p, buffer=%p\n", muxable->parent.stream, &wr_buffer);
+        err = camio_write_acquire(muxable->parent.stream, &wr_buffer);
+        if(err){
+            ERR("Could not get a writing buffer to stream\n");
+            return err;
+            //return CAMIO_EINVALID; /*TODO XXX put a better error here*/
+        }
+
+        //Figure out how much we should send. -- Just some basic sanity checking
+        const ch_word req_bytes     = MAX((size_t)options.len, sizeof(camio_perf_packet_head_t));
+        const ch_word bytes_to_send = MIN(req_bytes,wr_buffer->data_len);
+
+        //Initialize the packet with some non zero junk
+        for(int i = 0; i < bytes_to_send; i++){
+            *((char*)wr_buffer->data_start + i) = i % 27 + 'A';
+        }
+
+        camio_perf_packet_head_t* head = wr_buffer->data_start;
+        head->size = bytes_to_send;
+        *buffer_o = wr_buffer;
+    }
+
+    camio_perf_packet_head_t* head = wr_buffer->data_start;
+    head->seq_number = seq;
+    head->time_stamp = ts;
+
+    wreq.src_offset_hint = CAMIO_WRITE_REQ_SRC_OFFSET_NONE;
+    wreq.dst_offset_hint = CAMIO_WRITE_REQ_DST_OFFSET_NONE;
+    wreq.buffer  = wr_buffer;
+
+
+    DBG("Write request buffer %p  (buffer_o=%p) of size %lli at %p with parent=%p\n",
+            wr_buffer,
+            *buffer_o,
+        wreq.buffer->__internal.__mem_len,
+        wreq.buffer->__internal.__mem_start,
+        wreq.buffer->__internal.__parent
+    );
+
+
+    err = camio_write_request(muxable->parent.stream,&wreq,1 );
+    if(err != CAMIO_ENOERROR && err != CAMIO_ETRYAGAIN){
+        ERR("Unexpected write error %lli\n", err);
+        return err;
+    }
+
+    return CAMIO_ENOERROR;
 }
 
 int camio_perf_clinet(ch_cstr client_stream_uri, ch_word* stop)
@@ -41,43 +128,17 @@ int camio_perf_clinet(ch_cstr client_stream_uri, ch_word* stop)
     camio_error_t err = camio_mux_new(CAMIO_MUX_HINT_PERFORMANCE, &mux);
 
     //Construct a delimiter
-    ch_word id;
-    err = camio_transport_get_id("delim",&id);
-
-    delim_params_t delim_params = {
-            .base_uri = client_stream_uri,
-            .delim_fn = delimit,
-    };
-    ch_word params_size = sizeof(delim_params_t);
-    void* params = &delim_params;
-
-    //Use the parameters structure to construct a new connector object
     camio_connector_t* connector = NULL;
-    err = camio_transport_constr(id,&params,params_size,&connector);
+    err = connect_delim(client_stream_uri, &connector);
     if(err){
-        DBG("Could not construct connector\n");
-        return CAMIO_EINVALID; //TODO XXX put a better error here
+        DBG("Could not create delimiter!\n");
+        return CAMIO_EINVALID;
     }
-
-    DBG("Got connector\n");
 
     //Insert the connector into the mux
     err = camio_mux_insert(mux,&connector->muxable, CONNECTOR_ID);
     if(err){
         DBG("Could not insert connector into multiplexer\n");
-        return CAMIO_EINVALID;
-    }
-
-    camio_rd_buffer_t* wr_buffer = NULL;
-    camio_muxable_t* which       = NULL;
-
-    //Figure out how much data to send
-    ch_word bytes_to_send = options.len;
-
-    camio_stream_t* tmp_stream = NULL;
-    CH_VECTOR(voidp)* streams = CH_VECTOR_NEW(voidp,64,NULL);
-    if(!streams){
-        DBG("Could not create streams vector\n");
         return CAMIO_EINVALID;
     }
 
@@ -90,8 +151,14 @@ int camio_perf_clinet(ch_cstr client_stream_uri, ch_word* stop)
     ch_word time_interval_ns    = 1000 * 1000 * 1000;
     ch_word total_bytes         = 0;
     ch_word intv_bytes          = 0;
+    ch_word inflight_bytes      = 0;
 
     DBG("Staring main loop\n");
+    camio_muxable_t* muxable     = NULL;
+    camio_rd_buffer_t* wr_buffer = NULL;
+    ch_word which                = 0;
+    ch_word seq                  = 0;
+
     while(!*stop){
 
         gettimeofday(&now, NULL);
@@ -115,74 +182,58 @@ int camio_perf_clinet(ch_cstr client_stream_uri, ch_word* stop)
             intv_bytes = 0;
         }
 
-        //Block waiting for a stream to be ready
-        camio_mux_select(mux,&which);
-
-        //Do a read request on all streams -- We don't care about reading (yet)
-//        for(void** it = streams->first; it != streams->end; it = streams->next(streams,it)){
-//            camio_stream_t* tmp_stream = (camio_stream_t*)*it;
-//            camio_read_request(tmp_stream,0,0);
-//        }
+        //Block waiting for a stream to be ready to read or connect
+        camio_mux_select(mux,&muxable,&which);
 
         //Have a look at what we have
-        switch(which->id){
+        switch(muxable->mode){
             //This is a connector that's just fired
-            case CONNECTOR_ID:{
-                err = camio_connect(connector,&tmp_stream);
+            case CAMIO_MUX_MODE_CONNECT:{
+                DBG("Handling connect ready()\n");
+                camio_stream_t* tmp_stream = NULL;
+                err = camio_connect(muxable->parent.connector,&tmp_stream);
+
+                if(err == CAMIO_EALLREADYCONNECTED){ //No more connections possible
+                    DBG("Removing expired connector\n");
+                    camio_mux_remove(mux,muxable);
+                    continue;
+                }
                 if(err != CAMIO_ENOERROR){
-                    DBG("Could not get stream. Got errr %i\n", err);
+                    ERR("Could not get stream. Got errr %i\n", err);
                     return CAMIO_EINVALID;
                 }
-                streams->push_back(streams,tmp_stream);
-                //camio_mux_insert(mux,&tmp_stream->rd_muxable,CONNECTOR_ID + 1); -- We don't care about reading! (yet)
+
+                camio_mux_insert(mux,&tmp_stream->rd_muxable,CONNECTOR_ID + 1);
                 camio_mux_insert(mux,&tmp_stream->wr_muxable,CONNECTOR_ID + 3);
+
+                //Kick things off by sending the first message
+                send_message(&wr_buffer,&tmp_stream->wr_muxable,time_now_ns,seq++);
+                inflight_bytes = wreq.buffer->data_len;
+                DBG("Sending %lli bytes\n", inflight_bytes);
 
                 break;
             }
-            default:{
-                tmp_stream = which->parent.stream;
-                if(!wr_buffer){
-                    //Get and init a buffer for writing stuff to. Hang on to it if possible
-                    DBG("Stream is ready for writing, getting buffer\n");
-                    err = camio_write_acquire(tmp_stream, &wr_buffer);
-                    if(err){
-                        DBG("Could not get a writing buffer to stream\n");
-                        return CAMIO_EINVALID; /*TODO XXX put a better error here*/
-                    }
-                    DBG("Got buffer of size %i\n", wr_buffer->buffer_len);
-
-                    bytes_to_send = MIN(bytes_to_send,wr_buffer->buffer_len);
-
-                    for(int i = 0; i < bytes_to_send; i++){
-                        *((char*)wr_buffer->buffer_start + i) = i % 27 + 'A';
-                    }
-                    wr_buffer->data_start = wr_buffer->buffer_start;
-                    wr_buffer->data_len   = bytes_to_send;
-                }
-
-                err = camio_write_commit(tmp_stream, &wr_buffer );
-                if(err == CAMIO_ETRYAGAIN){
-                    //DBG("Only wrote %i bytes from %i\n", options.len - wr_buffer->)
-                    continue;
-                }
-                if(err){
-                    DBG("Got a write commit error %i\n", err);
-                    return -1;
-                }
-
-                intv_bytes += bytes_to_send;
-
+            case CAMIO_MUX_MODE_READ:{
+                DBG("Handling read ready() -- I didn't expect this...\n");
+                break;
             }
-
+            case CAMIO_MUX_MODE_WRITE:{
+                DBG("Handling write ready()\n");
+                DBG("Sent %lli bytes\n", inflight_bytes);
+                intv_bytes += inflight_bytes;
+                send_message(&wr_buffer,muxable,time_now_ns,seq++);
+                break;
+            }
+            default:{
+                ERR("Um? What\n");
+            }
         }
-
-        //Done with the write buffer, release it
-        if(wr_buffer){
-            camio_write_release(tmp_stream,&wr_buffer);
-        }
-
-
     }
+
+//    if(wr_buffer){
+//        camio_write_release(tmp_stream,&wr_buffer);
+//    }
+
 
     return 0;
 
