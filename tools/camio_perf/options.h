@@ -13,7 +13,7 @@
 
 struct options_t {
     ch_cstr client;
-    ch_bool server;
+    ch_cstr server;
     ch_word len;
 };
 

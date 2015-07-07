@@ -1,70 +1,209 @@
-///*
-// * CamIO - The Cambridge Input/Output API
-// * Copyright (c) 2015, All rights reserved.
-// * See LICENSE.txt for full details.
-// *
-// *  Created:    Jun 25, 2015
-// *  File name:  camio_perf_client.c
-// *  Description:
-// *  <INSERT DESCRIPTION HERE>
-// */
-//
+/*
+ * CamIO - The Cambridge Input/Output API
+ * Copyright (c) 2015, All rights reserved.
+ * See LICENSE.txt for full details.
+ *
+ *  Created:    Jun 25, 2015
+ *  File name:  camio_perf_client.c
+ *  Description:
+ *  <INSERT DESCRIPTION HERE>
+ */
+
+#include <stdio.h>
+
+#include <deps/chaste/chaste.h>
+
+#include <src/api/api_easy.h>
+#include <src/camio_debug.h>
+#include <src/drivers/delimiter/delim_transport.h>
+#include "camio_perf_packet.h"
+
+#include "options.h"
+extern struct options_t options;
 
 #include "camio_perf_server.h"
 
-//int camio_perf_clinet()
-//{
-//    //Create a new multiplexer for streams to go into
-//    camio_mux_t* mux = NULL;
-//    camio_error_t err = camio_mux_new(CAMIO_MUX_HINT_PERFORMANCE, &mux);
-//
-//    //Create and connect to a new stream
-//    camio_stream_t* stream = NULL;
-//    err = camio_stream_new("tcp:localhost:2000?listen=1", &stream);
-//    if(err){ DBG("Could not connect to stream\n"); return CAMIO_EINVALID; /*TODO XXX put a better error here*/ }
-//
-//    //Put the read stream into the mux
-//    camio_mux_insert(mux,&stream->rd_muxable,0);
-//
-//    //Read and write bytes to and from the stream - just do loopback for now
-//    camio_rd_buffer_t* rd_buffer = NULL;
-//    camio_rd_buffer_t* wr_buffer = NULL;
-//    camio_muxable_t* which       = NULL;
-//    while(1){
-//        //Tell the stream that we want some data
-//        camio_read_request(stream,0,0);
-//
-//        //Block waiting for a stream to be ready
-//        camio_mux_select(mux,&which);
-//
-//        //Acquire a pointer to the new data now that it's ready
-//        err = camio_read_acquire(which->parent.stream, &rd_buffer);
-//        if(err){ DBG("Got a read error %i\n", err); return -1; }
-//
-//        if(rd_buffer->data_len == 0){
-//            break; //The connection is dead!
-//        }
-//
-//        //Get a buffer for writing stuff to
-//        err = camio_write_acquire(stream, &wr_buffer);
-//        if(err){ DBG("Could not connect to stream\n"); return CAMIO_EINVALID; /*TODO XXX put a better error here*/ }
-//
-//        //Copy data over from the read buffer to the write buffer
-//        err = camio_copy_rw(&wr_buffer,&rd_buffer,0,rd_buffer->data_len);
-//        if(err){ DBG("Got a copy error %i\n", err); return -1; }
-//
-//        //Data copied, let's commit it and send it off
-//        err = camio_write_commit(stream, &wr_buffer );
-//        if(err){ DBG("Got a commit error %i\n", err); return -1; }
-//
-//        //Done with the write buffer, release it
-//        camio_write_release(stream,&wr_buffer);
-//
-//        //And we're done with the read buffer too, release it as well
-//        err = camio_read_release(stream, &rd_buffer);
-//        if(err){ DBG("Got a read release error %i\n", err); return -1; }
-//    }
-//
-//    return 0;
-//
-//}
+#define CONNECTOR_ID 0
+static ch_word delimit(char* buffer, ch_word len)
+{
+    if((size_t)len < sizeof(camio_perf_packet_head_t)){
+        return -1;
+    }
+
+    camio_perf_packet_head_t* head = (camio_perf_packet_head_t*)buffer;
+    if(len < head->size){
+        return -1;
+    }
+
+    return head->size;
+}
+
+
+static camio_error_t connect_delim(ch_cstr client_stream_uri, camio_connector_t** connector) {
+
+    //Find the ID of the delim stream
+    ch_word id;
+    camio_error_t err = camio_transport_get_id("delim", &id);
+
+    //Fill in the delim stream paramters structure
+    delim_params_t delim_params = {
+            .base_uri = client_stream_uri,
+            .delim_fn = delimit
+    };
+    ch_word params_size = sizeof(delim_params_t);
+    void* params = &delim_params;
+
+    //Use the parameters structure to construct a new connector object
+    err = camio_transport_constr(id, &params, params_size, connector);
+    if (err) {
+        DBG("Could not construct connector\n");
+        return CAMIO_EINVALID; //TODO XXX put a better error here
+    }
+
+    //And we're done!
+    DBG("Got connector\n");
+    return CAMIO_ENOERROR;
+}
+
+static camio_read_req_t rreq;
+
+int camio_perf_server(ch_cstr client_stream_uri, ch_word* stop)
+{
+    DBG("Staring CamIO-perf Server\n");
+    //Create a new multiplexer for streams to go into
+    camio_mux_t* mux = NULL;
+    camio_error_t err = camio_mux_new(CAMIO_MUX_HINT_PERFORMANCE, &mux);
+
+    //Construct a delimiter
+    camio_connector_t* connector = NULL;
+    err = connect_delim(client_stream_uri, &connector);
+    if(err){
+        DBG("Could not create delimiter!\n");
+        return CAMIO_EINVALID;
+    }
+
+    //Insert the connector into the mux
+    err = camio_mux_insert(mux,&connector->muxable, CONNECTOR_ID);
+    if(err){
+        DBG("Could not insert connector into multiplexer\n");
+        return CAMIO_EINVALID;
+    }
+
+    struct timeval now = {0};
+    gettimeofday(&now, NULL);
+
+    ch_word time_start_ns       = now.tv_sec * 1000 * 1000 * 1000 + now.tv_usec * 1000;
+    ch_word time_int_start_ns   = time_start_ns;
+    ch_word time_now_ns         = 0;
+    ch_word time_interval_ns    = 1000 * 1000 * 1000;
+    ch_word total_bytes         = 0;
+    ch_word intv_bytes          = 0;
+    //ch_word inflight_bytes      = 0;
+
+    DBG("Staring main loop\n");
+    camio_muxable_t* muxable     = NULL;
+    camio_rd_buffer_t* rd_buffer = NULL;
+    ch_word which                = 0;
+    //ch_word seq                  = 0;
+
+    while(!*stop){
+
+        gettimeofday(&now, NULL);
+        time_now_ns = now.tv_sec * 1000 * 1000 * 1000 + now.tv_usec * 1000;
+        if(time_now_ns >= time_int_start_ns + time_interval_ns){
+            time_int_start_ns       = time_now_ns;
+            total_bytes             += intv_bytes;
+            ch_word total_time_ns   = time_now_ns - time_start_ns;
+            double inst_rate_mbs    = ((double)intv_bytes / (double)time_interval_ns) * 1000;
+            double ave_rate_mbs     = ((double)total_bytes / (double)total_time_ns) * 1000;
+
+            printf("#### [%lli - %lli] Bytes sent=%lli, inst rate=%3.3fMBs, total_bytes sent=%lli, average rate=%3.3fMBs\n",
+                time_start_ns,
+                time_now_ns,
+                intv_bytes,
+                inst_rate_mbs,
+                total_bytes,
+                ave_rate_mbs
+            );
+
+            intv_bytes = 0;
+        }
+
+        //Block waiting for a stream to be ready to read or connect
+        camio_mux_select(mux,&muxable,&which);
+
+        //Have a look at what we have
+        switch(muxable->mode){
+            //This is a connector that's just fired
+            case CAMIO_MUX_MODE_CONNECT:{
+                DBG("Handling connect ready()\n");
+                camio_stream_t* tmp_stream = NULL;
+                err = camio_connect(muxable->parent.connector,&tmp_stream);
+
+                if(err == CAMIO_EALLREADYCONNECTED){ //No more connections possible
+                    DBG("Removing expired connector\n");
+                    camio_mux_remove(mux,muxable);
+                    continue;
+                }
+                if(err != CAMIO_ENOERROR){
+                    ERR("Could not get stream. Got errr %i\n", err);
+                    return CAMIO_EINVALID;
+                }
+
+                camio_mux_insert(mux,&tmp_stream->rd_muxable,CONNECTOR_ID + 1);
+                camio_mux_insert(mux,&tmp_stream->wr_muxable,CONNECTOR_ID + 3);
+
+                //Kick things off by asking for data
+                rreq.dst_offset_hint = CAMIO_READ_REQ_DST_OFFSET_NONE;
+                rreq.src_offset_hint = CAMIO_READ_REQ_SRC_OFFSET_NONE;
+                rreq.read_size_hint  = CAMIO_READ_REQ_SIZE_ANY;
+                err = camio_read_request(tmp_stream,&rreq,1);
+                if(err != CAMIO_ENOERROR){
+                    ERR("Could not issue read_request. Got errr %i\n", err);
+                    return CAMIO_EINVALID;
+                }
+
+                break;
+            }
+            case CAMIO_MUX_MODE_READ:{
+                DBG("Handling read ready() -- I didn't expect this...\n");
+                err = camio_read_acquire(muxable->parent.stream, &rd_buffer);
+                if(err != CAMIO_ENOERROR){
+                    ERR("Could not acquire buffer. Got errr %i\n", err);
+                    return CAMIO_EINVALID;
+                }
+
+                DBG("Got %lli bytes\n", rd_buffer->data_len);
+                if(rd_buffer->data_len <= 0){
+                    DBG("Stream has ended, removing\n");
+                    camio_mux_remove(mux, muxable);
+                }
+
+                intv_bytes += rd_buffer->data_len;
+
+                rreq.dst_offset_hint = CAMIO_READ_REQ_DST_OFFSET_NONE;
+                rreq.src_offset_hint = CAMIO_READ_REQ_SRC_OFFSET_NONE;
+                rreq.read_size_hint  = CAMIO_READ_REQ_SIZE_ANY;
+                err = camio_read_request(muxable->parent.stream,&rreq,1);
+                if(err != CAMIO_ENOERROR){
+                    ERR("Could not issue read_request. Got errr %i\n", err);
+                    return CAMIO_EINVALID;
+                }
+
+
+                break;
+            }
+            case CAMIO_MUX_MODE_WRITE:{
+                DBG("Handling write ready() -- I didn't expect this...\n");
+                break;
+            }
+            default:{
+                ERR("Um? What\n");
+            }
+        }
+    }
+
+
+    return 0;
+
+}

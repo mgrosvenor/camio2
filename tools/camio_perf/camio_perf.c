@@ -15,7 +15,7 @@
 #include <deps/chaste/chaste.h>
 
 #include "camio_perf_client.h"
-//#include "camio_perf_server.h"
+#include "camio_perf_server.h"
 #include "options.h"
 
 USE_CAMIO;
@@ -41,18 +41,23 @@ int main(int argc, char** argv)
 //    ch_opt_addSI(CH_OPTION_OPTIONAL,'f',"sixth","This is the 6th option", &options.opt6, "init strig vector");
 
     ch_opt_addsi(CH_OPTION_OPTIONAL,'c',"client","name or that the client should connect to", &options.client, "tcp:localhost:2000");
-    ch_opt_addbi(CH_OPTION_FLAG,    's',"server","put camio_perf in server mode", &options.server, false);
-    ch_opt_addii(CH_OPTION_OPTIONAL,'l',"len","max length of read/write buffer. This may be smaller\n", &options.len, 8 * 1024);
+    ch_opt_addsi(CH_OPTION_OPTIONAL, 's',"server","put camio_perf in server mode", &options.server, "tcp:localhost:2000?listen=1");
+    ch_opt_addii(CH_OPTION_OPTIONAL,'l',"listen","client or server. This may be smaller\n", &options.len, 0);
     ch_opt_parse(argc,argv);
 
-    if(options.client && options.server){
-        ch_log_fatal("Cannot be in both client and server mode at the same time, please choose one!\n");
-    }
-
+//    if(options.client && options.server){
+//        ch_log_fatal("Cannot be in both client and server mode at the same time, please choose one!\n");
+//    }
 
     ch_word stop = 0;
-    DBG("Starting camio perf client\n");
-    camio_perf_clinet(options.client,&stop);
+    if(options.len){
+        DBG("Starting camio perf server\n");
+        camio_perf_server(options.server,&stop);
+    }
+    else{
+        DBG("Starting camio perf client\n");
+       camio_perf_clinet(options.client,&stop);
+    }
 
     return 0;
 }

@@ -24,7 +24,7 @@ extern struct options_t options;
 #define CONNECTOR_ID 0
 
 
-ch_word delimit(char* buffer, ch_word len)
+static ch_word delimit(char* buffer, ch_word len)
 {
     if((size_t)len < sizeof(camio_perf_packet_head_t)){
         return -1;
@@ -38,7 +38,7 @@ ch_word delimit(char* buffer, ch_word len)
     return head->size;
 }
 
-camio_error_t connect_delim(ch_cstr client_stream_uri, camio_connector_t** connector) {
+static camio_error_t connect_delim(ch_cstr client_stream_uri, camio_connector_t** connector) {
 
     //Find the ID of the delim stream
     ch_word id;
@@ -65,7 +65,7 @@ camio_error_t connect_delim(ch_cstr client_stream_uri, camio_connector_t** conne
 }
 
 static camio_write_req_t wreq;
-camio_error_t send_message(camio_buffer_t** buffer_o, camio_muxable_t* muxable, ch_word ts, ch_word seq)
+static camio_error_t send_message(camio_buffer_t** buffer_o, camio_muxable_t* muxable, ch_word ts, ch_word seq)
 {
     camio_error_t err = CAMIO_ENOERROR;
     camio_buffer_t* wr_buffer = *buffer_o;
@@ -155,7 +155,7 @@ int camio_perf_clinet(ch_cstr client_stream_uri, ch_word* stop)
 
     DBG("Staring main loop\n");
     camio_muxable_t* muxable     = NULL;
-    camio_rd_buffer_t* wr_buffer = NULL;
+    camio_wr_buffer_t* wr_buffer = NULL;
     ch_word which                = 0;
     ch_word seq                  = 0;
 
