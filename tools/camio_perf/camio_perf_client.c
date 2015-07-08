@@ -179,7 +179,8 @@ int camio_perf_clinet(ch_cstr client_stream_uri, ch_word* stop)
                 ave_rate_mbs
             );
 
-            intv_bytes = 0;
+            intv_bytes  = 0;
+
         }
 
         //Block waiting for a stream to be ready to read or connect

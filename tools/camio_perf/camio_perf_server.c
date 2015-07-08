@@ -102,7 +102,10 @@ int camio_perf_server(ch_cstr client_stream_uri, ch_word* stop)
     ch_word intv_bytes          = 0;
     ch_word lost_count          = 0;
     ch_word found_count         = 0;
-    //ch_word inflight_bytes      = 0;
+    ch_word min_latency         = INT64_MAX;
+    ch_word max_latency         = INT64_MIN;
+    ch_word total_latency       = 0;
+
 
     DBG("Staring main loop\n");
     camio_muxable_t* muxable     = NULL;
@@ -121,15 +124,22 @@ int camio_perf_server(ch_cstr client_stream_uri, ch_word* stop)
             double inst_rate_mbs    = ((double)intv_bytes / (double)time_interval_ns) * 1000;
             double ave_rate_mbs     = ((double)total_bytes / (double)total_time_ns) * 1000;
             double loss_rate        = (double)lost_count / ((double)lost_count + (double)found_count) * 100;
+            double ave_latency      = (double)total_latency / (double)found_count;
 
-            printf("#### Bytes sent=%lli, inst rate=%3.3fMbs, total_bytes sent=%lli, average rate=%3.3fMBs loss=%3.3f%%\n",
-                intv_bytes,
+            printf("#### inst rate=%3.3fMbs, average rate=%3.3fMBs loss=%3.3f%% latency [%lli, %3.3f, %lli]us\n",
                 inst_rate_mbs * 8,
-                total_bytes,
                 ave_rate_mbs,
-                loss_rate
+                loss_rate,
+                min_latency / 1000,
+                ave_latency / 1000,
+                max_latency / 1000
             );
 
+            lost_count          = 0;
+            found_count         = 0;
+            min_latency         = INT64_MAX;
+            max_latency         = INT64_MIN;
+            total_latency       = 0;
             intv_bytes = 0;
         }
 
@@ -191,6 +201,10 @@ int camio_perf_server(ch_cstr client_stream_uri, ch_word* stop)
                 }
                 else{
                     found_count++;
+                    const ch_word latency = time_now_ns - head->time_stamp;
+                    min_latency = MIN(min_latency, latency);
+                    max_latency = MAX(max_latency, latency);
+                    total_latency += latency;
                 }
                 seq_exp = head->seq_number + 1;
 

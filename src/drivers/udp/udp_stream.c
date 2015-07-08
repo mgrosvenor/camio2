@@ -386,7 +386,7 @@ static camio_error_t udp_write_try(camio_stream_t* this)
                  return CAMIO_ETRYAGAIN;
              }
              else{
-                 DBG("error %s\n",strerror(errno));
+                 ERR("error %s\n",strerror(errno));
                  return CAMIO_ECHECKERRORNO;
              }
          }

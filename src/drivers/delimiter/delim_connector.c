@@ -41,7 +41,7 @@ typedef struct delim_priv_s {
  **************************************************************************************************************************/
 static camio_error_t delim_connector_ready(camio_muxable_t* this)
 {
-    DBG("Checking if base connector is ready\n");
+//    DBG("Checking if base connector is ready\n");
     //Forward the ready function from the base connector. The delimiter is always ready to party!
     delim_connector_priv_t* priv = CONNECTOR_GET_PRIVATE(this->parent.connector);
     return camio_connector_ready(priv->base);

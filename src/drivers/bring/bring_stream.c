@@ -578,6 +578,8 @@ camio_error_t bring_stream_construct(
     int fd
 )
 {
+
+    DBG("Constructing bring stream\n");
     //Basic sanity checks -- TODO XXX: Should these be made into (compile time optional?) asserts for runtime performance?
     if( NULL == this){
         ERR("This null???\n"); //WTF?
@@ -585,14 +587,14 @@ camio_error_t bring_stream_construct(
     }
     bring_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
 
-
-
+    DBG("-->\n");
     priv->connector  = *connector; //Keep a copy of the connector state
     priv->params     = *params;
     priv->bring_head = bring_head;
 
     //Connect the read and write ends together
 
+    DBG("bring head=%p\n", bring_head);
     priv->rd_mem            = (char*)bring_head + bring_head->rd_mem_start_offset;
     priv->rd_buffers_count  = bring_head->rd_slots;
     priv->rd_buffers        = (camio_buffer_t*)calloc(bring_head->rd_slots_size,sizeof(camio_buffer_t));
@@ -600,7 +602,8 @@ camio_error_t bring_stream_construct(
         ERR("Ran out of memory allocating buffer pool\n");
         return CAMIO_ENOMEM;
     }
-    for(int i = 0; i < bring_head->rd_slots;i++){
+    DBG("-->\n");
+    for(int i = 0; i < bring_head->rd_slots;i++){DBG("-->\n");
         priv->rd_buffers[i].__internal.__buffer_id       = i;
         priv->rd_buffers[i].__internal.__do_auto_release = false;
         priv->rd_buffers[i].__internal.__in_use          = false;
@@ -611,7 +614,7 @@ camio_error_t bring_stream_construct(
         priv->rd_buffers[i].__internal.__read_only       = true;
     }
 
-
+    DBG("-->\n");
     priv->wr_mem            = (char*)bring_head + bring_head->wr_mem_start_offset;
     priv->wr_buffers_count  = bring_head->wr_slots;
     priv->wr_buffers        = (camio_buffer_t*)calloc(bring_head->wr_slots_size,sizeof(camio_buffer_t));
@@ -620,7 +623,9 @@ camio_error_t bring_stream_construct(
         ERR("Ran out of memory allocating buffer pool\n");
         return CAMIO_ENOMEM;
     }
+    DBG("-->\n");
     for(int i = 0; i < bring_head->wr_slots;i++){
+        DBG("-->\n");
         priv->wr_buffers[i].__internal.__buffer_id       = i;
         priv->wr_buffers[i].__internal.__do_auto_release = true;
         priv->wr_buffers[i].__internal.__in_use          = false;
@@ -631,7 +636,7 @@ camio_error_t bring_stream_construct(
         priv->wr_buffers[i].__internal.__read_only       = true;
     }
 
-
+    DBG("-->\n");
     if(!priv->params.server){ //Swap things around to connect both ends
         ch_word tmp_buffers_count    = priv->rd_buffers_count;
         camio_buffer_t* tmp_buffers  = priv->rd_buffers;
@@ -644,7 +649,7 @@ camio_error_t bring_stream_construct(
         priv->rd_buffers             = tmp_buffers;
     }
 
-
+    DBG("-->\n");
     priv->rd_sync_counter   = 1; //This is where we expect the first counter
     priv->wr_sync_counter   = 1;
 
@@ -659,7 +664,7 @@ camio_error_t bring_stream_construct(
     this->wr_muxable.vtable.ready      = bring_write_ready;
     this->wr_muxable.fd                = fd;
 
-
+    DBG("-->\n");
     //DBG("Done constructing BRING stream with read_fd=%i and write_fd=%i\n", fd, fd);
     return CAMIO_ENOERROR;
 }

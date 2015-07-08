@@ -227,7 +227,7 @@ static camio_error_t bring_connect_peek_client(camio_connector_t* this)
 
     camio_error_t result = CAMIO_ENOERROR;
     bring_connector_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
-    //DBG("Doing connect peek client on %s\n", priv->bring_filen);
+    DBG("Doing connect peek client on %s\n", priv->bring_filen);
 
     //Now there is a bring file and it should have a header in it
     int bring_fd = open(priv->bring_filen, O_RDWR);
@@ -327,13 +327,14 @@ error_no_cleanup:
 //Try to see if connecting is possible.
 static camio_error_t bring_connect_peek(camio_connector_t* this)
 {
-    //DBG("Doing connect peek\n");
+    DBG("Doing connect peek\n");
     camio_error_t result = CAMIO_ENOERROR;
     bring_connector_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
 
     if(priv->bring_fd > -1 ){ //Ready to go! Call connect!
         return CAMIO_ENOERROR;
     }
+
 
     if(priv->params->server){
         result = bring_connect_peek_server(this);
@@ -357,21 +358,24 @@ static camio_error_t bring_connector_ready(camio_muxable_t* this)
         return err;
     }
 
-        return CAMIO_EREADY;
+    return CAMIO_EREADY;
 }
 
 static camio_error_t bring_connect(camio_connector_t* this, camio_stream_t** stream_o )
 {
+    DBG("Doing bring connect\n");
     bring_connector_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
     camio_error_t err = bring_connect_peek(this);
     if(err != CAMIO_ENOERROR){
         return err;
     }
 
+
     if(priv->is_connected){
         DBG("Already connected! Why are you calling this twice?\n");
         return CAMIO_EALLREADYCONNECTED; // We're already connected!
     }
+
 
     //DBG("Done connecting, now constructing UDP stream...\n");
     camio_stream_t* stream = NEW_STREAM(bring);
