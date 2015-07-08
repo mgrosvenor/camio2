@@ -26,6 +26,7 @@ extern struct options_t options;
 #define CONNECTOR_ID 0
 static ch_word delimit(char* buffer, ch_word len)
 {
+    DBG("Deliminting %p len=%lli\n", buffer, len);
     if((size_t)len < sizeof(camio_perf_packet_head_t)){
         return -1;
     }
@@ -35,10 +36,11 @@ static ch_word delimit(char* buffer, ch_word len)
         return -1;
     }
 
+    DBG("delimt packet size=%lli\n", head->size);
     return head->size;
 }
 
-
+delim_params_t delim_params;
 static camio_error_t connect_delim(ch_cstr client_stream_uri, camio_connector_t** connector) {
 
     //Find the ID of the delim stream
@@ -46,10 +48,10 @@ static camio_error_t connect_delim(ch_cstr client_stream_uri, camio_connector_t*
     camio_error_t err = camio_transport_get_id("delim", &id);
 
     //Fill in the delim stream paramters structure
-    delim_params_t delim_params = {
-            .base_uri = client_stream_uri,
-            .delim_fn = delimit
-    };
+    delim_params.base_uri = client_stream_uri;
+    delim_params.delim_fn = delimit;
+
+    DBG("delimter=%p\n", delimit);
     ch_word params_size = sizeof(delim_params_t);
     void* params = &delim_params;
 
@@ -98,13 +100,15 @@ int camio_perf_server(ch_cstr client_stream_uri, ch_word* stop)
     ch_word time_interval_ns    = 1000 * 1000 * 1000;
     ch_word total_bytes         = 0;
     ch_word intv_bytes          = 0;
+    ch_word lost_count          = 0;
+    ch_word found_count         = 0;
     //ch_word inflight_bytes      = 0;
 
     DBG("Staring main loop\n");
     camio_muxable_t* muxable     = NULL;
     camio_rd_buffer_t* rd_buffer = NULL;
     ch_word which                = 0;
-    //ch_word seq                  = 0;
+    ch_word seq_exp              = 0;
 
     while(!*stop){
 
@@ -116,14 +120,14 @@ int camio_perf_server(ch_cstr client_stream_uri, ch_word* stop)
             ch_word total_time_ns   = time_now_ns - time_start_ns;
             double inst_rate_mbs    = ((double)intv_bytes / (double)time_interval_ns) * 1000;
             double ave_rate_mbs     = ((double)total_bytes / (double)total_time_ns) * 1000;
+            double loss_rate        = (double)lost_count / ((double)lost_count + (double)found_count) * 100;
 
-            printf("#### [%lli - %lli] Bytes sent=%lli, inst rate=%3.3fMBs, total_bytes sent=%lli, average rate=%3.3fMBs\n",
-                time_start_ns,
-                time_now_ns,
+            printf("#### Bytes sent=%lli, inst rate=%3.3fMbs, total_bytes sent=%lli, average rate=%3.3fMBs loss=%3.3f%%\n",
                 intv_bytes,
-                inst_rate_mbs,
+                inst_rate_mbs * 8,
                 total_bytes,
-                ave_rate_mbs
+                ave_rate_mbs,
+                loss_rate
             );
 
             intv_bytes = 0;
@@ -166,7 +170,7 @@ int camio_perf_server(ch_cstr client_stream_uri, ch_word* stop)
                 break;
             }
             case CAMIO_MUX_MODE_READ:{
-                DBG("Handling read ready() -- I didn't expect this...\n");
+                DBG("Handling read ready()\n");
                 err = camio_read_acquire(muxable->parent.stream, &rd_buffer);
                 if(err != CAMIO_ENOERROR){
                     ERR("Could not acquire buffer. Got errr %i\n", err);
@@ -180,6 +184,19 @@ int camio_perf_server(ch_cstr client_stream_uri, ch_word* stop)
                 }
 
                 intv_bytes += rd_buffer->data_len;
+                camio_perf_packet_head_t* head = (camio_perf_packet_head_t*)rd_buffer->data_start;
+                if(head->seq_number != seq_exp){
+                    //ERR("Sequence number error, expected to find %lli but found %lli\n", seq_exp, head->seq_number);
+                    lost_count++;
+                }
+                else{
+                    found_count++;
+                }
+                seq_exp = head->seq_number + 1;
+
+                //printf("ts=%lli, len=%lli, seq=%lli, \n", head->time_stamp, head->size, head->seq_number );
+
+                camio_read_release(muxable->parent.stream, &rd_buffer);
 
                 rreq.dst_offset_hint = CAMIO_READ_REQ_DST_OFFSET_NONE;
                 rreq.src_offset_hint = CAMIO_READ_REQ_SRC_OFFSET_NONE;
@@ -194,7 +211,7 @@ int camio_perf_server(ch_cstr client_stream_uri, ch_word* stop)
                 break;
             }
             case CAMIO_MUX_MODE_WRITE:{
-                DBG("Handling write ready() -- I didn't expect this...\n");
+                ERR("Handling write ready() -- I didn't expect this...\n");
                 break;
             }
             default:{

@@ -157,10 +157,13 @@ static camio_error_t delim_read_peek( camio_stream_t* this)
     //We have real data and the working buffer is empty, try a fast path. Maybe we won't need to copy into the working buffer
     if(priv->rd_working_buff.data_len == 0){
         DBG("Trying empty working buffer fast path...\n");
+        DBG("Priv is %p\n", priv);
+        DBG("priv=%p Dlimiter fn=%p\n", priv, priv->delim_fn);
         const ch_word delimit_size = priv->delim_fn(priv->rd_base_buff->data_start, priv->rd_base_buff->data_len);
+        DBG("size=%lli\n", delimit_size);
         if(delimit_size > 0) { //Success! There is a valid packet in the read buffer alone.
-            buffer_slice(&priv->rd_result_buff,priv->rd_base_buff,priv->rd_base_buff->data_start, delimit_size);
             DBG("Fast path match from delimiter of size %lli!\n", delimit_size);
+            buffer_slice(&priv->rd_result_buff,priv->rd_base_buff,priv->rd_base_buff->data_start, delimit_size);
             return CAMIO_ENOERROR;
         }
         DBG("Datagram fast path fail. Try slow path...\n");
@@ -439,8 +442,8 @@ static camio_error_t delim_read_release(camio_stream_t* this, camio_rd_buffer_t*
         return err;
     }
 
-    ERR("Doing mem move of %lli from %p to %p\n", data_next_len, data_next,
-            priv->rd_working_buff.__internal.__mem_start );
+//    ERR("Doing mem move of %lli from %p to %p\n", data_next_len, data_next,
+//            priv->rd_working_buff.__internal.__mem_start );
     memmove(priv->rd_working_buff.__internal.__mem_start, data_next, data_next_len);
     priv->rd_working_buff.data_start = priv->rd_working_buff.__internal.__mem_start;
     priv->rd_working_buff.data_len   = data_next_len;

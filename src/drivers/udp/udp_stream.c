@@ -96,6 +96,7 @@ static camio_error_t udp_read_peek( camio_stream_t* this)
     char* read_buffer = (char*)priv->rd_buffer->__internal.__mem_start + req->dst_offset_hint; //Do the offset that we need
     ch_word read_size = priv->rd_buff_sz - req->dst_offset_hint; //Also make sure we don't overflow
     read_size = MIN(read_size,req->read_size_hint);
+    DBG("Attempting read size of %lli into read buffer %p (offset=%p)\n", read_size, read_buffer, read_buffer - (char*)priv->rd_buffer->__internal.__mem_start);
 
     ch_word bytes = read(priv->rd_fd, read_buffer, read_size);
     if(bytes < 0){ //Shit, got an error. Maybe there just isn't any data?
@@ -109,6 +110,10 @@ static camio_error_t udp_read_peek( camio_stream_t* this)
             ERR("Something else went wrong, check errno value: %s\n", strerror(errno));
             return CAMIO_ECHECKERRORNO;
         }
+    }
+
+    if(bytes == 0){
+        DBG("error %s\n",strerror(errno));
     }
 
     priv->rd_buffer->data_len = bytes;
@@ -318,7 +323,15 @@ static camio_error_t udp_write_acquire(camio_stream_t* this, camio_wr_buffer_t**
     camio_error_t err = buffer_malloc_linear_acquire(priv->wr_buff_pool,buffer_o);
     if(err){ return err; }
 
-    DBG("Returning new buffer of size %lli at %p\n", (*buffer_o)->__internal.__mem_len, (*buffer_o)->__internal.__mem_start);
+    (*buffer_o)->data_start = (*buffer_o)->__internal.__mem_start;
+    (*buffer_o)->data_len = (*buffer_o)->__internal.__mem_len;
+
+    DBG("Returning new buffer of size %lli at %p with parent=%p\n",
+        (*buffer_o)->__internal.__mem_len,
+        (*buffer_o)->__internal.__mem_start,
+        (*buffer_o)->__internal.__parent
+    );
+
     return CAMIO_ENOERROR;
 }
 
@@ -355,39 +368,49 @@ static camio_error_t udp_write_try(camio_stream_t* this)
     udp_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
 
     for(int i = priv->write_req_curr; i < priv->write_req_len; i++){
-        camio_write_req_t* req = priv->write_req + i;
-        camio_buffer_t* buff   = req->buffer;
-        DBG("Trying to writing %li bytes from %p to %i\n", buff->data_len,buff->data_start, priv->wr_fd);
+         camio_write_req_t* req = priv->write_req + i;
+         camio_buffer_t* buff   = req->buffer;
 
-        if(req->buffer->__internal.__parent != this){
-            DBG("Warning -- detected request to write from buffer not belonging to this stream\n");
-        }
+         if(req->buffer->__internal.__parent != this){
+             ERR("Warning -- detected request to write from buffer with parent %p not belonging to this stream %p\n",
+                 req->buffer->__internal.__parent,
+                 this
+             );
+         }
 
-        ch_word bytes = write(priv->wr_fd,buff->data_start,buff->data_len);
-        if(bytes < 0){
-            if(errno == EWOULDBLOCK || errno == EAGAIN){
-                return CAMIO_ETRYAGAIN;
-            }
-            else{
-                DBG("error %s\n",strerror(errno));
-                return CAMIO_ECHECKERRORNO;
-            }
-        }
+         DBG("Current request = %i - Trying to write %lli bytes from %p to %i\n", i, buff->data_len,buff->data_start, priv->wr_fd);
+         ch_word bytes = write(priv->wr_fd,buff->data_start,buff->data_len);
+         if(bytes < 0){
+             if(errno == EWOULDBLOCK || errno == EAGAIN){
+                 DBG("Stream would block\n");
+                 return CAMIO_ETRYAGAIN;
+             }
+             else{
+                 DBG("error %s\n",strerror(errno));
+                 return CAMIO_ECHECKERRORNO;
+             }
+         }
+         if(bytes < buff->data_len){
+             DBG("Did not write everything, %lli bytes remaining\n", buff->data_len - bytes);
+             buff->data_len -= bytes;
+             const char* data_start_new = (char*)buff->data_start + bytes;
+             buff->data_start = (void*)data_start_new;
+             return CAMIO_ETRYAGAIN;
+         }
 
-        buff->data_len -= bytes;
-        const char* data_start_new = (char*)buff->data_start + bytes;
-        buff->data_start = (void*)data_start_new;
 
-        if(buff->data_len != 0){
-            return CAMIO_ETRYAGAIN;
-        }
+         //Reset everything
+         buff->data_start = buff->__internal.__mem_start;
+         buff->data_len = buff->__internal.__mem_len;
+         DBG("Finished writing everything for request %i\n", i);
 
-    }
+     }
 
-    //If we get here, we've successfully written all the records out. This means we're now ready to take more write requests
-    priv->write_registered = false;
+     //If we get here, we've successfully written all the records out. This means we're now ready to take more write requests
+     DBG("De registering write\n");
+     priv->write_registered = false;
 
-    return CAMIO_ENOERROR;
+     return CAMIO_ENOERROR;
 }
 
 
@@ -404,6 +427,11 @@ static camio_error_t udp_write_ready(camio_muxable_t* this)
     if( this->mode != CAMIO_MUX_MODE_WRITE){
         DBG("Wrong kind of muxable!\n"); //WTF??
         return CAMIO_EINVALID;
+    }
+
+    udp_stream_priv_t* priv = STREAM_GET_PRIVATE(this->parent.stream);
+    if(!priv->write_registered){ //No body has asked us to write anything, so we're not ready
+        return CAMIO_ENOTREADY;
     }
 
     //OK now the fun begins

@@ -88,12 +88,16 @@ static camio_error_t send_message(camio_buffer_t** buffer_o, camio_muxable_t* mu
             *((char*)wr_buffer->data_start + i) = i % 27 + 'A';
         }
 
-        camio_perf_packet_head_t* head = wr_buffer->data_start;
-        head->size = bytes_to_send;
         *buffer_o = wr_buffer;
     }
 
+    const ch_word req_bytes     = MAX((size_t)options.len, sizeof(camio_perf_packet_head_t));
+    const ch_word bytes_to_send = MIN(req_bytes,wr_buffer->data_len);
+    DBG("Trying to send %lli from request of %lli bytes\n", bytes_to_send, req_bytes);
+
     camio_perf_packet_head_t* head = wr_buffer->data_start;
+    head->size = bytes_to_send;
+    wr_buffer->data_len = bytes_to_send;
     head->seq_number = seq;
     head->time_stamp = ts;
 
@@ -102,14 +106,10 @@ static camio_error_t send_message(camio_buffer_t** buffer_o, camio_muxable_t* mu
     wreq.buffer  = wr_buffer;
 
 
-    DBG("Write request buffer %p  (buffer_o=%p) of size %lli at %p with parent=%p\n",
-            wr_buffer,
-            *buffer_o,
-        wreq.buffer->__internal.__mem_len,
-        wreq.buffer->__internal.__mem_start,
-        wreq.buffer->__internal.__parent
+    DBG("Write request buffer %p of size %lli\n",
+            wreq.buffer,
+            wreq.buffer->data_len
     );
-
 
     err = camio_write_request(muxable->parent.stream,&wreq,1 );
     if(err != CAMIO_ENOERROR && err != CAMIO_ETRYAGAIN){
@@ -170,11 +170,11 @@ int camio_perf_clinet(ch_cstr client_stream_uri, ch_word* stop)
             double inst_rate_mbs    = ((double)intv_bytes / (double)time_interval_ns) * 1000;
             double ave_rate_mbs     = ((double)total_bytes / (double)total_time_ns) * 1000;
 
-            printf("#### [%lli - %lli] Bytes sent=%lli, inst rate=%3.3fMBs, total_bytes sent=%lli, average rate=%3.3fMBs\n",
+            printf("#### [%lli - %lli] Bytes sent=%lli, inst rate=%3.3fMbs, total_bytes sent=%lli, average rate=%3.3fMBs\n",
                 time_start_ns,
                 time_now_ns,
                 intv_bytes,
-                inst_rate_mbs,
+                inst_rate_mbs * 8,
                 total_bytes,
                 ave_rate_mbs
             );
@@ -214,7 +214,7 @@ int camio_perf_clinet(ch_cstr client_stream_uri, ch_word* stop)
                 break;
             }
             case CAMIO_MUX_MODE_READ:{
-                DBG("Handling read ready() -- I didn't expect this...\n");
+                ERR("Handling read ready() -- I didn't expect this...\n");
                 break;
             }
             case CAMIO_MUX_MODE_WRITE:{

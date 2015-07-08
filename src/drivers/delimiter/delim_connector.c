@@ -64,11 +64,13 @@ static camio_error_t delim_connect(camio_connector_t* this, camio_stream_t** str
     DBG("Making new delimiter stream\n");
     camio_stream_t* stream = NEW_STREAM(delim);
     if(!stream){
+        ERR("No memory for new delimter\n");
         *stream_o = NULL;
         return CAMIO_ENOMEM;
     }
     *stream_o = stream;
 
+    DBG("Constructing delimiter delimfn=%p\n", priv->params->delim_fn);
     return delim_stream_construct(stream,this,base_stream, priv->params->delim_fn);
 }
 
