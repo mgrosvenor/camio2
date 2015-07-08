@@ -596,14 +596,17 @@ camio_error_t bring_stream_construct(
 
     DBG("bring head=%p\n", bring_head);
     priv->rd_mem            = (char*)bring_head + bring_head->rd_mem_start_offset;
+    DBG("-->\n");
     priv->rd_buffers_count  = bring_head->rd_slots;
+    DBG("-->\n");
     priv->rd_buffers        = (camio_buffer_t*)calloc(bring_head->rd_slots_size,sizeof(camio_buffer_t));
     if(!priv->rd_buffers){
         ERR("Ran out of memory allocating buffer pool\n");
         return CAMIO_ENOMEM;
     }
     DBG("-->\n");
-    for(int i = 0; i < bring_head->rd_slots;i++){DBG("-->\n");
+    for(int i = 0; i < bring_head->rd_slots;i++){
+        DBG("-->\n");
         priv->rd_buffers[i].__internal.__buffer_id       = i;
         priv->rd_buffers[i].__internal.__do_auto_release = false;
         priv->rd_buffers[i].__internal.__in_use          = false;
