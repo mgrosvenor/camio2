@@ -65,14 +65,14 @@ static camio_error_t connect_delim(ch_cstr client_stream_uri, camio_connector_t*
 }
 
 static camio_write_req_t wreq;
-static camio_error_t send_message(camio_buffer_t** buffer_o, camio_muxable_t* muxable, ch_word ts, ch_word seq)
+static camio_error_t send_message(camio_muxable_t* muxable, ch_word ts, ch_word seq)
 {
     camio_error_t err = CAMIO_ENOERROR;
-    camio_buffer_t* wr_buffer = *buffer_o;
-    if(!wr_buffer){
+    DBG("Current req_buffer=%p\n", wreq.buffer);
+    if(!wreq.buffer){
         //Get and init a buffer for writing stuff to. Hang on to it if possible
-        DBG("No write buffer, grabbing a new one parent=%p, buffer=%p\n", muxable->parent.stream, &wr_buffer);
-        err = camio_write_acquire(muxable->parent.stream, &wr_buffer);
+        DBG("No write buffer, grabbing a new one parent=%p, buffer=%p\n", muxable->parent.stream, &wreq.buffer);
+        err = camio_write_acquire(muxable->parent.stream, &wreq.buffer);
         if(err){
             ERR("Could not get a writing buffer to stream\n");
             return err;
@@ -81,34 +81,32 @@ static camio_error_t send_message(camio_buffer_t** buffer_o, camio_muxable_t* mu
 
         //Figure out how much we should send. -- Just some basic sanity checking
         const ch_word req_bytes     = MAX((size_t)options.len, sizeof(camio_perf_packet_head_t));
-        const ch_word bytes_to_send = MIN(req_bytes,wr_buffer->data_len);
+        const ch_word bytes_to_send = MIN(req_bytes,wreq.buffer->data_len);
 
         //Initialize the packet with some non zero junk
         for(int i = 0; i < bytes_to_send; i++){
-            *((char*)wr_buffer->data_start + i) = i % 27 + 'A';
+            *((char*)wreq.buffer->data_start + i) = i % 27 + 'A';
         }
-
-        *buffer_o = wr_buffer;
     }
 
     const ch_word req_bytes     = MAX((size_t)options.len, sizeof(camio_perf_packet_head_t));
-    const ch_word bytes_to_send = MIN(req_bytes,wr_buffer->data_len);
-    DBG("Trying to send %lli from request of %lli bytes\n", bytes_to_send, req_bytes);
+    const ch_word bytes_to_send = MIN(req_bytes,wreq.buffer->data_len);
+    DBG("Trying to send %lli from request of %lli bytes (Min req=%lli / data len=%lli)\n", bytes_to_send, req_bytes, req_bytes, wreq.buffer->data_len);
 
-    camio_perf_packet_head_t* head = wr_buffer->data_start;
+    camio_perf_packet_head_t* head = wreq.buffer->data_start;
     head->size = bytes_to_send;
-    wr_buffer->data_len = bytes_to_send;
+    wreq.buffer->data_len = bytes_to_send;
     head->seq_number = seq;
     head->time_stamp = ts;
 
     wreq.src_offset_hint = CAMIO_WRITE_REQ_SRC_OFFSET_NONE;
     wreq.dst_offset_hint = CAMIO_WRITE_REQ_DST_OFFSET_NONE;
-    wreq.buffer  = wr_buffer;
 
 
-    DBG("Write request buffer %p of size %lli\n",
+    DBG("Write request buffer %p of size %lli with data at %p\n",
             wreq.buffer,
-            wreq.buffer->data_len
+            wreq.buffer->data_len,
+            wreq.buffer->data_start
     );
 
     err = camio_write_request(muxable->parent.stream,&wreq,1 );
@@ -155,7 +153,6 @@ int camio_perf_clinet(ch_cstr client_stream_uri, ch_word* stop)
 
     DBG("Staring main loop\n");
     camio_muxable_t* muxable     = NULL;
-    camio_wr_buffer_t* wr_buffer = NULL;
     ch_word which                = 0;
     ch_word seq                  = 0;
 
@@ -208,7 +205,7 @@ int camio_perf_clinet(ch_cstr client_stream_uri, ch_word* stop)
                 camio_mux_insert(mux,&tmp_stream->wr_muxable,CONNECTOR_ID + 3);
 
                 //Kick things off by sending the first message
-                send_message(&wr_buffer,&tmp_stream->wr_muxable,time_now_ns,seq++);
+                send_message(&tmp_stream->wr_muxable,time_now_ns,seq++);
                 inflight_bytes = wreq.buffer->data_len;
                 DBG("Sending %lli bytes\n", inflight_bytes);
 
@@ -222,7 +219,7 @@ int camio_perf_clinet(ch_cstr client_stream_uri, ch_word* stop)
                 DBG("Handling write ready()\n");
                 DBG("Sent %lli bytes\n", inflight_bytes);
                 intv_bytes += inflight_bytes;
-                send_message(&wr_buffer,muxable,time_now_ns,seq++);
+                send_message(muxable,time_now_ns,seq++);
                 break;
             }
             default:{

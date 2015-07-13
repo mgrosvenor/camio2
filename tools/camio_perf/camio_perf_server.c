@@ -59,7 +59,7 @@ static camio_error_t connect_delim(ch_cstr client_stream_uri, camio_connector_t*
     err = camio_transport_constr(id, &params, params_size, connector);
     if (err) {
         DBG("Could not construct connector\n");
-        return CAMIO_EINVALID; //TODO XXX put a better error here
+        return err; //TODO XXX put a better error here
     }
 
     //And we're done!

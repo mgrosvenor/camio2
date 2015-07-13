@@ -18,8 +18,8 @@
 NEW_STREAM_DECLARE(bring);
 
 typedef struct slot_header_s{
-    uint64_t data_size;
-    uint64_t seq_no;
+    ch_word data_size;
+    ch_word seq_no;
 } bring_slot_header_t;
 
 #define BRING_SEQ_MASK (~0xFFFFFFFFULL)

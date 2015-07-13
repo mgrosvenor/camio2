@@ -47,7 +47,7 @@ typedef struct bring_stream_priv_s {
     camio_read_req_t* read_req;     //Read request vector to put data into when there is new data
     ch_word read_req_len;           //size of the request vector
     ch_word read_req_curr;          //This will be needed later
-    u64 rd_sync_counter;            //Synchronization counter
+    ch_word rd_sync_counter;            //Synchronization counter
     ch_word rd_acq_index;           //Current index for acquiring new read buffers
     ch_word rd_rel_index;           //Current index for releasing new read buffers
 
@@ -65,7 +65,6 @@ typedef struct bring_stream_priv_s {
     ch_word wr_sync_counter;      //Synchronization counter
     ch_word wr_slot_size;         //Size of each slot in the ring
     ch_word wr_slot_count;        //Number of slots in the ring
-    ch_word wr_acq_index;         //Current slot in the bring
     ch_word wr_rel_index;         //Current slot in the bring
 
 } bring_stream_priv_t;
@@ -80,32 +79,43 @@ typedef struct bring_stream_priv_s {
 //See if there is something to read
 static camio_error_t bring_read_peek( camio_stream_t* this)
 {
-    //This is not a public function, can assume that preconditions have been checked.
     DBG("Doing read peek\n");
+
+    //This is not a public function, can assume that preconditions have been checked.
     bring_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
 
     if(priv->rd_buff){ //There is a ready already waiting
         return CAMIO_ENOERROR;
     }
 
+
     //Is there new data?
     volatile char* slot_mem     = (volatile void*)priv->rd_buffers[priv->rd_acq_index].__internal.__mem_start;
-    const uint64_t slot_mem_sz  = priv->rd_buffers[priv->rd_acq_index].__internal.__mem_len;
-    volatile char* hdr_mem      = slot_mem + slot_mem_sz - sizeof(bring_slot_header_t);
+    const ch_word slot_mem_sz  = priv->rd_buffers[priv->rd_acq_index].__internal.__mem_len;
+    volatile char* hdr_mem      = slot_mem + slot_mem_sz; // - sizeof(bring_slot_header_t);
+
+    DBG("Doing read peek on index %lli at %p\n", priv->rd_acq_index, slot_mem, hdr_mem );
 
     __sync_synchronize();
-    register bring_slot_header_t curr_slot_head = *(volatile bring_slot_header_t*)(hdr_mem);
+    volatile bring_slot_header_t curr_slot_head = *(volatile bring_slot_header_t*)(hdr_mem);
     __sync_synchronize();
+
+    DBG("seq no   =%lli offset=(%lli)\n", curr_slot_head.seq_no, (char*)hdr_mem - (char*)priv->bring_head);
+    DBG("data size=%lli\n", curr_slot_head.data_size);
 
     if(curr_slot_head.data_size > slot_mem_sz){
         ERR("Data size is larger than memory size, corruption is likely!\n");
         return CAMIO_ENOERROR;
     }
 
+    if( curr_slot_head.seq_no == 0){
+        return CAMIO_ETRYAGAIN;
+    }
+
     if( curr_slot_head.seq_no != priv->rd_sync_counter){
         DBG( "Ring overflow. This should not happen with a blocking ring %llu to %llu\n",
             curr_slot_head.seq_no,
-            priv->rd_sync_counter -1
+            priv->rd_sync_counter
         );
         return CAMIO_EWRONGBUFF;
     }
@@ -115,6 +125,10 @@ static camio_error_t bring_read_peek( camio_stream_t* this)
     priv->rd_buff->data_len             = curr_slot_head.data_size;
     priv->rd_buff->valid                = true;
     priv->rd_buff->__internal.__in_use  = true;
+    priv->rd_sync_counter++;
+//    if(priv->rd_sync_counter >= priv->rd_buffers_count){
+//        priv->rd_sync_counter = 0;
+//    }
     return CAMIO_ENOERROR;
 }
 
@@ -226,15 +240,21 @@ static camio_error_t bring_read_acquire( camio_stream_t* this,  camio_rd_buffer_
 
     *buffer_o = priv->rd_buff;
     priv->read_registered = false; //Release the read now. This means that read req can be called again
-    priv->rd_buff         = NULL;  //Release the temp buffer pointer
     DBG("Got new MFIO data of size %i\n", priv->rd_buff->data_len);
     DBG("Returning new buffer of size %lli at %p\n", (*buffer_o)->data_len, (*buffer_o)->data_start);
+    priv->rd_buff         = NULL;  //Release the temp buffer pointer
+    priv->rd_acq_index++;   //Move to the next index
+    if(priv->rd_acq_index >= priv->rd_buffers_count){ //But loop around
+        priv->rd_acq_index = 0;
+    }
     return CAMIO_ENOERROR;
 }
 
 
 static camio_error_t bring_read_release(camio_stream_t* this, camio_rd_buffer_t** buffer)
 {
+    DBG("Doing read release\n");
+
     //Basic sanity checks -- TODO XXX: Should these be made into (compile time optional?) asserts for runtime performance?
     if( NULL == this){
         ERR("This null???\n"); //WTF?
@@ -268,9 +288,10 @@ static camio_error_t bring_read_release(camio_stream_t* this, camio_rd_buffer_t*
         return CAMIO_EWRONGBUFF;
     }
 
+    DBG("Trying to relase buffer at index=%lli\n", priv->rd_rel_index);
     volatile char* slot_mem                         = (volatile void*)bring_buffer->__internal.__mem_start;
     const uint64_t slot_mem_sz                      = bring_buffer->__internal.__mem_len;
-    volatile char* hdr_mem                          = slot_mem + slot_mem_sz - sizeof(bring_slot_header_t);
+    volatile char* hdr_mem                          = slot_mem + slot_mem_sz; // - sizeof(bring_slot_header_t);
     volatile bring_slot_header_t* curr_slot_head    = (volatile bring_slot_header_t*)(hdr_mem);
 
     curr_slot_head->data_size = 0;
@@ -292,6 +313,8 @@ static camio_error_t bring_read_release(camio_stream_t* this, camio_rd_buffer_t*
         priv->rd_rel_index = 0;
     }
 
+    DBG("Success!\n");
+
     return CAMIO_ENOERROR;
 }
 
@@ -302,6 +325,8 @@ static camio_error_t bring_read_release(camio_stream_t* this, camio_rd_buffer_t*
  * WRITE FUNCTIONS
  **************************************************************************************************************************/
 static camio_error_t try_write_acquire(camio_stream_t* this){
+    DBG("Doing write acquire\n");
+
     //Basic sanity checks -- TODO XXX: Should these be made into (compile time optional?) asserts for runtime performance?
       if( NULL == this){
           DBG("This null???\n"); //WTF?
@@ -309,16 +334,20 @@ static camio_error_t try_write_acquire(camio_stream_t* this){
       }
       bring_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
 
+      DBG("Trying to do a write acquire at index=%lli\n", priv->wr_rel_index);
 
 
       //Is there a new slot ready for writing?
-      camio_buffer_t* result      = &priv->rd_buffers[priv->wr_acq_index];
+      camio_buffer_t* result      = &priv->wr_buffers[priv->wr_rel_index];
       volatile char* slot_mem     = (volatile void*)result->__internal.__mem_start;
       const uint64_t slot_mem_sz  = result->__internal.__mem_len;
-      volatile char* hdr_mem      = slot_mem + slot_mem_sz - sizeof(bring_slot_header_t);
+      volatile char* hdr_mem      = slot_mem + slot_mem_sz; // - sizeof(bring_slot_header_t);
       __sync_synchronize();
       register bring_slot_header_t curr_slot_head = *(volatile bring_slot_header_t*)(hdr_mem);
       __sync_synchronize();
+
+      DBG("seq no   =%lli offset=(%lli)\n", curr_slot_head.seq_no, (char*)hdr_mem - (char*)priv->bring_head);
+      DBG("data size=%lli\n", curr_slot_head.data_size);
 
 
       if( curr_slot_head.seq_no != 0x00ULL){
@@ -347,21 +376,23 @@ static camio_error_t bring_write_acquire(camio_stream_t* this, camio_wr_buffer_t
 
     camio_error_t err = try_write_acquire(this);
     if( err != CAMIO_ENOERROR){
+        DBG("Try write got an error %lli\n", err);
         return err;
     }
 
     bring_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
 
-    camio_buffer_t* result      = &priv->rd_buffers[priv->wr_acq_index];
+    camio_buffer_t* result      = &priv->wr_buffers[priv->wr_rel_index];
     volatile char* slot_mem     = (volatile void*)result->__internal.__mem_start;
     const uint64_t slot_mem_sz  = result->__internal.__mem_len;
 
     result->data_start  = (void*)slot_mem;
-    result->data_len    = slot_mem_sz - sizeof(bring_slot_header_t);
+    result->data_len    = slot_mem_sz; // - sizeof(bring_slot_header_t);
     result->valid       = true;
+    result->__internal.__in_use = true;
     *buffer_o           = result;
 
-    DBG("Returning new buffer of size %lli at %p\n", (*buffer_o)->data_len, (*buffer_o)->data_start);
+    DBG("Returning new buffer of size %lli at %p, index=%lli\n", (*buffer_o)->data_len, (*buffer_o)->data_start, priv->wr_rel_index);
     return CAMIO_ENOERROR;
 }
 
@@ -375,8 +406,6 @@ static camio_error_t bring_write_request(camio_stream_t* this, camio_write_req_t
     }
 
     bring_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
-
-    DBG("Got a write request vector with %lli items\n", req_vec_len);
     if(priv->write_registered){
         ERR("Already registered a write request. Currently this stream only handles one outstanding request at a time\n");
         return CAMIO_EINVALID; //TODO XXX better error code
@@ -400,7 +429,6 @@ static camio_error_t bring_write_try(camio_stream_t* this)
     for(int i = priv->write_req_curr; i < priv->write_req_len; i++){
         camio_write_req_t* req = priv->write_req + i;
         camio_buffer_t* buff   = req->buffer;
-        DBG("Trying to writing %li bytes from %p to %i\n", buff->data_len,buff->data_start);
 
         //Check that the buffers are being used in order
         if(buff->__internal.__buffer_id != priv->wr_rel_index){
@@ -420,21 +448,33 @@ static camio_error_t bring_write_try(camio_stream_t* this)
             return CAMIO_ETOOMANY;
         }
 
+        DBG("Trying to writing %li bytes from %p to %p (offset = %lli)\n", buff->data_len,buff->data_start, ((char*)priv->rd_buffers - (char*)buff->data_start));
+
         volatile char* slot_mem                         = (volatile void*)buff->__internal.__mem_start;
         const uint64_t slot_mem_sz                      = buff->__internal.__mem_len;
-        volatile char* hdr_mem                          = slot_mem + slot_mem_sz - sizeof(bring_slot_header_t);
+        volatile char* hdr_mem                          = slot_mem + slot_mem_sz; // - sizeof(bring_slot_header_t);
         volatile bring_slot_header_t* curr_slot_head    = (volatile bring_slot_header_t*)(hdr_mem);
+
+
+        DBG("seq no   =%lli offset=(%lli)\n", curr_slot_head->seq_no, (char*)hdr_mem - (char*)priv->bring_head);
+        DBG("data size=%lli\n", curr_slot_head->data_size);
 
         curr_slot_head->data_size = buff->data_len;
         //Apply an atomic update to tell the write end that we received this data
         //1 - Make sure all the memory writes are done
         __sync_synchronize();
         //2 - Do a word aligned single word write (atomic)
-        (*(volatile uint64_t*)&curr_slot_head->seq_no) = priv->wr_sync_counter;
+        *(volatile uint64_t*)&curr_slot_head->seq_no = priv->wr_sync_counter;
+        DBG("setting seq=%lli\n",  priv->wr_sync_counter);
         //3 - Again, make sure all the memory writes are done
         __sync_synchronize();
 
         priv->wr_sync_counter++;
+
+
+        DBG("seq no   =%lli offset=(%lli)\n", curr_slot_head->seq_no, (char*)hdr_mem - (char*)priv->bring_head);
+        DBG("data size=%lli\n", curr_slot_head->data_size);
+
 
         //This is an auto release stream, once you've used the buffer it goes away, you'll need to acquire another
         camio_error_t err = camio_write_release(this,&req->buffer);
@@ -495,6 +535,7 @@ static camio_error_t bring_write_ready(camio_muxable_t* this)
 
 static camio_error_t bring_write_release(camio_stream_t* this, camio_wr_buffer_t** buffer)
 {
+
     //Basic sanity checks -- TODO XXX: Should these be made into (compile time optional?) asserts for runtime performance?
     if( NULL == this){
         DBG("This null???\n"); //WTF?
@@ -514,6 +555,7 @@ static camio_error_t bring_write_release(camio_stream_t* this, camio_wr_buffer_t
     camio_buffer_t* bring_buffer = *buffer;
 
     if( !bring_buffer->__internal.__in_use){
+        DBG("Trying to release buffer that is already released\n");
         return CAMIO_ENOERROR; //Buffer has already been released
     }
 
@@ -531,6 +573,9 @@ static camio_error_t bring_write_release(camio_stream_t* this, camio_wr_buffer_t
     bring_buffer->data_len            = 0;
     bring_buffer->data_start          = NULL;
     priv->wr_rel_index++;
+    if(priv->wr_rel_index >= priv->wr_buffers_count){ //But loop around
+        priv->wr_rel_index = 0;
+    }
 
     *buffer = NULL; //Remove dangling pointers!
 
@@ -587,26 +632,19 @@ camio_error_t bring_stream_construct(
     }
     bring_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
 
-    DBG("-->\n");
     priv->connector  = *connector; //Keep a copy of the connector state
     priv->params     = *params;
     priv->bring_head = bring_head;
 
     //Connect the read and write ends together
-
-    DBG("bring head=%p\n", bring_head);
     priv->rd_mem            = (char*)bring_head + bring_head->rd_mem_start_offset;
-    DBG("-->\n");
     priv->rd_buffers_count  = bring_head->rd_slots;
-    DBG("-->\n");
     priv->rd_buffers        = (camio_buffer_t*)calloc(bring_head->rd_slots_size,sizeof(camio_buffer_t));
     if(!priv->rd_buffers){
         ERR("Ran out of memory allocating buffer pool\n");
         return CAMIO_ENOMEM;
     }
-    DBG("-->\n");
     for(int i = 0; i < bring_head->rd_slots;i++){
-        DBG("-->\n");
         priv->rd_buffers[i].__internal.__buffer_id       = i;
         priv->rd_buffers[i].__internal.__do_auto_release = false;
         priv->rd_buffers[i].__internal.__in_use          = false;
@@ -617,7 +655,6 @@ camio_error_t bring_stream_construct(
         priv->rd_buffers[i].__internal.__read_only       = true;
     }
 
-    DBG("-->\n");
     priv->wr_mem            = (char*)bring_head + bring_head->wr_mem_start_offset;
     priv->wr_buffers_count  = bring_head->wr_slots;
     priv->wr_buffers        = (camio_buffer_t*)calloc(bring_head->wr_slots_size,sizeof(camio_buffer_t));
@@ -626,9 +663,7 @@ camio_error_t bring_stream_construct(
         ERR("Ran out of memory allocating buffer pool\n");
         return CAMIO_ENOMEM;
     }
-    DBG("-->\n");
     for(int i = 0; i < bring_head->wr_slots;i++){
-        DBG("-->\n");
         priv->wr_buffers[i].__internal.__buffer_id       = i;
         priv->wr_buffers[i].__internal.__do_auto_release = true;
         priv->wr_buffers[i].__internal.__in_use          = false;
@@ -639,7 +674,6 @@ camio_error_t bring_stream_construct(
         priv->wr_buffers[i].__internal.__read_only       = true;
     }
 
-    DBG("-->\n");
     if(!priv->params.server){ //Swap things around to connect both ends
         ch_word tmp_buffers_count    = priv->rd_buffers_count;
         camio_buffer_t* tmp_buffers  = priv->rd_buffers;
@@ -652,7 +686,6 @@ camio_error_t bring_stream_construct(
         priv->rd_buffers             = tmp_buffers;
     }
 
-    DBG("-->\n");
     priv->rd_sync_counter   = 1; //This is where we expect the first counter
     priv->wr_sync_counter   = 1;
 
@@ -667,8 +700,7 @@ camio_error_t bring_stream_construct(
     this->wr_muxable.vtable.ready      = bring_write_ready;
     this->wr_muxable.fd                = fd;
 
-    DBG("-->\n");
-    //DBG("Done constructing BRING stream with read_fd=%i and write_fd=%i\n", fd, fd);
+    DBG("Done constructing BRING stream with fd=%i\n", fd);
     return CAMIO_ENOERROR;
 }
 

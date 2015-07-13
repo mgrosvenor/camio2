@@ -60,6 +60,10 @@ static camio_error_t bring_connect_peek_server(camio_connector_t* this)
     bring_connector_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
     DBG("Doing connect peek server on %s\n", priv->bring_filen);
 
+    if(priv->bring_fd > -1 ){ //Ready to go! Call connect!
+        return CAMIO_ENOERROR;
+    }
+
     DBG("Making bring called %.*s with %lu slots of size %lu\n",
         priv->params->hierarchical.str_len,
         priv->params->hierarchical.str,
@@ -229,10 +233,14 @@ static camio_error_t bring_connect_peek_client(camio_connector_t* this)
     bring_connector_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
     DBG("Doing connect peek client on %s\n", priv->bring_filen);
 
+    if(priv->bring_fd > -1 ){ //Ready to go! Call connect!
+        return CAMIO_ENOERROR;
+    }
+
     //Now there is a bring file and it should have a header in it
     int bring_fd = open(priv->bring_filen, O_RDWR);
     if(bring_fd < 0){
-        //ERR("Could not open named shared memory file \"%s\". Error=%s\n", priv->bring_filen, strerror(errno));
+        ERR("Could not open named shared memory file \"%s\". Error=%s\n", priv->bring_filen, strerror(errno));
         result = CAMIO_ETRYAGAIN;
         goto error_no_cleanup;
     }
@@ -263,7 +271,7 @@ static camio_error_t bring_connect_peek_client(camio_connector_t* this)
 
     bring_header_t* bring_head = &header_tmp;
     (void)bring_head;
-    DBG("bring memory offsets\n");
+    DBG("bring memory offsets (from file)\n");
     DBG("-------------------------\n");
     DBG("total_mem            %016llx (%lli)\n", bring_head->total_mem, bring_head->total_mem);
     DBG("rd_slots             %016llx (%lli)\n", bring_head->rd_slots,  bring_head->rd_slots);
@@ -284,7 +292,7 @@ static camio_error_t bring_connect_peek_client(camio_connector_t* this)
     }
 
     //Memory must be page aligned otherwise we're in trouble (TODO - could pass alignment though the file and check..)
-    DBG("memory mapped at addres =%p\n", mem);
+    DBG("%lli bytes of memory mapped at address =%p\n", header_tmp.total_mem, mem);
     if( ((uint64_t)mem) != (((uint64_t)mem) & ~0xFFF)){
         ERR("Could not memory map bring file \"%s\". Error=%s\n", priv->bring_filen, strerror(errno));
         result = CAMIO_EINVALID;
@@ -309,6 +317,27 @@ static camio_error_t bring_connect_peek_client(camio_connector_t* this)
     priv->bring_fd = bring_fd;
     priv->bring_head = mem;
 
+    bring_head = mem;
+    (void)bring_head;
+    DBG("bring memory offsets (from mmap)\n");
+    DBG("-------------------------\n");
+    DBG("total_mem            %016llx (%lli)\n", bring_head->total_mem, bring_head->total_mem);
+    DBG("rd_slots             %016llx (%lli)\n", bring_head->rd_slots,  bring_head->rd_slots);
+    DBG("rd_slots_size        %016llx (%lli)\n", bring_head->rd_slots_size, bring_head->rd_slots_size);
+    DBG("rd_mem_start_offset  %016llx (%lli)\n", bring_head->rd_mem_start_offset, bring_head->rd_mem_start_offset);
+    DBG("rd_mem_len           %016llx (%lli)\n", bring_head->rd_mem_len, bring_head->rd_mem_len);
+    DBG("wr_slots             %016llx (%lli)\n", bring_head->wr_slots,  bring_head->wr_slots);
+    DBG("wr_slots_size        %016llx (%lli)\n", bring_head->wr_slots_size, bring_head->wr_slots_size);
+    DBG("wr_mem_start_offset  %016llx (%lli)\n", bring_head->wr_mem_start_offset,bring_head->wr_mem_start_offset);
+    DBG("wr_mem_len           %016llx (%lli)\n", bring_head->wr_mem_len, bring_head->wr_mem_len);
+    DBG("-------------------------\n");
+
+    __sync_synchronize();
+    priv->bring_head->magic = (volatile ch_word)BRING_MAGIC_CLIENT;
+    __sync_synchronize();
+
+    return CAMIO_ENOERROR;
+
 error_unlock_mem:
     munlock(mem, header_tmp.total_mem);
 
@@ -331,13 +360,20 @@ static camio_error_t bring_connect_peek(camio_connector_t* this)
     camio_error_t result = CAMIO_ENOERROR;
     bring_connector_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
 
-    if(priv->bring_fd > -1 ){ //Ready to go! Call connect!
-        return CAMIO_ENOERROR;
-    }
-
-
     if(priv->params->server){
         result = bring_connect_peek_server(this);
+        if(!result == CAMIO_ENOERROR){
+            return result;
+        }
+
+        __sync_synchronize();
+        if(priv->bring_head->magic == (volatile ch_word)BRING_MAGIC_CLIENT){
+            DBG("Head magic found!\n");
+            return CAMIO_ENOERROR;
+        }
+
+        return CAMIO_ETRYAGAIN;
+
     }
     else{
         result = bring_connect_peek_client(this);
@@ -369,7 +405,6 @@ static camio_error_t bring_connect(camio_connector_t* this, camio_stream_t** str
     if(err != CAMIO_ENOERROR){
         return err;
     }
-
 
     if(priv->is_connected){
         DBG("Already connected! Why are you calling this twice?\n");
