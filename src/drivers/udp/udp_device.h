@@ -4,14 +4,14 @@
  * See LICENSE.txt for full details. 
  * 
  *  Created:   17 Nov 2014
- *  File name: udp_transport.h
+ *  File name: udp_device.h
  *  Description:
  *  <INSERT DESCRIPTION HERE> 
  */
 #ifndef SRC_DRIVERS_UDP_UDP_TRANSPORT_H_
 #define SRC_DRIVERS_UDP_UDP_TRANSPORT_H_
 
-#include <src/drivers/udp/udp_connector.h>
+#include <src/drivers/udp/udp_controller.h>
 #include <src/types/len_string.h>
 
 typedef struct udp_global_s{

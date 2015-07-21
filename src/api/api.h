@@ -43,13 +43,13 @@ camio_error_t camio_channel_request( camio_controller_t* this, camio_channel_req
 
 
 /**
- * When the channel_ is ready to connect. A connector is ready if calling connect will be non-blocking.
+ * When the channel_ is ready to connect. A controller is ready if calling connect will be non-blocking.
  */
 camio_error_t camio_channel_req_ready( camio_controller_t* this, ch_word* id_o);
 
 
 /**
- * Free resources associated with this connector, but not with any of the channels it has created.
+ * Free resources associated with this controller, but not with any of the channels it has created.
  */
 void camio_controller_destroy(camio_controller_t* this);
 
@@ -84,7 +84,7 @@ camio_error_t camio_mux_remove(camio_mux_t* this, camio_muxable_t* muxable);
 /**
  * Perform the select operation. Find if any of the supplied channels are ready for reading, writing or connecting. The first
  * channel that matches one of these will fire. A camio_selector is trigger based. It has no memory. Once an event has been
- * delivered once, it will not be delivered again until there is a change in the state of the channel or connector.
+ * delivered once, it will not be delivered again until there is a change in the state of the channel or controller.
  * Return values:
  * - ENOERROR: All good, please continue.
  * - TODO XXX: More errors here
@@ -144,7 +144,7 @@ camio_error_t camio_read_request( camio_channel_t* this, camio_read_req_t* req_v
 
 
 /**
- * Check if the channel is ready to read. A connector is ready if calling read will be non-blocking.
+ * Check if the channel is ready to read. A controller is ready if calling read will be non-blocking.
  * Return values:
  * - EREADY - the channel is ready to be read
  * - ENOTREDY - the channel is not ready to be read, try again later
@@ -197,7 +197,7 @@ camio_error_t camio_read_release(camio_channel_t* this, camio_rd_buffer_t** buff
 camio_error_t camio_write_acquire(camio_channel_t* this, camio_wr_buffer_t** buffer_o);
 
 /**
- * Check if the channel is ready to write. A connector is ready if calling write will be non-blocking.
+ * Check if the channel is ready to write. A controller is ready if calling write will be non-blocking.
  */
 camio_error_t camio_write_ready( camio_channel_t* this);
 
@@ -225,7 +225,7 @@ camio_error_t camio_write_release(camio_channel_t* this, camio_wr_buffer_t** buf
 
 
 /**
- * Free resources associated with this channel, but not with its connector.
+ * Free resources associated with this channel, but not with its controller.
  */
 void camio_channel_destroy(camio_channel_t* this);
 

@@ -4,15 +4,15 @@
  * See LICENSE.txt for full details. 
  * 
  *  Created:   04 Jul 2015
- *  File name: bring_stream.h
+ *  File name: bring_channel.h
  *  Description:
  *  <INSERT DESCRIPTION HERE> 
  */
 #ifndef SRC_DRIVERS_BRING_BRING_STREAM_H_
 #define SRC_DRIVERS_BRING_BRING_STREAM_H_
 
-#include <src/transports/stream.h>
-#include <src/transports/connector.h>
+#include <src/devices/channel.h>
+#include <src/devices/controller.h>
 #include <src/types/len_string.h>
 
 NEW_STREAM_DECLARE(bring);
@@ -61,9 +61,9 @@ typedef struct {
     int64_t expand;
 } bring_params_t;
 
-camio_error_t bring_stream_construct(
-    camio_stream_t* this,
-    camio_controller_t* connector,
+camio_error_t bring_channel_construct(
+    camio_channel_t* this,
+    camio_controller_t* controller,
     volatile bring_header_t* bring_head,
     bring_params_t* params,
     int fd

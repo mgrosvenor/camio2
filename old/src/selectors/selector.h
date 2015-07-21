@@ -18,7 +18,7 @@ typedef enum {
 
 struct ciosel_s {
     /**
-     * Insert a new stream into the selector called “this”. The id will be returned by the selector when an event matching the
+     * Insert a new channel into the selector called “this”. The id will be returned by the selector when an event matching the
      * mode happens. Mode may be either:
      * - CIOSEL_MODE_READ - Only wake up when new data is ready to ready
      * - CIOSEL_MODE_WRITE - Only wake up when data can be written
@@ -34,7 +34,7 @@ struct ciosel_s {
 
 
     /**
-     * Remove the stream with the given id from the selector.
+     * Remove the channel with the given id from the selector.
      */
     void (*remove)(ciosel* this, int id);
 
@@ -44,7 +44,7 @@ struct ciosel_s {
     int (*select)(ciosel* this, cioselable** selectable_o);
 
     /*
-     * Returns the number of streams in this selctor
+     * Returns the number of channels in this selctor
      */
     size_t (*count)(ciosel* this);
 
@@ -61,10 +61,10 @@ struct ciosel_s {
 };
 
 /**
- * All streams in CamIO are non-blocking. Blocking behaviour is achieved through using a selector. Both read and write
- * streams may be placed into a selector. Selection strategies vary and some streams may implement many. A selector is given
- * a string based target optimisation criteria or all streams can be forced to use a single selection strategy. In this
- * case, streams that do not support the selection strategy will be rejected.
+ * All channels in CamIO are non-blocking. Blocking behaviour is achieved through using a selector. Both read and write
+ * channels may be placed into a selector. Selection strategies vary and some channels may implement many. A selector is given
+ * a string based target optimisation criteria or all channels can be forced to use a single selection strategy. In this
+ * case, channels that do not support the selection strategy will be rejected.
  */
 typedef enum { LOW_LATENCY, LOW_CPU, __SPIN, __POLL,  __EPOLL,  __SELECT } ciosel_strategy;
 

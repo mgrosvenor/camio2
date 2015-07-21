@@ -4,7 +4,7 @@
  * See LICENSE.txt for full details. 
  * 
  *  Created:   04 Jul 2015
- *  File name: bring_transport.h
+ *  File name: bring_device.h
  *  Description:
  *  <INSERT DESCRIPTION HERE> 
  */
@@ -12,8 +12,8 @@
 #define SRC_DRIVERS_BRING_BRING_TRANSPORT_H_
 
 
-#include "bring_connector.h"
-#include "bring_stream.h"
+#include "bring_controller.h"
+#include "bring_channel.h"
 
 typedef struct bring_global_s{
     ch_bool is_init;

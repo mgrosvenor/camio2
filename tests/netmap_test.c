@@ -6,7 +6,7 @@
  *  Created:   Aug 15, 2014
  *  File name: netmap_test.c
  *  Description:
- *  Test that the netmap stream works as we expect
+ *  Test that the netmap channel works as we expect
  */
 
 

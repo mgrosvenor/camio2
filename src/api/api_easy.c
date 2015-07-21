@@ -25,14 +25,14 @@ camio_error_t camio_channel_new(char* uri, camio_channel_t** channel)
    }
    //DBG("Got parameter at %p with size %i and id=%i\n", params, params_size, id);
 
-   //Use the parameters structure to construct a new connector object
-   camio_controller_t* connector = NULL;
-   err = camio_device_constr(id,&params,params_size,&connector);
+   //Use the parameters structure to construct a new controller object
+   camio_controller_t* controller = NULL;
+   err = camio_device_constr(id,&params,params_size,&controller);
    if(err){
-       DBG("Could not construct connector\n");
+       DBG("Could not construct controller\n");
        return CAMIO_EINVALID; //TODO XXX put a better error here
    }
-   //DBG("## Got new connector at address %p\n", connector);
+   //DBG("## Got new controller at address %p\n", controller);
 
 // This code is not really necessary, it's a lot of setup to just spin
 //   //Create a new multiplexer object
@@ -43,23 +43,23 @@ camio_error_t camio_channel_new(char* uri, camio_channel_t** channel)
 //       return CAMIO_EINVALID;
 //   }
 //
-//   err = camio_mux_insert(mux,&connector->muxable, 0);
+//   err = camio_mux_insert(mux,&controller->muxable, 0);
 //   if(err){
-//       DBG("Could not insert connector into multiplexer\n");
+//       DBG("Could not insert controller into multiplexer\n");
 //       return CAMIO_EINVALID;
 //   }
 //
 //   camio_muxable_t* muxable = NULL;
-//   err = camio_mux_select(mux,&muxable); //Block waiting for connector to connect
+//   err = camio_mux_select(mux,&muxable); //Block waiting for controller to connect
 //   if(err){
 //       DBG("Could not select in multiplexer\n");
 //       return err;
 //   }
 //
 //   //If not true, we have a problem!
-//   assert(muxable->parent.connector == connector);
+//   assert(muxable->parent.controller == controller);
 
-   while( (err = camio_connect(connector,channel)) == CAMIO_ETRYAGAIN ){}
+   while( (err = camio_connect(controller,channel)) == CAMIO_ETRYAGAIN ){}
    if(err){
        DBG("Could not connect to channel\n");
        return CAMIO_EINVALID; //TODO XXX put a better error here
@@ -70,11 +70,11 @@ camio_error_t camio_channel_new(char* uri, camio_channel_t** channel)
 
    //Clean up our mess
    //camio_mux_destroy(mux);
-   camio_connector_destroy(connector);
+   camio_controller_destroy(controller);
    return CAMIO_ENOERROR;
 }
 
-camio_error_t camio_connector_new(char* uri, camio_controller_t** connector_o)
+camio_error_t camio_controller_new(char* uri, camio_controller_t** controller_o)
 {
     ch_word id = -1;
     void* params = NULL;
@@ -85,10 +85,10 @@ camio_error_t camio_connector_new(char* uri, camio_controller_t** connector_o)
         return CAMIO_EINVALID; //TODO XXX put a better error here
     }
 
-    //Use the parameters structure to construct a new connector object
-    err = camio_device_constr(id,&params,params_size,connector_o);
+    //Use the parameters structure to construct a new controller object
+    err = camio_device_constr(id,&params,params_size,controller_o);
     if(err){
-        DBG("Could not construct connector\n");
+        DBG("Could not construct controller\n");
         return CAMIO_EINVALID; //TODO XXX put a better error here
     }
 

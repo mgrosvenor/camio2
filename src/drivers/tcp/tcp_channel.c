@@ -4,20 +4,20 @@
  * See LICENSE.txt for full details. 
  * 
  *  Created:   22 Jun 2015
- *  File name: tcp_stream.c
+ *  File name: tcp_channel.c
  *  Description:
  *  <INSERT DESCRIPTION HERE> 
  */
 
 
-#include <src/transports/stream.h>
-#include <src/transports/connector.h>
+#include <src/devices/channel.h>
+#include <src/devices/controller.h>
 #include <src/buffers/buffer_malloc_linear.h>
 #include <deps/chaste/utils/util.h>
 
 #include <src/camio_debug.h>
 
-#include "tcp_stream.h"
+#include "tcp_channel.h"
 
 #include <fcntl.h>
 #include <errno.h>
@@ -29,8 +29,8 @@
 //Current (simple) TCP recv only does one buffer at a time, this could change with vectored I/O in the future.
 #define CAMIO_TCP_BUFFER_COUNT (1)
 
-typedef struct tcp_stream_priv_s {
-    camio_controller_t connector;
+typedef struct tcp_channel_priv_s {
+    camio_controller_t controller;
 
     ch_word rd_buff_sz;
     ch_word wr_buff_sz;
@@ -44,19 +44,19 @@ typedef struct tcp_stream_priv_s {
 
     //The current read buffer
     ch_bool read_registered;    //Has a read been registered?
-    ch_bool read_ready;         //Is the stream ready for writing (for edge triggered multiplexers)
+    ch_bool read_ready;         //Is the channel ready for writing (for edge triggered multiplexers)
     camio_buffer_t* rd_buffer;  //A place to keep a read buffer until it's ready to be consumed
     camio_read_req_t* read_req; //Read request vector to put data into when there is new data
     ch_word read_req_len;       //size of the request vector
     ch_word read_req_curr;      //This will be needed later
 
     ch_bool write_registered;     //Has a write been registered?
-    ch_bool write_ready;          //Is the stream ready for writing (for edge triggered multiplexers)
+    ch_bool write_ready;          //Is the channel ready for writing (for edge triggered multiplexers)
     camio_write_req_t* write_req; //Write request vector to take data out of when there is new data.
     ch_word write_req_len;        //size of the request vector
     ch_word write_req_curr;
 
-} tcp_stream_priv_t;
+} tcp_channel_priv_t;
 
 
 
@@ -66,11 +66,11 @@ typedef struct tcp_stream_priv_s {
  **************************************************************************************************************************/
 
 //See if there is something to read
-static camio_error_t tcp_read_peek( camio_stream_t* this)
+static camio_error_t tcp_read_peek( camio_channel_t* this)
 {
     //This is not a public function, can assume that preconditions have been checked.
     DBG("Doing read peek\n");
-    tcp_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
+    tcp_channel_priv_t* priv = STREAM_GET_PRIVATE(this);
     camio_error_t err = buffer_malloc_linear_acquire(priv->rd_buff_pool,&priv->rd_buffer);
     if(err){
         DBG("Could not acquire read buffer Have you called release?!\n");
@@ -139,7 +139,7 @@ static camio_error_t tcp_read_ready(camio_muxable_t* this)
     }
 
     //OK now the fun begins
-    tcp_stream_priv_t* priv = STREAM_GET_PRIVATE(this->parent.stream);
+    tcp_channel_priv_t* priv = STREAM_GET_PRIVATE(this->parent.channel);
 
     if(!priv->read_registered){ //Even if there is data waiting, nobody want's it, so ignore for now.
         DBG("Nobody wants the data\n");
@@ -153,7 +153,7 @@ static camio_error_t tcp_read_ready(camio_muxable_t* this)
     }
 
     //Nope, OK, see if we can get some
-    camio_error_t err = tcp_read_peek(this->parent.stream);
+    camio_error_t err = tcp_read_peek(this->parent.channel);
     if(err == CAMIO_ENOERROR ){
         DBG("There is new data waiting!\n");
         return CAMIO_EREADY;
@@ -170,7 +170,7 @@ static camio_error_t tcp_read_ready(camio_muxable_t* this)
 
 }
 
-static camio_error_t tcp_read_request( camio_stream_t* this, camio_read_req_t* req_vec, ch_word req_vec_len )
+static camio_error_t tcp_read_request( camio_channel_t* this, camio_read_req_t* req_vec, ch_word req_vec_len )
 {
     DBG("Doing TCP read request...!\n");
     //Basic sanity checks -- TODO XXX: Should these be made into (compile time optional?) asserts for runtime performance?
@@ -178,7 +178,7 @@ static camio_error_t tcp_read_request( camio_stream_t* this, camio_read_req_t* r
         DBG("This null???\n"); //WTF?
         return CAMIO_EINVALID;
     }
-    tcp_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
+    tcp_channel_priv_t* priv = STREAM_GET_PRIVATE(this);
 
     if(req_vec_len != 1){
         DBG("Stream currently only supports read requests of size 1\n"); //TODO this should be coded in the features struct
@@ -186,7 +186,7 @@ static camio_error_t tcp_read_request( camio_stream_t* this, camio_read_req_t* r
     }
 
     if(priv->read_registered){
-        DBG("Already registered a read request. Currently this stream only handles one outstanding request at a time\n");
+        DBG("Already registered a read request. Currently this channel only handles one outstanding request at a time\n");
         return CAMIO_ETOOMANY; //TODO XXX better error code
     }
 
@@ -201,7 +201,7 @@ static camio_error_t tcp_read_request( camio_stream_t* this, camio_read_req_t* r
 }
 
 
-static camio_error_t tcp_read_acquire( camio_stream_t* this,  camio_rd_buffer_t** buffer_o)
+static camio_error_t tcp_read_acquire( camio_channel_t* this,  camio_rd_buffer_t** buffer_o)
 {
 
     DBG("Doing read acquire\n");
@@ -218,7 +218,7 @@ static camio_error_t tcp_read_acquire( camio_stream_t* this,  camio_rd_buffer_t*
         DBG("Buffer chain not null. You should release this before getting a new one, otherwise dangling pointers!\n");
         return CAMIO_EINVALID;
     }
-    tcp_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
+    tcp_channel_priv_t* priv = STREAM_GET_PRIVATE(this);
 
     camio_error_t err = tcp_read_ready(&this->rd_muxable);
     if(err == CAMIO_EREADY){ //Whoo hoo! There's data!
@@ -237,14 +237,14 @@ static camio_error_t tcp_read_acquire( camio_stream_t* this,  camio_rd_buffer_t*
 }
 
 
-static camio_error_t tcp_read_release(camio_stream_t* this, camio_rd_buffer_t** buffer)
+static camio_error_t tcp_read_release(camio_channel_t* this, camio_rd_buffer_t** buffer)
 {
     //Basic sanity checks -- TODO XXX: Should these be made into (compile time optional?) asserts for runtime performance?
     if( NULL == this){
         DBG("This null???\n"); //WTF?
         return CAMIO_EINVALID;
     }
-    tcp_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
+    tcp_channel_priv_t* priv = STREAM_GET_PRIVATE(this);
     (void)priv;
 
     if( NULL == buffer){
@@ -281,14 +281,14 @@ static camio_error_t tcp_read_release(camio_stream_t* this, camio_rd_buffer_t** 
  * WRITE FUNCTIONS
  **************************************************************************************************************************/
 
-static camio_error_t tcp_write_acquire(camio_stream_t* this, camio_wr_buffer_t** buffer_o)
+static camio_error_t tcp_write_acquire(camio_channel_t* this, camio_wr_buffer_t** buffer_o)
 {
     //Basic sanity checks -- TODO XXX: Should these be made into (compile time optional?) asserts for runtime performance?
     if( NULL == this){
         DBG("This null???\n"); //WTF?
         return CAMIO_EINVALID;
     }
-    tcp_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
+    tcp_channel_priv_t* priv = STREAM_GET_PRIVATE(this);
 
     if( NULL == buffer_o){
         DBG("Buffer chain pointer null\n"); //WTF?
@@ -316,7 +316,7 @@ static camio_error_t tcp_write_acquire(camio_stream_t* this, camio_wr_buffer_t**
 }
 
 
-static camio_error_t tcp_write_request(camio_stream_t* this, camio_write_req_t* req_vec, ch_word req_vec_len)
+static camio_error_t tcp_write_request(camio_channel_t* this, camio_write_req_t* req_vec, ch_word req_vec_len)
 {
     //Basic sanity checks -- TODO XXX: Should these be made into (compile time optional?) asserts for runtime performance?
     if( NULL == this){
@@ -324,11 +324,11 @@ static camio_error_t tcp_write_request(camio_stream_t* this, camio_write_req_t* 
         return CAMIO_EINVALID;
     }
 
-    tcp_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
+    tcp_channel_priv_t* priv = STREAM_GET_PRIVATE(this);
 
     DBG("Got a write request vector with %lli items\n", req_vec_len);
     if(priv->write_registered){
-        DBG("Already registered a write request. Currently this stream only handles one outstanding request at a time\n");
+        DBG("Already registered a write request. Currently this channel only handles one outstanding request at a time\n");
         return CAMIO_EINVALID; //TODO XXX better error code
     }
 
@@ -342,10 +342,10 @@ static camio_error_t tcp_write_request(camio_stream_t* this, camio_write_req_t* 
 }
 
 
-//Try to write to the underlying, stream. This function is private, so no precondition checks necessary
-static camio_error_t tcp_write_try(camio_stream_t* this)
+//Try to write to the underlying, channel. This function is private, so no precondition checks necessary
+static camio_error_t tcp_write_try(camio_channel_t* this)
 {
-    tcp_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
+    tcp_channel_priv_t* priv = STREAM_GET_PRIVATE(this);
     //DBG("Doing write_try\n");
 
     for(int i = priv->write_req_curr; i < priv->write_req_len; i++){
@@ -353,7 +353,7 @@ static camio_error_t tcp_write_try(camio_stream_t* this)
         camio_buffer_t* buff   = req->buffer;
 
         if(req->buffer->__internal.__parent != this){
-            ERR("Warning -- detected request to write from buffer with parent %p not belonging to this stream %p\n",
+            ERR("Warning -- detected request to write from buffer with parent %p not belonging to this channel %p\n",
                 req->buffer->__internal.__parent,
                 this
             );
@@ -396,7 +396,7 @@ static camio_error_t tcp_write_try(camio_stream_t* this)
 
 
 
-//Is the underlying stream done writing and ready for more?
+//Is the underlying channel done writing and ready for more?
 static camio_error_t tcp_write_ready(camio_muxable_t* this)
 {
     //Basic sanity checks -- TODO XXX: Should these be made into (compile time optional?) asserts for runtime performance?
@@ -410,13 +410,13 @@ static camio_error_t tcp_write_ready(camio_muxable_t* this)
         return CAMIO_EINVALID;
     }
 
-    tcp_stream_priv_t* priv = STREAM_GET_PRIVATE(this->parent.stream);
+    tcp_channel_priv_t* priv = STREAM_GET_PRIVATE(this->parent.channel);
     if(!priv->write_registered){ //No body has asked us to write anything, so we're not ready
         return CAMIO_ENOTREADY;
     }
 
     //OK now the fun begins
-    camio_error_t err = tcp_write_try(this->parent.stream);
+    camio_error_t err = tcp_write_try(this->parent.channel);
     if(err == CAMIO_ENOERROR){
         DBG("Writing has completed successfully. Release the buffers and/or write some more\n");
         return CAMIO_EREADY;
@@ -428,7 +428,7 @@ static camio_error_t tcp_write_ready(camio_muxable_t* this)
     }
 
     if(err == CAMIO_ECLOSED){
-        DBG("The stream has been closed. You cannot write any more\n");
+        DBG("The channel has been closed. You cannot write any more\n");
         return CAMIO_ECLOSED;
     }
 
@@ -438,14 +438,14 @@ static camio_error_t tcp_write_ready(camio_muxable_t* this)
 }
 
 
-static camio_error_t tcp_write_release(camio_stream_t* this, camio_wr_buffer_t** buffer)
+static camio_error_t tcp_write_release(camio_channel_t* this, camio_wr_buffer_t** buffer)
 {
     //Basic sanity checks -- TODO XXX: Should these be made into (compile time optional?) asserts for runtime performance?
     if( NULL == this){
         DBG("This null???\n"); //WTF?
         return CAMIO_EINVALID;
     }
-    tcp_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
+    tcp_channel_priv_t* priv = STREAM_GET_PRIVATE(this);
     (void)priv;
 
     if( NULL == buffer){
@@ -485,14 +485,14 @@ static camio_error_t tcp_write_release(camio_stream_t* this, camio_wr_buffer_t**
  * SETUP/CLEANUP FUNCTIONS
  **************************************************************************************************************************/
 
-static void tcp_destroy(camio_stream_t* this)
+static void tcp_destroy(camio_channel_t* this)
 {
     //Basic sanity checks -- TODO XXX: Should these be made into (compile time optional?) asserts for runtime performance?
     if( NULL == this){
         DBG("This null???\n"); //WTF?
         return;
     }
-    tcp_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
+    tcp_channel_priv_t* priv = STREAM_GET_PRIVATE(this);
 
     if(priv->fd > -1){
         close(priv->fd);
@@ -512,16 +512,16 @@ static void tcp_destroy(camio_stream_t* this)
 
 }
 
-camio_error_t tcp_stream_construct(camio_stream_t* this, camio_controller_t* connector, tcp_params_t* params, int fd)
+camio_error_t tcp_channel_construct(camio_channel_t* this, camio_controller_t* controller, tcp_params_t* params, int fd)
 {
     //Basic sanity checks -- TODO XXX: Should these be made into (compile time optional?) asserts for runtime performance?
     if( NULL == this){
         DBG("This null???\n"); //WTF?
         return CAMIO_EINVALID;
     }
-    tcp_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
+    tcp_channel_priv_t* priv = STREAM_GET_PRIVATE(this);
 
-    priv->connector     = *connector; //Keep a copy of the connector state
+    priv->controller     = *controller; //Keep a copy of the controller state
     priv->fd            = fd;
     priv->rd_buff_sz    = params->rd_buff_sz;
     priv->wr_buff_sz    = params->wr_buff_sz;
@@ -541,21 +541,21 @@ camio_error_t tcp_stream_construct(camio_stream_t* this, camio_controller_t* con
         DBG("No memory for linear write buffer!\n");
         return CAMIO_ENOMEM;
     }
-    DBG("stream called %p has buffer pool called %p\n", this, priv->wr_buff_pool);
+    DBG("channel called %p has buffer pool called %p\n", this, priv->wr_buff_pool);
 
     this->rd_muxable.mode              = CAMIO_MUX_MODE_READ;
-    this->rd_muxable.parent.stream     = this;
+    this->rd_muxable.parent.channel     = this;
     this->rd_muxable.vtable.ready      = tcp_read_ready;
     this->rd_muxable.fd                = priv->fd;
 
     this->wr_muxable.mode              = CAMIO_MUX_MODE_WRITE;
-    this->wr_muxable.parent.stream     = this;
+    this->wr_muxable.parent.channel     = this;
     this->wr_muxable.vtable.ready      = tcp_write_ready;
     this->wr_muxable.fd                = priv->fd;
 
-    DBG("Done constructing TCP stream with read_fd=%i and write_fd=%i\n", fd, fd);
+    DBG("Done constructing TCP channel with read_fd=%i and write_fd=%i\n", fd, fd);
     return CAMIO_ENOERROR;
 }
 
 
-NEW_STREAM_DEFINE(tcp,tcp_stream_priv_t)
+NEW_STREAM_DEFINE(tcp,tcp_channel_priv_t)

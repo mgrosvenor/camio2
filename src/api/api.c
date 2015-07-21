@@ -22,7 +22,7 @@
  */
 
 
-#include <src/devices/connector.h>
+#include <src/devices/controller.h>
 #include <src/devices/features.h>
 #include <src/devices/channel.h>
 #include <src/errors/camio_errors.h>
@@ -38,12 +38,12 @@ inline camio_error_t camio_connect( camio_controller_t* this, camio_channel_t** 
 }
 
 
-inline void camio_connector_destroy(camio_controller_t* this)
+inline void camio_controller_destroy(camio_controller_t* this)
 {
     this->vtable.destroy(this);
 }
 
-inline camio_error_t camio_connector_ready( camio_controller_t* this)
+inline camio_error_t camio_controller_ready( camio_controller_t* this)
 {
     return this->muxable.vtable.ready(&this->muxable);
 }

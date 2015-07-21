@@ -53,7 +53,7 @@ int new_malloc_buffer(uint64_t slot_count, uint64_t slot_size, malloc_buffer** b
 	result->slots = slot_count;
 
 	//Populate them with sensible defaults.
-	//Each stream should override with specific settings
+	//Each channel should override with specific settings
 	for(int i = 0; i < result->slot_count; i++){
 		result->slots[i].__buffer_id    = (uint64_t)result;
 		result->slots[i].__in_use       = false;

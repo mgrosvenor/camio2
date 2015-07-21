@@ -4,7 +4,7 @@
  * See LICENSE.txt for full details. 
  * 
  *  Created:   26 Jun 2015
- *  File name: delim_transport.h
+ *  File name: delim_device.h
  *  Description:
  *  <INSERT DESCRIPTION HERE> 
  */
@@ -13,7 +13,7 @@
 
 #include <src/types/len_string.h>
 
-#include "delim_connector.h"
+#include "delim_controller.h"
 
 //No global state
 //typedef struct delim_global_s{
@@ -21,7 +21,7 @@
 
 
 typedef struct {
-    char* base_uri; //URI for the base stream that this will be delimiting
+    char* base_uri; //URI for the base channel that this will be delimiting
     ch_word (*delim_fn)(char* buffer, ch_word len); //Delimiting function
 } delim_params_t;
 

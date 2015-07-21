@@ -6,7 +6,7 @@
  *  Created:   Aug 17, 2014
  *  File name: muxable.h
  *  Description:
- *  Every channel and connector implements a "muxable" interface. This interface allows the channel or connector to be put
+ *  Every channel and controller implements a "muxable" interface. This interface allows the channel or controller to be put
  *  into a "muxor object" for runtime nonblocking multiplexing of devices
  */
 
@@ -50,8 +50,8 @@ typedef struct camio_muxable_s {
     int fd;
 
     union{
-        camio_channel_t*    channel;    //Gives access back to the channel or connector which is the parent of this
-        camio_controller_t* connector;
+        camio_channel_t*    channel;    //Gives access back to the channel or controller which is the parent of this
+        camio_controller_t* controller;
     } parent;
 
     /**

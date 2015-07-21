@@ -4,19 +4,19 @@
  * See LICENSE.txt for full details. 
  * 
  *  Created:   01 Jul 2015
- *  File name: mfio_stream.c
+ *  File name: mfio_channel.c
  *  Description:
  *  <INSERT DESCRIPTION HERE> 
  */
 
-#include <src/transports/stream.h>
-#include <src/transports/connector.h>
+#include <src/devices/channel.h>
+#include <src/devices/controller.h>
 #include <src/buffers/buffer_malloc_linear.h>
 #include <deps/chaste/utils/util.h>
 
 #include <src/camio_debug.h>
 
-#include "mfio_stream.h"
+#include "mfio_channel.h"
 
 #include <fcntl.h>
 #include <errno.h>
@@ -27,14 +27,14 @@
 /**************************************************************************************************************************
  * PER STREAM STATE
  **************************************************************************************************************************/
-typedef struct mfio_stream_priv_s {
-    camio_controller_t connector;
+typedef struct mfio_channel_priv_s {
+    camio_controller_t controller;
 
     //To manage read buffer/requests --TODO should harmonize the naming convention. read vs rd etc
     ch_bool is_rd_closed;
     camio_buffer_t mmap_rd_buff;
     ch_bool read_registered;    //Has a read been registered?
-    ch_bool read_ready;         //Is the stream ready for reading? (for edge triggered multiplexers)
+    ch_bool read_ready;         //Is the channel ready for reading? (for edge triggered multiplexers)
     camio_read_req_t* read_req;  //Read request vector to put data into when there is new data
     ch_word read_req_len;       //size of the request vector
     ch_word read_req_curr;      //This will be needed later
@@ -44,19 +44,19 @@ typedef struct mfio_stream_priv_s {
     camio_buffer_t mmap_wr_buff;
     ch_bool write_acquired;       //Has a write alreay been acquired?
     ch_bool write_registered;     //Has a write been registered?
-    ch_bool write_ready;          //Is the stream ready for writing (for edge triggered multiplexers)
+    ch_bool write_ready;          //Is the channel ready for writing (for edge triggered multiplexers)
     camio_write_req_t* write_req;  //Write request vector to take data out of when there is new data.
     ch_word write_req_len;        //size of the request vector
     ch_word write_req_curr;
 
-} mfio_stream_priv_t;
+} mfio_channel_priv_t;
 
 
 /**************************************************************************************************************************
  * READ FUNCTIONS
  **************************************************************************************************************************/
-static void mfio_read_close(camio_stream_t* this){
-    mfio_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
+static void mfio_read_close(camio_channel_t* this){
+    mfio_channel_priv_t* priv = STREAM_GET_PRIVATE(this);
     if(!priv->is_rd_closed){
         priv->mmap_rd_buff.data_start = NULL;
         priv->mmap_rd_buff.data_len   = 0;
@@ -65,14 +65,14 @@ static void mfio_read_close(camio_stream_t* this){
 }
 
 //See if there is something to read
-static camio_error_t mfio_read_peek( camio_stream_t* this)
+static camio_error_t mfio_read_peek( camio_channel_t* this)
 {
     //This is not a public function, can assume that preconditions have been checked.
     DBG("Doing read peek\n");
-    mfio_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
+    mfio_channel_priv_t* priv = STREAM_GET_PRIVATE(this);
 
     if(priv->is_rd_closed){
-        DBG("Cannot keep reading, the stream is closed\n");
+        DBG("Cannot keep reading, the channel is closed\n");
         return CAMIO_ECLOSED;
     }
 
@@ -80,14 +80,14 @@ static camio_error_t mfio_read_peek( camio_stream_t* this)
 
     //WARNING: Code below here assumes that req len == 1!!
     if( req->src_offset_hint != CAMIO_READ_REQ_SRC_OFFSET_NONE){
-        DBG("This stream currently does no support source offsets!\n");
-        //Fundamental question. If you support arbitrary offsets, then the stream has infinite length and will never close.
+        DBG("This channel currently does no support source offsets!\n");
+        //Fundamental question. If you support arbitrary offsets, then the channel has infinite length and will never close.
         //is this ok? Is it a problem? If you do an offset read, surely all reads should be offset reads? This suggests that
-        //this stream can be in one of two modes. 1) auto increment mode and 2) offset mode and that these cannot be mixed.
+        //this channel can be in one of two modes. 1) auto increment mode and 2) offset mode and that these cannot be mixed.
         return CAMIO_EINVALID;
     }
     if( req->dst_offset_hint != CAMIO_READ_REQ_DST_OFFSET_NONE){
-        DBG("This stream does not support destination offsets. (It is a buffer donor!)\n");
+        DBG("This channel does not support destination offsets. (It is a buffer donor!)\n");
         return CAMIO_EINVALID;
     }
     if(req->read_size_hint == CAMIO_READ_REQ_SIZE_ANY){
@@ -114,7 +114,7 @@ static camio_error_t mfio_read_peek( camio_stream_t* this)
     if( current_offset >= priv->mmap_rd_buff.__internal.__mem_len  || priv->is_rd_closed){
         mfio_read_close(this);
         priv->read_ready = true;
-        DBG("Have run out of data. Cannot keep reading, the stream is closed\n");
+        DBG("Have run out of data. Cannot keep reading, the channel is closed\n");
         return CAMIO_ENOERROR; //Nothing more to read
     }
 
@@ -142,7 +142,7 @@ static camio_error_t mfio_read_ready(camio_muxable_t* this)
     }
 
     //OK now the fun begins
-    mfio_stream_priv_t* priv = STREAM_GET_PRIVATE(this->parent.stream);
+    mfio_channel_priv_t* priv = STREAM_GET_PRIVATE(this->parent.channel);
 
     if(!priv->read_registered){ //Even if there is data waiting, nobody want's it, so ignore for now.
         DBG("Nobody wants the data\n");
@@ -156,7 +156,7 @@ static camio_error_t mfio_read_ready(camio_muxable_t* this)
     }
 
     //Nope, OK, see if we can get some
-    camio_error_t err = mfio_read_peek(this->parent.stream);
+    camio_error_t err = mfio_read_peek(this->parent.channel);
     if(err == CAMIO_ENOERROR ){
         DBG("There is new data waiting!\n");
         return CAMIO_EREADY;
@@ -173,7 +173,7 @@ static camio_error_t mfio_read_ready(camio_muxable_t* this)
 
 }
 
-static camio_error_t mfio_read_request( camio_stream_t* this, camio_read_req_t* req_vec, ch_word req_vec_len )
+static camio_error_t mfio_read_request( camio_channel_t* this, camio_read_req_t* req_vec, ch_word req_vec_len )
 {
     DBG("Doing MFIO read request...!\n");
     //Basic sanity checks -- TODO XXX: Should these be made into (compile time optional?) asserts for runtime performance?
@@ -181,7 +181,7 @@ static camio_error_t mfio_read_request( camio_stream_t* this, camio_read_req_t* 
         DBG("This null???\n"); //WTF?
         return CAMIO_EINVALID;
     }
-    mfio_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
+    mfio_channel_priv_t* priv = STREAM_GET_PRIVATE(this);
 
     if(req_vec_len != 1){
         DBG("Stream currently only supports read requests of size 1\n"); //TODO this should be coded in the features struct
@@ -189,7 +189,7 @@ static camio_error_t mfio_read_request( camio_stream_t* this, camio_read_req_t* 
     }
 
     if(priv->read_registered){
-        DBG("Already registered a read request. Currently this stream only handles one outstanding request at a time\n");
+        DBG("Already registered a read request. Currently this channel only handles one outstanding request at a time\n");
         return CAMIO_ETOOMANY; //TODO XXX better error code
     }
 
@@ -204,7 +204,7 @@ static camio_error_t mfio_read_request( camio_stream_t* this, camio_read_req_t* 
 }
 
 
-static camio_error_t mfio_read_acquire( camio_stream_t* this,  camio_rd_buffer_t** buffer_o)
+static camio_error_t mfio_read_acquire( camio_channel_t* this,  camio_rd_buffer_t** buffer_o)
 {
 
     //Basic sanity checks -- TODO XXX: Should these be made into (compile time optional?) asserts for runtime performance?
@@ -220,7 +220,7 @@ static camio_error_t mfio_read_acquire( camio_stream_t* this,  camio_rd_buffer_t
         DBG("Buffer chain not null. You should release this before getting a new one, otherwise dangling pointers!\n");
         return CAMIO_EINVALID;
     }
-    mfio_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
+    mfio_channel_priv_t* priv = STREAM_GET_PRIVATE(this);
 
     camio_error_t err = mfio_read_ready(&this->rd_muxable);
     if(err == CAMIO_EREADY){ //Whoo hoo! There's data!
@@ -239,14 +239,14 @@ static camio_error_t mfio_read_acquire( camio_stream_t* this,  camio_rd_buffer_t
 }
 
 
-static camio_error_t mfio_read_release(camio_stream_t* this, camio_rd_buffer_t** buffer)
+static camio_error_t mfio_read_release(camio_channel_t* this, camio_rd_buffer_t** buffer)
 {
     //Basic sanity checks -- TODO XXX: Should these be made into (compile time optional?) asserts for runtime performance?
     if( NULL == this){
         DBG("This null???\n"); //WTF?
         return CAMIO_EINVALID;
     }
-    mfio_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
+    mfio_channel_priv_t* priv = STREAM_GET_PRIVATE(this);
 
     if( NULL == buffer){
         DBG("Buffer chain pointer null\n"); //WTF?
@@ -280,8 +280,8 @@ static camio_error_t mfio_read_release(camio_stream_t* this, camio_rd_buffer_t**
 /**************************************************************************************************************************
  * WRITE FUNCTIONS
  **************************************************************************************************************************/
-static void mfio_write_close(camio_stream_t* this){
-    mfio_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
+static void mfio_write_close(camio_channel_t* this){
+    mfio_channel_priv_t* priv = STREAM_GET_PRIVATE(this);
     if(!priv->is_wr_closed){
         priv->mmap_wr_buff.data_start = NULL;
         priv->mmap_wr_buff.data_len   = 0;
@@ -290,7 +290,7 @@ static void mfio_write_close(camio_stream_t* this){
 }
 
 
-static camio_error_t mfio_write_acquire(camio_stream_t* this, camio_wr_buffer_t** buffer_o)
+static camio_error_t mfio_write_acquire(camio_channel_t* this, camio_wr_buffer_t** buffer_o)
 {
     DBG("Doing write acquire\n");
 
@@ -299,7 +299,7 @@ static camio_error_t mfio_write_acquire(camio_stream_t* this, camio_wr_buffer_t*
         DBG("This null???\n"); //WTF?
         return CAMIO_EINVALID;
     }
-    mfio_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
+    mfio_channel_priv_t* priv = STREAM_GET_PRIVATE(this);
 
     if( NULL == buffer_o){
         DBG("Buffer chain pointer null\n"); //WTF?
@@ -320,7 +320,7 @@ static camio_error_t mfio_write_acquire(camio_stream_t* this, camio_wr_buffer_t*
     const ch_word current_offset = (char*)priv->mmap_rd_buff.data_start - (char*)priv->mmap_rd_buff.__internal.__mem_start;
     if( current_offset >= priv->mmap_wr_buff.__internal.__mem_len  || priv->is_wr_closed){
         mfio_write_close(this);
-        DBG("Have run out of data. Cannot keep reading, the stream is closed\n");
+        DBG("Have run out of data. Cannot keep reading, the channel is closed\n");
         return CAMIO_ECLOSED; //Nothing more to read
     }
 
@@ -331,7 +331,7 @@ static camio_error_t mfio_write_acquire(camio_stream_t* this, camio_wr_buffer_t*
 }
 
 
-static camio_error_t mfio_write_request(camio_stream_t* this, camio_write_req_t* req_vec, ch_word req_vec_len)
+static camio_error_t mfio_write_request(camio_channel_t* this, camio_write_req_t* req_vec, ch_word req_vec_len)
 {
     //Basic sanity checks -- TODO XXX: Should these be made into (compile time optional?) asserts for runtime performance?
     if( NULL == this){
@@ -339,7 +339,7 @@ static camio_error_t mfio_write_request(camio_stream_t* this, camio_write_req_t*
         return CAMIO_EINVALID;
     }
 
-    mfio_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
+    mfio_channel_priv_t* priv = STREAM_GET_PRIVATE(this);
 
     if(req_vec_len != 1){
         DBG("request length of %lli requested. This value is not currently supported\n", req_vec_len);
@@ -348,7 +348,7 @@ static camio_error_t mfio_write_request(camio_stream_t* this, camio_write_req_t*
 
     DBG("Got a write request vector with %lli items\n", req_vec_len);
     if(priv->write_registered){
-        DBG("Already registered a write request. Currently this stream only handles one outstanding request at a time\n");
+        DBG("Already registered a write request. Currently this channel only handles one outstanding request at a time\n");
         return CAMIO_EINVALID; //TODO XXX better error code
     }
 
@@ -362,28 +362,28 @@ static camio_error_t mfio_write_request(camio_stream_t* this, camio_write_req_t*
 }
 
 
-//Try to write to the underlying, stream. This function is private, so no precondition checks necessary
-static camio_error_t mfio_write_try(camio_stream_t* this)
+//Try to write to the underlying, channel. This function is private, so no precondition checks necessary
+static camio_error_t mfio_write_try(camio_channel_t* this)
 {
-    mfio_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
+    mfio_channel_priv_t* priv = STREAM_GET_PRIVATE(this);
 
     camio_write_req_t* req = &priv->write_req[0];
 
     if(req->buffer->__internal.__parent != this){
         //TODO XXX could add this feature but it would be non-trivial
-        DBG("This stream cannot support writing from an alternative source with zero copy\n");
+        DBG("This channel cannot support writing from an alternative source with zero copy\n");
         return CAMIO_EINVALID;
     }
 
     if( req->src_offset_hint != CAMIO_WRITE_REQ_SRC_OFFSET_NONE){
-        DBG("This stream currently does no support source offsets!\n");
-        //Fundamental question. If you support arbitrary offsets, then the stream has infinite length and will never close.
+        DBG("This channel currently does no support source offsets!\n");
+        //Fundamental question. If you support arbitrary offsets, then the channel has infinite length and will never close.
         //is this ok? Is it a problem? If you do an offset read, surely all reads should be offset reads? This suggests that
-        //this stream can be in one of two modes. 1) auto increment mode and 2) offset mode and that these cannot be mixed.
+        //this channel can be in one of two modes. 1) auto increment mode and 2) offset mode and that these cannot be mixed.
         return CAMIO_EINVALID;
     }
     if( req->dst_offset_hint != CAMIO_WRITE_REQ_DST_OFFSET_NONE){
-        DBG("This stream does not support source offsets. (It is a buffer donor!)\n");
+        DBG("This channel does not support source offsets. (It is a buffer donor!)\n");
         return CAMIO_EINVALID;
     }
     if( req->buffer->data_len > req->buffer->__internal.__mem_len){
@@ -407,7 +407,7 @@ static camio_error_t mfio_write_try(camio_stream_t* this)
 
 
 
-//Is the underlying stream done writing and ready for more?
+//Is the underlying channel done writing and ready for more?
 static camio_error_t mfio_write_ready(camio_muxable_t* this)
 {
     //Basic sanity checks -- TODO XXX: Should these be made into (compile time optional?) asserts for runtime performance?
@@ -421,13 +421,13 @@ static camio_error_t mfio_write_ready(camio_muxable_t* this)
         return CAMIO_EINVALID;
     }
 
-    mfio_stream_priv_t* priv = STREAM_GET_PRIVATE(this->parent.stream);
+    mfio_channel_priv_t* priv = STREAM_GET_PRIVATE(this->parent.channel);
     if(!priv->write_registered){ //No body has asked us to write anything, so we're not ready
         return CAMIO_ENOTREADY;
     }
 
     //OK now the fun begins
-    camio_error_t err = mfio_write_try(this->parent.stream);
+    camio_error_t err = mfio_write_try(this->parent.channel);
     if(err == CAMIO_ENOERROR){
         DBG("Writing has completed successfully. Release the buffers and/or write some more\n");
         return CAMIO_EREADY;
@@ -439,7 +439,7 @@ static camio_error_t mfio_write_ready(camio_muxable_t* this)
     }
 
     if(err == CAMIO_ECLOSED){
-        DBG("The stream has been closed. You cannot write any more\n");
+        DBG("The channel has been closed. You cannot write any more\n");
         return CAMIO_ECLOSED;
     }
 
@@ -449,14 +449,14 @@ static camio_error_t mfio_write_ready(camio_muxable_t* this)
 }
 
 
-static camio_error_t mfio_write_release(camio_stream_t* this, camio_wr_buffer_t** buffer)
+static camio_error_t mfio_write_release(camio_channel_t* this, camio_wr_buffer_t** buffer)
 {
     //Basic sanity checks -- TODO XXX: Should these be made into (compile time optional?) asserts for runtime performance?
     if( NULL == this){
         DBG("This null???\n"); //WTF?
         return CAMIO_EINVALID;
     }
-    mfio_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
+    mfio_channel_priv_t* priv = STREAM_GET_PRIVATE(this);
     (void)priv;
 
     if( NULL == buffer){
@@ -492,14 +492,14 @@ static camio_error_t mfio_write_release(camio_stream_t* this, camio_wr_buffer_t*
 /**************************************************************************************************************************
  * SETUP/CLEANUP FUNCTIONS
  **************************************************************************************************************************/
-static void mfio_destroy(camio_stream_t* this)
+static void mfio_destroy(camio_channel_t* this)
 {
     //Basic sanity checks -- TODO XXX: Should these be made into (compile time optional?) asserts for runtime performance?
     if( NULL == this){
         DBG("This null???\n"); //WTF?
         return;
     }
-    mfio_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
+    mfio_channel_priv_t* priv = STREAM_GET_PRIVATE(this);
 
     if(priv->mmap_rd_buff.__internal.__mem_start){
         munmap(priv->mmap_rd_buff.__internal.__mem_start, priv->mmap_rd_buff.__internal.__mem_len);
@@ -522,7 +522,7 @@ static void mfio_destroy(camio_stream_t* this)
     free(this);
 }
 
-void init_buffer(camio_buffer_t* buff, ch_bool read_only, camio_stream_t* parent, void* base_mem_start, ch_word base_mem_len)
+void init_buffer(camio_buffer_t* buff, ch_bool read_only, camio_channel_t* parent, void* base_mem_start, ch_word base_mem_len)
 {
     buff->__internal.__mem_start        = base_mem_start;
     buff->__internal.__mem_len          = base_mem_len;
@@ -539,9 +539,9 @@ void init_buffer(camio_buffer_t* buff, ch_bool read_only, camio_stream_t* parent
 }
 
 
-camio_error_t mfio_stream_construct(
-    camio_stream_t* this,
-    camio_controller_t* connector,
+camio_error_t mfio_channel_construct(
+    camio_channel_t* this,
+    camio_controller_t* controller,
     int base_fd,
     void* base_mem_start,
     ch_word base_mem_len
@@ -552,27 +552,27 @@ camio_error_t mfio_stream_construct(
         DBG("This null???\n"); //WTF?
         return CAMIO_EINVALID;
     }
-    mfio_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
+    mfio_channel_priv_t* priv = STREAM_GET_PRIVATE(this);
 
-    priv->connector = *connector; //Keep a copy of the connector state
+    priv->controller = *controller; //Keep a copy of the controller state
     //Set up the buffer states
     init_buffer(&priv->mmap_rd_buff,true,this, base_mem_start, base_mem_len);
     init_buffer(&priv->mmap_wr_buff,false,this, base_mem_start, base_mem_len);
 
     this->rd_muxable.mode              = CAMIO_MUX_MODE_READ;
-    this->rd_muxable.parent.stream     = this;
+    this->rd_muxable.parent.channel     = this;
     this->rd_muxable.vtable.ready      = mfio_read_ready;
     this->rd_muxable.fd                = base_fd;
 
     this->wr_muxable.mode              = CAMIO_MUX_MODE_WRITE;
-    this->wr_muxable.parent.stream     = this;
+    this->wr_muxable.parent.channel     = this;
     this->wr_muxable.vtable.ready      = mfio_write_ready;
     this->wr_muxable.fd                = base_fd;
 
 
-    DBG("Done constructing MFIO stream with size=%lli\n", priv->mmap_rd_buff.__internal.__mem_len);
+    DBG("Done constructing MFIO channel with size=%lli\n", priv->mmap_rd_buff.__internal.__mem_len);
     return CAMIO_ENOERROR;
 }
 
 
-NEW_STREAM_DEFINE(mfio,mfio_stream_priv_t)
+NEW_STREAM_DEFINE(mfio,mfio_channel_priv_t)

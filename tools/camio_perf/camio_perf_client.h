@@ -12,6 +12,6 @@
 #define CAMIO_PERF_CLIENT_H_
 
 
-int camio_perf_clinet(ch_cstr client_stream_uri, ch_word* stop);
+int camio_perf_clinet(ch_cstr client_channel_uri, ch_word* stop);
 
 #endif /* CAMIO_PERF_CLINET_H_ */

@@ -14,8 +14,8 @@
 //Slot information
 typedef struct  {
     bool valid;          //True if the data is valid (can be set to untrue by read_release)
-    int timestamp_type; //The type of timestamp associated with this stream
-    #define CIO_SLOT_TST_NONE       0   //No timestamp on this stream
+    int timestamp_type; //The type of timestamp associated with this channel
+    #define CIO_SLOT_TST_NONE       0   //No timestamp on this channel
     #define CIO_SLOT_TST_S_1970     1   //Timestamp is seconds since 1970
     #define CIO_SLOT_TST_US_1970    2   //Timestamp is microseconds since 1970
     #define CIO_SLOT_TST_NS_1970    3   //Timestamp is nanoseconds since 1970
@@ -52,7 +52,7 @@ typedef struct  {
     bool __do_release;      //Should release be called for this slot?
     ciostrm* __slot_parent;  //Parent who generated this slot
 
-    void* __priv;             //Per stream private data if necessary
+    void* __priv;             //Per channel private data if necessary
 
 } cioslot;
 

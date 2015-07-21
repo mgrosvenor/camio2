@@ -4,14 +4,14 @@
  * See LICENSE.txt for full details. 
  * 
  *  Created:   04 Jul 2015
- *  File name: bring_connector.h
+ *  File name: bring_controller.h
  *  Description:
  *  <INSERT DESCRIPTION HERE> 
  */
 #ifndef SRC_DRIVERS_BRING_BRING_CONNECTOR_H_
 #define SRC_DRIVERS_BRING_BRING_CONNECTOR_H_
 
-#include "../../transports/connector.h"
+#include "../../devices/controller.h"
 
 NEW_CONNECTOR_DECLARE(bring);
 

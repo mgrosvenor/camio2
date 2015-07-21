@@ -1,23 +1,23 @@
 /*
- * ciostream.c
+ * ciochannel.c
  *
  *  Created on: Oct 18, 2013
  *      Author: mgrosvenor
  */
-#include "ciostream.h"
+#include "ciochannel.h"
 #include "../uri_parser/uri_parser.h"
 
-#include "ciostream_fileio.h"
+#include "ciochannel_fileio.h"
 
 typedef struct {
   char* scheme;
   void* global_data;
   int (*strm_new_cioconn)( uri* uri_parsed , struct cioconn_s** cioconn_o, void** global_data );
-} cio_stream_entry;
+} cio_channel_entry;
 
 
 //Should this be in a .h file?? Hmm, feels right, but looks wrong. Like your mum.
-static cio_stream_entry cio_stream_registry[] = {
+static cio_channel_entry cio_channel_registry[] = {
         {"file", NULL, new_cioconn_fileio},
         {0} //Null last entry
 };
@@ -37,15 +37,15 @@ int new_cioconn( char* uri_str , ciostrm_req* properties, struct cioconn_s** cio
         return CIO_EBADURI;
     }
 
-    //Find the stream that has the same scheme name
-    cio_stream_entry* entry = cio_stream_registry;
+    //Find the channel that has the same scheme name
+    cio_channel_entry* entry = cio_channel_registry;
     for(; entry->scheme; ++entry){
         if(strncmp(entry->scheme, uri_parsed->scheme_name, uri_parsed->scheme_name_len) == 0){
             break;
         }
     }
 
-    //Could not find the stream name type
+    //Could not find the channel name type
     if(!entry->scheme){
         return CIO_ENOSTREAM;
     }

@@ -4,20 +4,20 @@
  * See LICENSE.txt for full details. 
  * 
  *  Created:   17 Nov 2014
- *  File name: udp_connector.c
+ *  File name: udp_controller.c
  *  Description:
  *  <INSERT DESCRIPTION HERE> 
  */
 
-#include "../../transports/connector.h"
+#include "../../devices/controller.h"
 #include "../../camio.h"
 #include "../../camio_debug.h"
 
 #include <src/buffers/buffer_malloc_linear.h>
 
-#include "udp_transport.h"
-#include "udp_connector.h"
-#include "udp_stream.h"
+#include "udp_device.h"
+#include "udp_controller.h"
+#include "udp_channel.h"
 
 #include <errno.h>
 #include <stdio.h>
@@ -48,7 +48,7 @@ typedef struct udp_priv_s {
     //Has connect be called?
     bool is_connected;
 
-} udp_connector_priv_t;
+} udp_controller_priv_t;
 
 
 
@@ -67,7 +67,7 @@ static camio_error_t resolve_bind_connect(char* address, char* prot, ch_bool do_
 
     memset(&hints, 0, sizeof(hints));
     hints.ai_family = PF_UNSPEC;
-    hints.ai_socktype = SOCK_DGRAM; //This could be more general in the future if the code is moved out of the UDP stream
+    hints.ai_socktype = SOCK_DGRAM; //This could be more general in the future if the code is moved out of the UDP channel
     error = getaddrinfo(address, prot, &hints, &res0);
     if (error) {
         ERR("Getaddrinfo() failed: %s\n", gai_strerror(error));
@@ -116,7 +116,7 @@ static camio_error_t resolve_bind_connect(char* address, char* prot, ch_bool do_
 }
 
 //Try to see if connecting is possible. With UDP, it is always possible.
-static camio_error_t udp_connect_peek(udp_connector_priv_t* priv)
+static camio_error_t udp_connect_peek(udp_controller_priv_t* priv)
 {
     if(priv->is_connected){
         return CAMIO_EALLREADYCONNECTED; // We're already connected!
@@ -146,9 +146,9 @@ static camio_error_t udp_connect_peek(udp_connector_priv_t* priv)
     return CAMIO_ENOERROR;
 }
 
-static camio_error_t udp_connector_ready(camio_muxable_t* this)
+static camio_error_t udp_controller_ready(camio_muxable_t* this)
 {
-    udp_connector_priv_t* priv = CONNECTOR_GET_PRIVATE(this->parent.connector);
+    udp_controller_priv_t* priv = CONNECTOR_GET_PRIVATE(this->parent.controller);
     if(priv->rd_fd > -1 || priv->wr_fd > -1){
         return CAMIO_EREADY;
     }
@@ -161,23 +161,23 @@ static camio_error_t udp_connector_ready(camio_muxable_t* this)
     return CAMIO_EREADY;
 }
 
-static camio_error_t udp_connect(camio_controller_t* this, camio_stream_t** stream_o )
+static camio_error_t udp_connect(camio_controller_t* this, camio_channel_t** channel_o )
 {
-    udp_connector_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
+    udp_controller_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
     camio_error_t err = udp_connect_peek(priv);
     if(err != CAMIO_ENOERROR){
         return err;
     }
-    //DBG("Done connecting, now constructing UDP stream...\n");
+    //DBG("Done connecting, now constructing UDP channel...\n");
 
-    camio_stream_t* stream = NEW_STREAM(udp);
-    if(!stream){
-        *stream_o = NULL;
+    camio_channel_t* channel = NEW_STREAM(udp);
+    if(!channel){
+        *channel_o = NULL;
         return CAMIO_ENOMEM;
     }
-    *stream_o = stream;
+    *channel_o = channel;
 
-    err = udp_stream_construct(stream, this, priv->params, priv->rd_fd, priv->wr_fd);
+    err = udp_channel_construct(channel, this, priv->params, priv->rd_fd, priv->wr_fd);
     if(err){
        return err;
     }
@@ -197,7 +197,7 @@ static camio_error_t udp_connect(camio_controller_t* this, camio_stream_t** stre
 static camio_error_t udp_construct(camio_controller_t* this, void** params, ch_word params_size)
 {
 
-    udp_connector_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
+    udp_controller_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
     //Basic sanity check that the params is the right one.
     if(params_size != sizeof(udp_params_t)){
         ERR("Bad parameters structure passed\n");
@@ -279,8 +279,8 @@ static camio_error_t udp_construct(camio_controller_t* this, void** params, ch_w
 
     //Populate the muxable structure
     this->muxable.mode              = CAMIO_MUX_MODE_CONNECT;
-    this->muxable.parent.connector  = this;
-    this->muxable.vtable.ready      = udp_connector_ready;
+    this->muxable.parent.controller  = this;
+    this->muxable.vtable.ready      = udp_controller_ready;
     this->muxable.fd                = -1;
 
     //Populate the descriptors
@@ -293,10 +293,10 @@ static camio_error_t udp_construct(camio_controller_t* this, void** params, ch_w
 
 static void udp_destroy(camio_controller_t* this)
 {
-    DBG("Destorying udp connector\n");
-    udp_connector_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
+    DBG("Destorying udp controller\n");
+    udp_controller_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
 
-// Don't free these! The stream relies on them!!
+// Don't free these! The channel relies on them!!
 //    if(priv->rd_fd)  { close(priv->rd_fd); }
 //    if(priv->wr_fd)  { close(priv->wr_fd); }
 //    DBG("Freed FD's\n");
@@ -304,7 +304,7 @@ static void udp_destroy(camio_controller_t* this)
     if(priv->params) { free(priv->params); }
     DBG("Freed params\n");
     free(this);
-    DBG("Freed connector structure\n");
+    DBG("Freed controller structure\n");
 }
 
-NEW_CONNECTOR_DEFINE(udp, udp_connector_priv_t)
+NEW_CONNECTOR_DEFINE(udp, udp_controller_priv_t)

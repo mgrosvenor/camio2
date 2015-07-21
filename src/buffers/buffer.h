@@ -85,7 +85,7 @@ typedef camio_buffer_t camio_wr_buffer_t; //get from a read (rd) buffer to a wri
 
 
 /**
- * Some macros to make life easier BUFFER_GET_PRIVATE helps us grab the private members out of the public connector_t and
+ * Some macros to make life easier BUFFER_GET_PRIVATE helps us grab the private members out of the public controller_t and
  * CONNECTOR_DECLARE help to make a custom allocator for each channel
  */
 #define BUFFER_GET_PRIVATE(THIS) ( (void*)((THIS) + 1))

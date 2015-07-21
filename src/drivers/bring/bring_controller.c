@@ -4,7 +4,7 @@
  * See LICENSE.txt for full details. 
  * 
  *  Created:   04 Jul 2015
- *  File name: bring_connector.h
+ *  File name: bring_controller.h
  *  Description:
  *  <INSERT DESCRIPTION HERE> 
  */
@@ -19,15 +19,15 @@
 #include <unistd.h>
 
 
-#include <src/transports/connector.h>
+#include <src/devices/controller.h>
 #include <src/camio.h>
 #include <src/camio_debug.h>
 
 #include <deps/chaste/utils/util.h>
 
-#include "bring_transport.h"
-#include "bring_connector.h"
-#include "bring_stream.h"
+#include "bring_device.h"
+#include "bring_controller.h"
+#include "bring_channel.h"
 
 #define getpagesize() sysconf(_SC_PAGESIZE)
 
@@ -46,7 +46,7 @@ typedef struct bring_priv_s {
 
     char* bring_filen;
 
-} bring_connector_priv_t;
+} bring_controller_priv_t;
 
 
 
@@ -57,7 +57,7 @@ static camio_error_t bring_connect_peek_server(camio_controller_t* this)
 {
 
     camio_error_t result = CAMIO_ENOERROR;
-    bring_connector_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
+    bring_controller_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
     DBG("Doing connect peek server on %s\n", priv->bring_filen);
 
     if(priv->bring_fd > -1 ){ //Ready to go! Call connect!
@@ -230,7 +230,7 @@ static camio_error_t bring_connect_peek_client(camio_controller_t* this)
 {
 
     camio_error_t result = CAMIO_ENOERROR;
-    bring_connector_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
+    bring_controller_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
     DBG("Doing connect peek client on %s\n", priv->bring_filen);
 
     if(priv->bring_fd > -1 ){ //Ready to go! Call connect!
@@ -358,7 +358,7 @@ static camio_error_t bring_connect_peek(camio_controller_t* this)
 {
     DBG("Doing connect peek\n");
     camio_error_t result = CAMIO_ENOERROR;
-    bring_connector_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
+    bring_controller_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
 
     if(priv->params->server){
         result = bring_connect_peek_server(this);
@@ -383,9 +383,9 @@ static camio_error_t bring_connect_peek(camio_controller_t* this)
 
 }
 
-static camio_error_t bring_connector_ready(camio_muxable_t* this)
+static camio_error_t bring_controller_ready(camio_muxable_t* this)
 {
-    camio_error_t err = bring_connect_peek(this->parent.connector);
+    camio_error_t err = bring_connect_peek(this->parent.controller);
     if(err == CAMIO_ETRYAGAIN){
         return CAMIO_ENOTREADY;
     }
@@ -397,10 +397,10 @@ static camio_error_t bring_connector_ready(camio_muxable_t* this)
     return CAMIO_EREADY;
 }
 
-static camio_error_t bring_connect(camio_controller_t* this, camio_stream_t** stream_o )
+static camio_error_t bring_connect(camio_controller_t* this, camio_channel_t** channel_o )
 {
     DBG("Doing bring connect\n");
-    bring_connector_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
+    bring_controller_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
     camio_error_t err = bring_connect_peek(this);
     if(err != CAMIO_ENOERROR){
         return err;
@@ -412,15 +412,15 @@ static camio_error_t bring_connect(camio_controller_t* this, camio_stream_t** st
     }
 
 
-    //DBG("Done connecting, now constructing UDP stream...\n");
-    camio_stream_t* stream = NEW_STREAM(bring);
-    if(!stream){
-        *stream_o = NULL;
+    //DBG("Done connecting, now constructing UDP channel...\n");
+    camio_channel_t* channel = NEW_STREAM(bring);
+    if(!channel){
+        *channel_o = NULL;
         return CAMIO_ENOMEM;
     }
-    *stream_o = stream;
+    *channel_o = channel;
 
-    err = bring_stream_construct(stream, this, priv->bring_head, priv->params, priv->bring_fd);
+    err = bring_channel_construct(channel, this, priv->bring_head, priv->params, priv->bring_fd);
     if(err){
        return err;
     }
@@ -438,7 +438,7 @@ static camio_error_t bring_connect(camio_controller_t* this, camio_stream_t** st
 static camio_error_t bring_construct(camio_controller_t* this, void** params, ch_word params_size)
 {
 
-    bring_connector_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
+    bring_controller_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
     //Basic sanity check that the params is the right one.
     if(params_size != sizeof(bring_params_t)){
         ERR("Bad parameters structure passed\n");
@@ -473,8 +473,8 @@ static camio_error_t bring_construct(camio_controller_t* this, void** params, ch
 
     //Populate the rest of the muxable structure
     this->muxable.mode              = CAMIO_MUX_MODE_CONNECT;
-    this->muxable.parent.connector  = this;
-    this->muxable.vtable.ready      = bring_connector_ready;
+    this->muxable.parent.controller  = this;
+    this->muxable.vtable.ready      = bring_controller_ready;
     this->muxable.fd                = -1;
 
     return CAMIO_ENOERROR;
@@ -483,15 +483,15 @@ static camio_error_t bring_construct(camio_controller_t* this, void** params, ch
 
 static void bring_destroy(camio_controller_t* this)
 {
-    DBG("Destroying bring connector\n");
-    bring_connector_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
+    DBG("Destroying bring controller\n");
+    bring_controller_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
 
     if(priv->bring_filen)      { free(priv->bring_filen);       }
 
     if(priv->params) { free(priv->params); }
     DBG("Freed params\n");
     free(this);
-    DBG("Freed connector structure\n");
+    DBG("Freed controller structure\n");
 }
 
-NEW_CONNECTOR_DEFINE(bring, bring_connector_priv_t)
+NEW_CONNECTOR_DEFINE(bring, bring_controller_priv_t)

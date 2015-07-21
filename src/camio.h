@@ -71,10 +71,10 @@ camio_error_t camio_device_params_new( ch_cstr uri, void** params_o, ch_word* pa
 
 
 /**
- * Construct a new CamIO device with the given ID, from the parameters structure as given. Return a connector object for
+ * Construct a new CamIO device with the given ID, from the parameters structure as given. Return a controller object for
  * connecting to underlying data channels.
  */
-camio_error_t camio_device_constr(ch_word id, void** params, ch_word params_size, camio_controller_t** connector_o);
+camio_error_t camio_device_constr(ch_word id, void** params, ch_word params_size, camio_controller_t** controller_o);
 
 
 /**

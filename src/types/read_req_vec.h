@@ -13,7 +13,7 @@
 #define SRC_TYPES_CHANNEL_STATE_VEC_H_
 
 #include "types.h"
-#include <src/devices/connector.h>
+#include <src/devices/controller.h>
 #include <src/types/device_params_vec.h>
 #include <deps/chaste/data_structs/vector/vector_typed_declare_template.h>
 #include <src/utils/uri_parser/uri_parser.h>

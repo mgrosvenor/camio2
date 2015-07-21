@@ -4,14 +4,14 @@
  * See LICENSE.txt for full details. 
  * 
  *  Created:   26 Jun 2015
- *  File name: delim_connector.h
+ *  File name: delim_controller.h
  *  Description:
  *  <INSERT DESCRIPTION HERE> 
  */
 #ifndef SRC_DRIVERS_DELIM_DELIM_CONNECTOR_H_
 #define SRC_DRIVERS_DELIM_DELIM_CONNECTOR_H_
 
-#include "../../transports/connector.h"
+#include "../../devices/controller.h"
 
 NEW_CONNECTOR_DECLARE(delim);
 

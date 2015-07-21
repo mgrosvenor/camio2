@@ -13,6 +13,6 @@
 
 #include "camio_perf_client.h"
 
-int camio_perf_server(ch_cstr client_stream_uri, ch_word* stop);
+int camio_perf_server(ch_cstr client_channel_uri, ch_word* stop);
 
 #endif /* CAMIO_PERF_CLINET_H_ */

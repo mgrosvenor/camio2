@@ -6,7 +6,7 @@
  *  Created:   May 2, 2015
  *  File name: camio_udp_test.c
  *  Description:
- *  Test the features of the CamIO API regardless of the stream used
+ *  Test the features of the CamIO API regardless of the channel used
  */
 
 #include <stdio.h>

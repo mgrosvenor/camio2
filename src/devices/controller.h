@@ -4,7 +4,7 @@
  * See LICENSE.txt for full details. 
  * 
  *  Created:   Jul 25, 2014
- *  File name: connector.h
+ *  File name: controller.h
  *  Description:
  *  <INSERT DESCRIPTION HERE> 
  */
@@ -19,23 +19,23 @@
 #include <src/utils/uri_parser/uri_parser.h>
 
 
-typedef camio_error_t (*camio_conn_construct_f)(camio_controller_t* connector_o, void** params, ch_word params_size);
+typedef camio_error_t (*camio_conn_construct_f)(camio_controller_t* controller_o, void** params, ch_word params_size);
 
 
 /**
  * Every CamIO channel must implement this interface, see function prototypes in api.h
  */
 
-typedef struct camio_connector_interface_s{
+typedef struct camio_controller_interface_s{
     camio_conn_construct_f construct;
     camio_error_t (*connect)( camio_controller_t* this, camio_channel_t** channel_o );
     void (*destroy)(camio_controller_t* this);
-} camio_connector_interface_t;
+} camio_controller_interface_t;
 
 
 
 /**
- * This is a basic CamIO connector structure. All channels must implement this. Streams will use the macros provided to
+ * This is a basic CamIO controller structure. All channels must implement this. Streams will use the macros provided to
  * overload this structure with and include a private data structures..
  */
 
@@ -45,16 +45,16 @@ typedef struct camio_controller_s {
      * vtable that holds the function pointers, usually this would be a pointer, but saving a couple of bytes seems a little
      * silly when it will cost a pointer dereference on the critical path. YMMV.
      */
-    camio_connector_interface_t vtable;
+    camio_controller_interface_t vtable;
 
     /**
-     * Return the the selectable structure for adding into a selector. Not valid until the connector constructor has been
+     * Return the the selectable structure for adding into a selector. Not valid until the controller constructor has been
      * called.
      */
     camio_muxable_t muxable;
 
     /**
-     * Return the features supported by this device. Not valid until the connector constructor has been called.
+     * Return the features supported by this device. Not valid until the controller constructor has been called.
      */
     camio_device_features_t features;
 } camio_controller_t;
@@ -62,19 +62,19 @@ typedef struct camio_controller_s {
 
 
 /**
- * Some macros to make life easier CONNECTOR_GET_PRIVATE helps us grab the private members out of the public connector_t and
+ * Some macros to make life easier CONNECTOR_GET_PRIVATE helps us grab the private members out of the public controller_t and
  * CONNECTOR_DECLARE help to make a custom allocator for each channel
  */
 #define CONNECTOR_GET_PRIVATE(THIS) ( (void*)(THIS + 1))
 
 #define NEW_CONNECTOR(name)\
-        new_##name##_connector()
+        new_##name##_controller()
 
 #define NEW_CONNECTOR_DECLARE(NAME)\
-        camio_connector_t* new_##NAME##_connector()
+        camio_controller_t* new_##NAME##_controller()
 
 #define NEW_CONNECTOR_DEFINE(NAME, PRIVATE_TYPE) \
-    static const camio_connector_interface_t NAME##_connector_interface = {\
+    static const camio_controller_interface_t NAME##_controller_interface = {\
             .construct = NAME##_construct,\
             .connect   = NAME##_connect,\
             .destroy   = NAME##_destroy,\
@@ -82,9 +82,9 @@ typedef struct camio_controller_s {
     \
     NEW_CONNECTOR_DECLARE(NAME)\
     {\
-        camio_connector_t* result = (camio_connector_t*)calloc(1,sizeof(camio_connector_t) + sizeof(PRIVATE_TYPE));\
+        camio_controller_t* result = (camio_controller_t*)calloc(1,sizeof(camio_controller_t) + sizeof(PRIVATE_TYPE));\
         if(!result) return NULL;\
-        result->vtable = NAME##_connector_interface;\
+        result->vtable = NAME##_controller_interface;\
         return result;\
     }
 

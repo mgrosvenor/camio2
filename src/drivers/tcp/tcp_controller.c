@@ -4,20 +4,20 @@
  * See LICENSE.txt for full details. 
  * 
  *  Created:   22 Jun 2015
- *  File name: tcp_connector.c
+ *  File name: tcp_controller.c
  *  Description:
  *  <INSERT DESCRIPTION HERE> 
  */
 
-#include "../../transports/connector.h"
+#include "../../devices/controller.h"
 #include "../../camio.h"
 #include "../../camio_debug.h"
 
 #include <src/buffers/buffer_malloc_linear.h>
 
-#include "tcp_transport.h"
-#include "tcp_connector.h"
-#include "tcp_stream.h"
+#include "tcp_device.h"
+#include "tcp_controller.h"
+#include "tcp_channel.h"
 
 
 #include <errno.h>
@@ -52,7 +52,7 @@ typedef struct tcp_priv_s {
     ch_bool connected_client;
 
 
-} tcp_connector_priv_t;
+} tcp_controller_priv_t;
 
 
 /**************************************************************************************************************************
@@ -78,7 +78,7 @@ static camio_error_t resolve_bind_connect(char* address, char* prot, ch_bool do_
 
     memset(&hints, 0, sizeof(hints));
     hints.ai_family = PF_UNSPEC;
-    hints.ai_socktype = SOCK_STREAM; //This could be more general in the future if the code is moved out of the TCP stream
+    hints.ai_socktype = SOCK_STREAM; //This could be more general in the future if the code is moved out of the TCP channel
     error = getaddrinfo(address, prot, &hints, &res_head);
     if (error) {
         ERR("Getaddrinfo() failed: %s\n", gai_strerror(error));
@@ -152,7 +152,7 @@ static camio_error_t tcp_connect_peek(camio_controller_t* this)
 {
 
     DBG("Doing TCP connect peek\n");
-    tcp_connector_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
+    tcp_controller_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
     if(this->muxable.fd < 0){ //No socket yet
         const bool do_bind    = priv->params->listen;
         const bool do_connect = !do_bind;
@@ -203,10 +203,10 @@ static camio_error_t tcp_connect_peek(camio_controller_t* this)
     return CAMIO_ENOERROR;
 }
 
-static camio_error_t tcp_connector_ready(camio_muxable_t* this)
+static camio_error_t tcp_controller_ready(camio_muxable_t* this)
 {
     DBG("Checking if TCP is ready to connect...\n");
-    tcp_connector_priv_t* priv = CONNECTOR_GET_PRIVATE(this->parent.connector);
+    tcp_controller_priv_t* priv = CONNECTOR_GET_PRIVATE(this->parent.controller);
 
     if(priv->connected_client){
         DBG("Already connected!\n");
@@ -218,7 +218,7 @@ static camio_error_t tcp_connector_ready(camio_muxable_t* this)
         return CAMIO_EREADY;
     }
 
-    camio_error_t err = tcp_connect_peek(this->parent.connector);
+    camio_error_t err = tcp_connect_peek(this->parent.controller);
     if(err == CAMIO_ETRYAGAIN){
         DBG("Not ready to connect, try again in a while\n");
         return CAMIO_ENOTREADY;
@@ -232,23 +232,23 @@ static camio_error_t tcp_connector_ready(camio_muxable_t* this)
     return CAMIO_EREADY;
 }
 
-static camio_error_t tcp_connect(camio_controller_t* this, camio_stream_t** stream_o )
+static camio_error_t tcp_connect(camio_controller_t* this, camio_channel_t** channel_o )
 {
-    tcp_connector_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
-    camio_error_t err = tcp_connector_ready(&this->muxable);
+    tcp_controller_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
+    camio_error_t err = tcp_controller_ready(&this->muxable);
     if(err != CAMIO_EREADY){
         return err;
     }
-    DBG("Done connecting, now constructing TCP stream...\n");
+    DBG("Done connecting, now constructing TCP channel...\n");
 
-    camio_stream_t* stream = NEW_STREAM(tcp);
-    if(!stream){
-        *stream_o = NULL;
+    camio_channel_t* channel = NEW_STREAM(tcp);
+    if(!channel){
+        *channel_o = NULL;
         return CAMIO_ENOMEM;
     }
-    *stream_o = stream;
+    *channel_o = channel;
 
-    err = tcp_stream_construct(stream, this,priv->params, priv->con_fd_tmp);
+    err = tcp_channel_construct(channel, this,priv->params, priv->con_fd_tmp);
     if(err){
        return err;
     }
@@ -274,7 +274,7 @@ static camio_error_t tcp_connect(camio_controller_t* this, camio_stream_t** stre
 static camio_error_t tcp_construct(camio_controller_t* this, void** params, ch_word params_size)
 {
 
-    tcp_connector_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
+    tcp_controller_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
     //Basic sanity check that the params is the right one.
     if(params_size != sizeof(tcp_params_t)){
         ERR("Bad parameters structure passed\n");
@@ -317,8 +317,8 @@ static camio_error_t tcp_construct(camio_controller_t* this, void** params, ch_w
 
     //Populate the muxable structure
     this->muxable.mode              = CAMIO_MUX_MODE_CONNECT;
-    this->muxable.parent.connector  = this;
-    this->muxable.vtable.ready      = tcp_connector_ready;
+    this->muxable.parent.controller  = this;
+    this->muxable.vtable.ready      = tcp_controller_ready;
     this->muxable.fd                = -1;
 
     return CAMIO_ENOERROR;
@@ -327,17 +327,17 @@ static camio_error_t tcp_construct(camio_controller_t* this, void** params, ch_w
 
 static void tcp_destroy(camio_controller_t* this)
 {
-    DBG("Destorying tcp connector\n");
-    tcp_connector_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
+    DBG("Destorying tcp controller\n");
+    tcp_controller_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
 
-    //Only close this if it's in listening mode and the streams will not be affected
+    //Only close this if it's in listening mode and the channels will not be affected
     if(this->muxable.fd > -1 && priv->params->listen)  { close(this->muxable.fd); }
     DBG("Freed FD's\n");
 
     if(priv->params) { free(priv->params); }
     DBG("Freed params\n");
     free(this);
-    DBG("Freed connector structure\n");
+    DBG("Freed controller structure\n");
 }
 
-NEW_CONNECTOR_DEFINE(tcp, tcp_connector_priv_t)
+NEW_CONNECTOR_DEFINE(tcp, tcp_controller_priv_t)

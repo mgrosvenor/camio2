@@ -6,13 +6,13 @@
  *  Created:   May 2, 2015
  *  File name: camio_udp_test.c
  *  Description:
- *  Test the features of the CamIO API regardless of the stream used
+ *  Test the features of the CamIO API regardless of the channel used
  */
 
 #include <stdio.h>
 #include <src/api/api_easy.h>
 #include <src/camio_debug.h>
-#include <src/drivers/delimiter/delim_transport.h>
+#include <src/drivers/delimiter/delim_device.h>
 
 
 USE_CAMIO;
@@ -46,14 +46,14 @@ int main(int argc, char** argv)
     }
     char* uri = argv[1];
 
-    //Create a new multiplexer for streams to go into
+    //Create a new multiplexer for channels to go into
     camio_mux_t* mux = NULL;
     camio_error_t err = camio_mux_new(CAMIO_MUX_HINT_PERFORMANCE, &mux);
 
 
     //    //Construct a delimiter
     //    ch_word id;
-    //    err = camio_transport_get_id("delim",&id);
+    //    err = camio_device_get_id("delim",&id);
     //    delim_params_t delim_params = { .base_uri = uri, .delim_fn = delimit };
     //    ch_word params_size = sizeof(delim_params_t);
     //    void* params = &delim_params;
@@ -62,35 +62,35 @@ int main(int argc, char** argv)
     ch_word id = -1;
     void* params = NULL;
     ch_word params_size = 0;
-    err = camio_transport_params_new(uri,&params,&params_size, &id);
+    err = camio_device_params_new(uri,&params,&params_size, &id);
     if(err){
-        ERR("Invalid transport specification %s\n", uri);
+        ERR("Invalid device specification %s\n", uri);
         return CAMIO_EINVALID; //TODO XXX put a better error here
     }
 
-    //Use the parameters structure to construct a new connector object
-    camio_controller_t* connector = NULL;
-    err = camio_transport_constr(id,&params,params_size,&connector);
+    //Use the parameters structure to construct a new controller object
+    camio_controller_t* controller = NULL;
+    err = camio_device_constr(id,&params,params_size,&controller);
     if(err){
-        ERR("Could not construct connector\n");
+        ERR("Could not construct controller\n");
         return CAMIO_EINVALID; //TODO XXX put a better error here
     }
 
     //Spin waiting for a connection. A little bit naughty.
-    while( (err = camio_connector_ready(connector)) == CAMIO_ENOTREADY ){}
+    while( (err = camio_controller_ready(controller)) == CAMIO_ENOTREADY ){}
     if(err != CAMIO_EREADY){
-        ERR("Unexpected error in connector\n");
+        ERR("Unexpected error in controller\n");
         return CAMIO_EINVALID;
     }
 
-    camio_stream_t* io_stream = NULL;
-    err = camio_connect(connector,&io_stream);
-    if(err){ ERR("Could not connect to stream\n"); return CAMIO_EINVALID; /*TODO XXX put a better error here*/ }
+    camio_channel_t* io_channel = NULL;
+    err = camio_connect(controller,&io_channel);
+    if(err){ ERR("Could not connect to channel\n"); return CAMIO_EINVALID; /*TODO XXX put a better error here*/ }
 
-    //Put the read stream into the mux
-    camio_mux_insert(mux,&io_stream->rd_muxable,READ_STREAM);
+    //Put the read channel into the mux
+    camio_mux_insert(mux,&io_channel->rd_muxable,READ_STREAM);
 
-   //Read and write bytes to and from the stream - just do loopback for now
+   //Read and write bytes to and from the channel - just do loopback for now
     camio_rd_buffer_t* rd_buffer = NULL;
     camio_muxable_t* muxable     = NULL;
     ch_word which                = -1;
@@ -99,23 +99,23 @@ int main(int argc, char** argv)
             .dst_offset_hint = CAMIO_READ_REQ_DST_OFFSET_NONE,
             .read_size_hint  = CAMIO_READ_REQ_SIZE_ANY
     };
-    err = camio_read_request(io_stream,&rd_req,1); //kick the process off -- tell the read stream that we would like some data,
+    err = camio_read_request(io_channel,&rd_req,1); //kick the process off -- tell the read channel that we would like some data,
     if(err){ ERR("Got a read request error %i\n", err); return -1; }
 
     ch_word line_count = 0;
 
     while(1){
-        //Block waiting for a stream to be ready
+        //Block waiting for a channel to be ready
         err = camio_mux_select(mux,&muxable,&which);
         if(err != CAMIO_ENOERROR){
-            ERR("Unexpected error %lli on stream with id =%lli\n", err, which);
+            ERR("Unexpected error %lli on channel with id =%lli\n", err, which);
             break;
         }
         switch(which){
             case READ_STREAM: {//There is new data to be read
                 //Acquire a pointer to the new data now that it's ready
                 DBG("Handling read event\n");
-                err = camio_read_acquire(muxable->parent.stream, &rd_buffer);
+                err = camio_read_acquire(muxable->parent.channel, &rd_buffer);
                 if(err){ ERR("Got a read error %i\n", err); return -1; }
                 DBG("Got %lli bytes of new data at %p\n", rd_buffer->data_len, rd_buffer->data_start);
 
@@ -140,10 +140,10 @@ int main(int argc, char** argv)
                 }
 
                 //And we're done with the read buffer now, release it
-                err = camio_read_release(io_stream, &rd_buffer);
+                err = camio_read_release(io_channel, &rd_buffer);
                 if(err){ ERR("Got a read release error %i\n", err); return -1; }
 
-                err = camio_read_request(io_stream,&rd_req,1); //kick the process off -- tell the read stream that we would like some data,
+                err = camio_read_request(io_channel,&rd_req,1); //kick the process off -- tell the read channel that we would like some data,
                 if(err){ ERR("Got a read request error %i\n", err); return -1; }
                 break;
             }

@@ -5,16 +5,16 @@
 #ifndef BIND_H_
 #define BIND_H_
 
-#include "../iostreams/ciostream.h"
+#include "../iochannels/ciochannel.h"
 
 /**
- * Associate two streams with each other. This means that CamIO will try to share buffers between the streams. This may not
+ * Associate two channels with each other. This means that CamIO will try to share buffers between the channels. This may not
  * always be possible. In these cases, CamIO will implicitly copy between buffers during a read operation. The return status
- * of bind will indicate if implicit copying is to be expected. Can be called for any two input streams, and any two output
- * streams. However, an input stream can only be directly associated with 1 output stream.  Return values:
- * - ENOERROR: Bind was successful, the two streams now share a buffer.
+ * of bind will indicate if implicit copying is to be expected. Can be called for any two input channels, and any two output
+ * channels. However, an input channel can only be directly associated with 1 output channel.  Return values:
+ * - ENOERROR: Bind was successful, the two channels now share a buffer.
  * - EMUSTCOPY: Bind was unsuccessful
- * - ETOOMANY: This stream was already bound and cannot be bound again.
+ * - ETOOMANY: This channel was already bound and cannot be bound again.
  *
  */
 

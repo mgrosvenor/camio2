@@ -15,7 +15,7 @@
 
 #include <src/api/api_easy.h>
 #include <src/camio_debug.h>
-#include <src/drivers/delimiter/delim_transport.h>
+#include <src/drivers/delimiter/delim_device.h>
 #include "camio_perf_packet.h"
 
 #include "options.h"
@@ -38,29 +38,29 @@ static ch_word delimit(char* buffer, ch_word len)
     return head->size;
 }
 
-static camio_error_t connect_delim(ch_cstr client_stream_uri, camio_controller_t** connector) {
+static camio_error_t connect_delim(ch_cstr client_channel_uri, camio_controller_t** controller) {
 
-    //Find the ID of the delim stream
+    //Find the ID of the delim channel
     ch_word id;
-    camio_error_t err = camio_transport_get_id("delim", &id);
+    camio_error_t err = camio_device_get_id("delim", &id);
 
-    //Fill in the delim stream paramters structure
+    //Fill in the delim channel paramters structure
     delim_params_t delim_params = {
-            .base_uri = client_stream_uri,
+            .base_uri = client_channel_uri,
             .delim_fn = delimit
     };
     ch_word params_size = sizeof(delim_params_t);
     void* params = &delim_params;
 
-    //Use the parameters structure to construct a new connector object
-    err = camio_transport_constr(id, &params, params_size, connector);
+    //Use the parameters structure to construct a new controller object
+    err = camio_device_constr(id, &params, params_size, controller);
     if (err) {
-        DBG("Could not construct connector\n");
+        DBG("Could not construct controller\n");
         return CAMIO_EINVALID; //TODO XXX put a better error here
     }
 
     //And we're done!
-    DBG("Got connector\n");
+    DBG("Got controller\n");
     return CAMIO_ENOERROR;
 }
 
@@ -71,10 +71,10 @@ static camio_error_t send_message(camio_muxable_t* muxable, ch_word ts, ch_word 
     DBG("Current req_buffer=%p\n", wreq.buffer);
     if(!wreq.buffer){
         //Get and init a buffer for writing stuff to. Hang on to it if possible
-        DBG("No write buffer, grabbing a new one parent=%p, buffer=%p\n", muxable->parent.stream, &wreq.buffer);
-        err = camio_write_acquire(muxable->parent.stream, &wreq.buffer);
+        DBG("No write buffer, grabbing a new one parent=%p, buffer=%p\n", muxable->parent.channel, &wreq.buffer);
+        err = camio_write_acquire(muxable->parent.channel, &wreq.buffer);
         if(err){
-            ERR("Could not get a writing buffer to stream\n");
+            ERR("Could not get a writing buffer to channel\n");
             return err;
             //return CAMIO_EINVALID; /*TODO XXX put a better error here*/
         }
@@ -109,7 +109,7 @@ static camio_error_t send_message(camio_muxable_t* muxable, ch_word ts, ch_word 
             wreq.buffer->data_start
     );
 
-    err = camio_write_request(muxable->parent.stream,&wreq,1 );
+    err = camio_write_request(muxable->parent.channel,&wreq,1 );
     if(err != CAMIO_ENOERROR && err != CAMIO_ETRYAGAIN){
         ERR("Unexpected write error %lli\n", err);
         return err;
@@ -118,25 +118,25 @@ static camio_error_t send_message(camio_muxable_t* muxable, ch_word ts, ch_word 
     return CAMIO_ENOERROR;
 }
 
-int camio_perf_clinet(ch_cstr client_stream_uri, ch_word* stop)
+int camio_perf_clinet(ch_cstr client_channel_uri, ch_word* stop)
 {
     DBG("Staring CamIO-perf client\n");
-    //Create a new multiplexer for streams to go into
+    //Create a new multiplexer for channels to go into
     camio_mux_t* mux = NULL;
     camio_error_t err = camio_mux_new(CAMIO_MUX_HINT_PERFORMANCE, &mux);
 
     //Construct a delimiter
-    camio_controller_t* connector = NULL;
-    err = connect_delim(client_stream_uri, &connector);
+    camio_controller_t* controller = NULL;
+    err = connect_delim(client_channel_uri, &controller);
     if(err){
         DBG("Could not create delimiter!\n");
         return CAMIO_EINVALID;
     }
 
-    //Insert the connector into the mux
-    err = camio_mux_insert(mux,&connector->muxable, CONNECTOR_ID);
+    //Insert the controller into the mux
+    err = camio_mux_insert(mux,&controller->muxable, CONNECTOR_ID);
     if(err){
-        DBG("Could not insert connector into multiplexer\n");
+        DBG("Could not insert controller into multiplexer\n");
         return CAMIO_EINVALID;
     }
 
@@ -179,32 +179,32 @@ int camio_perf_clinet(ch_cstr client_stream_uri, ch_word* stop)
 
         }
 
-        //Block waiting for a stream to be ready to read or connect
+        //Block waiting for a channel to be ready to read or connect
         camio_mux_select(mux,&muxable,&which);
 
         //Have a look at what we have
         switch(muxable->mode){
-            //This is a connector that's just fired
+            //This is a controller that's just fired
             case CAMIO_MUX_MODE_CONNECT:{
                 DBG("Handling connect ready()\n");
-                camio_stream_t* tmp_stream = NULL;
-                err = camio_connect(muxable->parent.connector,&tmp_stream);
+                camio_channel_t* tmp_channel = NULL;
+                err = camio_connect(muxable->parent.controller,&tmp_channel);
 
                 if(err == CAMIO_EALLREADYCONNECTED){ //No more connections possible
-                    DBG("Removing expired connector\n");
+                    DBG("Removing expired controller\n");
                     camio_mux_remove(mux,muxable);
                     continue;
                 }
                 if(err != CAMIO_ENOERROR){
-                    ERR("Could not get stream. Got errr %i\n", err);
+                    ERR("Could not get channel. Got errr %i\n", err);
                     return CAMIO_EINVALID;
                 }
 
-                camio_mux_insert(mux,&tmp_stream->rd_muxable,CONNECTOR_ID + 1);
-                camio_mux_insert(mux,&tmp_stream->wr_muxable,CONNECTOR_ID + 3);
+                camio_mux_insert(mux,&tmp_channel->rd_muxable,CONNECTOR_ID + 1);
+                camio_mux_insert(mux,&tmp_channel->wr_muxable,CONNECTOR_ID + 3);
 
                 //Kick things off by sending the first message
-                send_message(&tmp_stream->wr_muxable,time_now_ns,seq++);
+                send_message(&tmp_channel->wr_muxable,time_now_ns,seq++);
                 inflight_bytes = wreq.buffer->data_len;
                 DBG("Sending %lli bytes\n", inflight_bytes);
 
@@ -228,7 +228,7 @@ int camio_perf_clinet(ch_cstr client_stream_uri, ch_word* stop)
     }
 
 //    if(wr_buffer){
-//        camio_write_release(tmp_stream,&wr_buffer);
+//        camio_write_release(tmp_channel,&wr_buffer);
 //    }
 
 

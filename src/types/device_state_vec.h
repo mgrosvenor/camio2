@@ -13,12 +13,12 @@
 #define SRC_TYPES_CHANNEL_STATE_VEC_H_
 
 #include "types.h"
-#include <src/devices/connector.h>
+#include <src/devices/controller.h>
 #include <src/types/device_params_vec.h>
 #include <deps/chaste/data_structs/vector/vector_typed_declare_template.h>
 #include <src/utils/uri_parser/uri_parser.h>
 
-typedef camio_error_t (*camio_construct_f)(void** params, ch_word params_size, camio_controller_t** connector_o);
+typedef camio_error_t (*camio_construct_f)(void** params, ch_word params_size, camio_controller_t** controller_o);
 
 typedef struct camio_device_state_s {
     ch_ccstr scheme;                                // The short name for this channel eg: "tcp" or "udp"

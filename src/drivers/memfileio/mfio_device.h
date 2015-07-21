@@ -4,7 +4,7 @@
  * See LICENSE.txt for full details. 
  * 
  *  Created:   01 Jul 2015
- *  File name: mfio_transport.h
+ *  File name: mfio_device.h
  *  Description:
  *  <INSERT DESCRIPTION HERE> 
  */
@@ -13,7 +13,7 @@
 
 #include <src/types/len_string.h>
 
-#include "mfio_connector.h"
+#include "mfio_controller.h"
 
 typedef struct mfio_global_s{
     ch_bool is_init;

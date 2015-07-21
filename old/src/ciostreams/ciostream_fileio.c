@@ -1,8 +1,8 @@
-// CamIO 2: ciostreams_fileio.c
+// CamIO 2: ciochannels_fileio.c
 // Copyright (C) 2013: Matthew P. Grosvenor (matthew.grosvenor@cl.cam.ac.uk) 
 // Licensed under BSD 3 Clause, please see LICENSE for more details. 
 
-#include "ciostream_fileio.h"
+#include "ciochannel_fileio.h"
 #include "../types/stdinclude.h"
 #include "../uri_parser/uri_opts.h"
 #include "../selectors/selectable.h"
@@ -30,14 +30,14 @@ typedef struct {
 
 /**
  * This function tries to do a non-blocking read for new data from the CamIO Stream called “this” and return slot info
- * pointer called “slot”. If the stream is empty, (e.g. end of file) or closed (e.g. disconnected) it is EEMPTU is
+ * pointer called “slot”. If the channel is empty, (e.g. end of file) or closed (e.g. disconnected) it is EEMPTU is
  * returned
  * Return values:
  * - ENOERROR:  Completed successfully, sloto contains a valid structure.
  * - ETRYAGAIN: There was no data available at this time, but there might be some more later.
- * - ENOSLOTS:  The stream could not allocate more slots for the read. Free some slots by releasing a read or write
+ * - ENOSLOTS:  The channel could not allocate more slots for the read. Free some slots by releasing a read or write
  *              transaction.
- * - EEMPTY:	The stream has run out of data
+ * - EEMPTY:	The channel has run out of data
  */
 static int strm_read_acquire( ciostrm* this, cioslot* slot_o, int padding)
 {
@@ -75,11 +75,11 @@ static int strm_read_acquire( ciostrm* this, cioslot* slot_o, int padding)
 
 /**
  * Try to acquire a slot for writing data into.  You can hang on to this slot as long as you like, but beware, most
- * streams offer a limited number of slots, and some streams offer only one. If you are using stream association for
+ * channels offer a limited number of slots, and some channels offer only one. If you are using channel association for
  * zero-copy data movement, calling read_aquire has the effect as calling write_acquire.
  * Returns:
  *  - ENOERROR: Completed successfully, sloto contains a valid structure.
- *  - ENOSLOTS: The stream could not allocate more slots for the read. Free some slots by releasing a read or write
+ *  - ENOSLOTS: The channel could not allocate more slots for the read. Free some slots by releasing a read or write
  *              transaction.
  */
 static int strm_write_aquire(ciostrm* this, cioslot* slot_o)
@@ -88,9 +88,9 @@ static int strm_write_aquire(ciostrm* this, cioslot* slot_o)
 }
 
 
-/* Try to write data described by sloto_i to the given stream called “this”.  If auto_release is set to true,
- * write_commit will release the resources associated with the slot when it is done. Some streams support bulk transfer
- * options to amortise the cost of system calls. For these streams, you can set enqueue to true. Release()
+/* Try to write data described by sloto_i to the given channel called “this”.  If auto_release is set to true,
+ * write_commit will release the resources associated with the slot when it is done. Some channels support bulk transfer
+ * options to amortise the cost of system calls. For these channels, you can set enqueue to true. Release()
  * with enqueue set to 0 will flush the queue. Write_release() can be called with a NULL slot_i parameter to flush
  * the queue. Unlike POSIX, write_comit() returns the number of bytes remaining rather than the number of bytes sent
  * to make it easy to wait until a write is committed.
@@ -98,7 +98,7 @@ static int strm_write_aquire(ciostrm* this, cioslot* slot_o)
  * - ENOERROR: Completed successfully.
  * - EQFULL: The queue is full. Cannot enqueue more slots. Call write with enqueue set to 0.
  * - ECOPYOP: A copy operation was required to complete this commit.
- * - or: the bytes remaining for this stream. Since writing is non-blocking, this may not always be 0.
+ * - or: the bytes remaining for this channel. Since writing is non-blocking, this may not always be 0.
  */
 static int strm_write_commit(ciostrm* this, cioslot* slot_i, int auto_release,  int enqueue)
 {
@@ -107,9 +107,9 @@ static int strm_write_commit(ciostrm* this, cioslot* slot_i, int auto_release,  
 
 
 /**
- * Relinquish resources associated with the the slot. Some streams support asynchronous update modes. Release() will
+ * Relinquish resources associated with the the slot. Some channels support asynchronous update modes. Release() will
  * check to see if the data in this slot is still valid. If it is not valid, it may have been trashed while you were
- * working on it, so results are invalid! If you are concerned about correctness, you should a) not use a stream
+ * working on it, so results are invalid! If you are concerned about correctness, you should a) not use a channel
  * that supports asynchronous updates b) ensure that your software can “roll back” c) copy data and check for
  * validity before proceeding.
  * Return values:
@@ -123,7 +123,7 @@ static int strm_release(ciostrm* this, cioslot* slot_i)
 
 
 /**
- * Free resources associated with this stream, but not with its connector.
+ * Free resources associated with this channel, but not with its controller.
  * Connectors should be free'd separately
  */
 static void strm_destroy(ciostrm* this)
@@ -149,32 +149,32 @@ static int strm_ready(cioselable* this)
 }
 
 
-//Make a new fileio stream
+//Make a new fileio channel
 static int new_ciostrm_fileio( conn_private* conn_priv, ciostrm** ciostrm_o)
 {
     int result = CIO_ENOERROR;
 
-    //Make a new connector
-    ciostrm* stream = calloc(1,sizeof(ciostrm));
-    if(!stream){
+    //Make a new controller
+    ciostrm* channel = calloc(1,sizeof(ciostrm));
+    if(!channel){
         return CIO_ENOMEM;
     }
 
     //Populate it
-    stream->read_acquire = strm_read_acquire;
-    stream->write_aquire = strm_write_aquire;
-    stream->write_commit = strm_write_commit;
-    stream->release		 = strm_release;
-    stream->destroy		 = strm_destroy;
+    channel->read_acquire = strm_read_acquire;
+    channel->write_aquire = strm_write_aquire;
+    channel->write_commit = strm_write_commit;
+    channel->release		 = strm_release;
+    channel->destroy		 = strm_destroy;
 
     //Make a new private structure
-    stream->__priv = calloc(0,sizeof(strm_private));
-    if(!stream->__priv){
+    channel->__priv = calloc(0,sizeof(strm_private));
+    if(!channel->__priv){
         return CIO_ENOMEM;
     }
 
     //Populate it
-    strm_private* priv   = stream->__priv;
+    strm_private* priv   = channel->__priv;
     priv->fd			 = conn_priv->fd; //Link back so we can recover from the selectable
     int ret = new_malloc_buffer(8,4096,&priv->buff); //TODO XXX: These are nasty constants, should be fixed
     if(ret){
@@ -182,24 +182,24 @@ static int new_ciostrm_fileio( conn_private* conn_priv, ciostrm** ciostrm_o)
     }
 
     //Set up the selector
-    stream->selectable.ready  = strm_ready;
-    stream->selectable.fd     = priv->fd;
-    stream->selectable.__priv = priv;
+    channel->selectable.ready  = strm_ready;
+    channel->selectable.fd     = priv->fd;
+    channel->selectable.__priv = priv;
 
-    //Set up the stream info
-    stream->info->can_read_off 		= true;
-    stream->info->has_async_arrv 	= false;
-    stream->info->is_bytestream 	= true;
-    stream->info->is_encrypted		= false;
-    stream->info->is_reliable		= true;
-    stream->info->is_thread_safe	= false; //XXX TODO: The answer here should be yes. Butt...
+    //Set up the channel info
+    channel->info->can_read_off 		= true;
+    channel->info->has_async_arrv 	= false;
+    channel->info->is_bytechannel 	= true;
+    channel->info->is_encrypted		= false;
+    channel->info->is_reliable		= true;
+    channel->info->is_thread_safe	= false; //XXX TODO: The answer here should be yes. Butt...
     										 //But it's tricky. Thread safety should be a compile time AND runtime option.
     										 //Thread safety is costly, and we only want it in if we REALY need it.
-    stream->info->mtu				= 0; //XXX TODO: Don't know yet. This is buffer size dependent
-    stream->info->scope				= 1;
+    channel->info->mtu				= 0; //XXX TODO: Don't know yet. This is buffer size dependent
+    channel->info->scope				= 1;
 
-    //Output the stream
-    *ciostrm_o = stream;
+    //Output the channel
+    *ciostrm_o = channel;
 
     //Done!
     return CIO_ENOERROR;
@@ -247,29 +247,29 @@ static int conn_ready(cioselable* this)
 }
 
 
-//Make a new fileio connector
+//Make a new fileio controller
 int new_cioconn_fileio( uri* uri_parsed , struct cioconn_s** cioconn_o, void** global_data )
 {
     int result = CIO_ENOERROR;
 
-    //Make a new connector
-    cioconn* connector = calloc(0,sizeof(cioconn));
-    if(!connector){
+    //Make a new controller
+    cioconn* controller = calloc(0,sizeof(cioconn));
+    if(!controller){
         return CIO_ENOMEM;
     }
 
     //Populate it
-    connector->connect          = conn_connect;
-    connector->destroy          = conn_destroy;
+    controller->connect          = conn_connect;
+    controller->destroy          = conn_destroy;
 
     //Make a new private structure
-    connector->__priv = calloc(0,sizeof(conn_private));
-    if(!connector->__priv){
+    controller->__priv = calloc(0,sizeof(conn_private));
+    if(!controller->__priv){
         return CIO_ENOMEM;
     }
 
     //Populate it
-    conn_private* priv   = connector->__priv;
+    conn_private* priv   = controller->__priv;
     priv->filename  = NULL;
     priv->flags     = 0;
     priv->mode      = 0;
@@ -321,16 +321,16 @@ int new_cioconn_fileio( uri* uri_parsed , struct cioconn_s** cioconn_o, void** g
     priv->flags = flags_readwrite ? O_RDWR   : priv->flags;
     priv->flags = flags_readonly  ? O_RDONLY : priv->flags;
 
-    //This stream has no global data ... yet?
+    //This channel has no global data ... yet?
     (void)global_data;
 
     //Set up the selector
-    connector->selectable.ready  = conn_ready;
-    connector->selectable.fd     = -1; //Can only use this in a spinner selector right now. TODO XXX: Fake this out.
-    connector->selectable.__priv = priv; //Close the loop
+    controller->selectable.ready  = conn_ready;
+    controller->selectable.fd     = -1; //Can only use this in a spinner selector right now. TODO XXX: Fake this out.
+    controller->selectable.__priv = priv; //Close the loop
 
-    //Output the connector
-    *cioconn_o = connector;
+    //Output the controller
+    *cioconn_o = controller;
 
     //Done!
     return CIO_ENOERROR;

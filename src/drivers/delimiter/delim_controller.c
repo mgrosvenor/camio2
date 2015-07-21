@@ -4,18 +4,18 @@
  * See LICENSE.txt for full details. 
  * 
  *  Created:   26 Jun 2015
- *  File name: delim_connector.c
+ *  File name: delim_controller.c
  *  Description:
  *  <INSERT DESCRIPTION HERE> 
  */
 
-#include "../../transports/connector.h"
+#include "../../devices/controller.h"
 #include "../../camio.h"
 #include "../../camio_debug.h"
 
-#include "delim_transport.h"
-#include "delim_connector.h"
-#include "delim_stream.h"
+#include "delim_device.h"
+#include "delim_controller.h"
+#include "delim_channel.h"
 
 
 /**************************************************************************************************************************
@@ -25,13 +25,13 @@ typedef struct delim_priv_s {
     //Parameters used when a connection happens
     delim_params_t* params;
 
-    //Properties of the base stream
+    //Properties of the base channel
     camio_controller_t* base;
     void* base_params;
     ch_word base_params_size;
     ch_word base_id;
 
-} delim_connector_priv_t;
+} delim_controller_priv_t;
 
 
 
@@ -39,39 +39,39 @@ typedef struct delim_priv_s {
 /**************************************************************************************************************************
  * Connect functions
  **************************************************************************************************************************/
-static camio_error_t delim_connector_ready(camio_muxable_t* this)
+static camio_error_t delim_controller_ready(camio_muxable_t* this)
 {
-//    DBG("Checking if base connector is ready\n");
-    //Forward the ready function from the base connector. The delimiter is always ready to party!
-    delim_connector_priv_t* priv = CONNECTOR_GET_PRIVATE(this->parent.connector);
-    return camio_connector_ready(priv->base);
+//    DBG("Checking if base controller is ready\n");
+    //Forward the ready function from the base controller. The delimiter is always ready to party!
+    delim_controller_priv_t* priv = CONNECTOR_GET_PRIVATE(this->parent.controller);
+    return camio_controller_ready(priv->base);
 
 }
 
-static camio_error_t delim_connect(camio_controller_t* this, camio_stream_t** stream_o )
+static camio_error_t delim_connect(camio_controller_t* this, camio_channel_t** channel_o )
 {
-    delim_connector_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
-    camio_stream_t* base_stream;
-    DBG("Doing connect on base connector\n");
-    camio_error_t err = camio_connect(priv->base, &base_stream);
+    delim_controller_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
+    camio_channel_t* base_channel;
+    DBG("Doing connect on base controller\n");
+    camio_error_t err = camio_connect(priv->base, &base_channel);
     if(err){
         if(err != CAMIO_ETRYAGAIN){//ETRYAGAIN is ok.
-            DBG("EEK unexpected error trying to call connect on base stream\n");
+            DBG("EEK unexpected error trying to call connect on base channel\n");
         }
         return err;
     }
 
-    DBG("Making new delimiter stream\n");
-    camio_stream_t* stream = NEW_STREAM(delim);
-    if(!stream){
+    DBG("Making new delimiter channel\n");
+    camio_channel_t* channel = NEW_STREAM(delim);
+    if(!channel){
         ERR("No memory for new delimter\n");
-        *stream_o = NULL;
+        *channel_o = NULL;
         return CAMIO_ENOMEM;
     }
-    *stream_o = stream;
+    *channel_o = channel;
 
     DBG("Constructing delimiter delimfn=%p\n", priv->params->delim_fn);
-    return delim_stream_construct(stream,this,base_stream, priv->params->delim_fn);
+    return delim_channel_construct(channel,this,base_channel, priv->params->delim_fn);
 }
 
 
@@ -97,50 +97,50 @@ static camio_error_t delim_construct(camio_controller_t* this, void** params, ch
     }
 
     //Populate the parameters
-    delim_connector_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
+    delim_controller_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
     priv->params = delim_params;
 
-    //OK try to construct the base stream connector...
-    camio_error_t err = camio_transport_params_new(
+    //OK try to construct the base channel controller...
+    camio_error_t err = camio_device_params_new(
         priv->params->base_uri,
         &priv->base_params,
         &priv->base_params_size,
         &priv->base_id
     );
     if(err){
-        DBG("Uh ohh, got %lli error trying to make base connector parameters\n",err);
+        DBG("Uh ohh, got %lli error trying to make base controller parameters\n",err);
         return err;
     }
 
-    err = camio_transport_constr(priv->base_id,&priv->base_params,priv->base_params_size,&priv->base);
+    err = camio_device_constr(priv->base_id,&priv->base_params,priv->base_params_size,&priv->base);
     if(err){
-        DBG("Uh ohh, got %lli error trying to construct base connector\n",err);
+        DBG("Uh ohh, got %lli error trying to construct base controller\n",err);
         return err;
     }
 
 
     //Populate the muxable structure
     this->muxable.mode              = CAMIO_MUX_MODE_CONNECT;
-    this->muxable.parent.connector  = this;
-    this->muxable.vtable.ready      = delim_connector_ready;
+    this->muxable.parent.controller  = this;
+    this->muxable.vtable.ready      = delim_controller_ready;
     this->muxable.fd                = priv->base->muxable.id; //Pass this out, but retain the ready function.
                                                               //Smells a bit bad, but is probably ok.
 
-    DBG("Finished constructing delimiter connector and base connector\n");
+    DBG("Finished constructing delimiter controller and base controller\n");
     return CAMIO_ENOERROR;
 }
 
 
 static void delim_destroy(camio_controller_t* this)
 {
-    DBG("Destroying delim connector...\n");
-    delim_connector_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
+    DBG("Destroying delim controller...\n");
+    delim_controller_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
 
-    if(priv->base){ camio_connector_destroy(priv->base); }
+    if(priv->base){ camio_controller_destroy(priv->base); }
 
     if(priv->params) { free(priv->params); }
     free(this);
-    DBG("Done destroying delim connector structure\n");
+    DBG("Done destroying delim controller structure\n");
 }
 
-NEW_CONNECTOR_DEFINE(delim, delim_connector_priv_t)
+NEW_CONNECTOR_DEFINE(delim, delim_controller_priv_t)

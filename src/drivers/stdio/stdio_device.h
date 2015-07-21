@@ -4,7 +4,7 @@
  * See LICENSE.txt for full details. 
  * 
  *  Created:   03 Jul 2015
- *  File name: stdio_transport.h
+ *  File name: stdio_device.h
  *  Description:
  *  <INSERT DESCRIPTION HERE> 
  */
@@ -13,8 +13,8 @@
 
 #include <src/types/len_string.h>
 
-#include "stdio_connector.h"
-#include <src/drivers/fileio/fio_transport.h>
+#include "stdio_controller.h"
+#include <src/drivers/fileio/fio_device.h>
 
 typedef struct stdio_global_s{
     ch_bool is_init;

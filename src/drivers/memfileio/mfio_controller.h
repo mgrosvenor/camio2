@@ -4,14 +4,14 @@
  * See LICENSE.txt for full details. 
  * 
  *  Created:   01 Jul 2015
- *  File name: mfio_connector.h
+ *  File name: mfio_controller.h
  *  Description:
  *  <INSERT DESCRIPTION HERE> 
  */
 #ifndef SRC_DRIVERS_MFIO_MFIO_CONNECTOR_H_
 #define SRC_DRIVERS_MFIO_MFIO_CONNECTOR_H_
 
-#include "../../transports/connector.h"
+#include "../../devices/controller.h"
 
 NEW_CONNECTOR_DECLARE(mfio);
 

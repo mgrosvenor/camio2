@@ -4,22 +4,22 @@
  * See LICENSE.txt for full details. 
  * 
  *  Created:   26 Jun 2015
- *  File name: delim_stream.h
+ *  File name: delim_channel.h
  *  Description:
  *  <INSERT DESCRIPTION HERE> 
  */
 #ifndef SRC_DRIVERS_DELIM_DELIM_STREAM_H_
 #define SRC_DRIVERS_DELIM_DELIM_STREAM_H_
 
-#include <src/transports/stream.h>
-#include <src/transports/connector.h>
+#include <src/devices/channel.h>
+#include <src/devices/controller.h>
 
 NEW_STREAM_DECLARE(delim);
 
-camio_error_t delim_stream_construct(
-    camio_stream_t* this,
-    camio_controller_t* connector,
-    camio_stream_t* base_stream,
+camio_error_t delim_channel_construct(
+    camio_channel_t* this,
+    camio_controller_t* controller,
+    camio_channel_t* base_channel,
     ch_word (*delim_fn)(char* buffer, ch_word len)
 );
 

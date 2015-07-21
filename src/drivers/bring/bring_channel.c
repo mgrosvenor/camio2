@@ -4,7 +4,7 @@
  * See LICENSE.txt for full details. 
  * 
  *  Created:   04 Jul 2015
- *  File name: bring_stream.c
+ *  File name: bring_channel.c
  *  Description:
  *  <INSERT DESCRIPTION HERE> 
  */
@@ -14,15 +14,15 @@
 #include <fcntl.h>
 #include <errno.h>
 
-#include <src/transports/stream.h>
-#include <src/transports/connector.h>
+#include <src/devices/channel.h>
+#include <src/devices/controller.h>
 #include <src/buffers/buffer_malloc_linear.h>
 #include <deps/chaste/utils/util.h>
 #include <src/api/api.h>
 #include <src/camio_debug.h>
 
-#include "bring_stream.h"
-#include "bring_transport.h"
+#include "bring_channel.h"
+#include "bring_device.h"
 
 /**************************************************************************************************************************
  * PER STREAM STATE
@@ -31,16 +31,16 @@
 //Current (simple) BRING recv only does one buffer at a time, this could change with vectored I/O in the future.
 #define CAMIO_BRING_BUFFER_COUNT (1)
 
-typedef struct bring_stream_priv_s {
-    camio_controller_t connector;
+typedef struct bring_channel_priv_s {
+    camio_controller_t controller;
     bring_params_t params;
     volatile bring_header_t* bring_head;
-    ch_bool connected; //Is the stream currently running? Or has close been called?
+    ch_bool connected; //Is the channel currently running? Or has close been called?
 
     //The current read buffer
     volatile char* rd_mem;
     ch_bool read_registered;        //Has a read been registered?
-    //ch_bool read_ready;           //Is the stream ready for writing (for edge triggered multiplexers)
+    //ch_bool read_ready;           //Is the channel ready for writing (for edge triggered multiplexers)
     camio_buffer_t* rd_buffers;     //All buffers for the read side;
     ch_word rd_buffers_count;
     camio_buffer_t* rd_buff;        //A place to keep a read buffer until it's ready to be consumed
@@ -54,7 +54,7 @@ typedef struct bring_stream_priv_s {
 
     volatile char* wr_mem;
     ch_bool write_registered;     //Has a write been registered?
-    ch_bool write_ready;          //Is the stream ready for writing (for edge triggered multiplexers)
+    ch_bool write_ready;          //Is the channel ready for writing (for edge triggered multiplexers)
     camio_buffer_t* wr_buffers;   //All buffers for the write side;
     ch_word wr_buffers_count;
     camio_write_req_t* write_req; //Write request vector to take data out of when there is new data.
@@ -68,7 +68,7 @@ typedef struct bring_stream_priv_s {
     ch_word wr_slot_count;        //Number of slots in the ring
     ch_word wr_rel_index;         //Current slot in the bring
 
-} bring_stream_priv_t;
+} bring_channel_priv_t;
 
 
 
@@ -78,12 +78,12 @@ typedef struct bring_stream_priv_s {
  **************************************************************************************************************************/
 
 //See if there is something to read
-static camio_error_t bring_read_peek( camio_stream_t* this)
+static camio_error_t bring_read_peek( camio_channel_t* this)
 {
     DBG("Doing read peek\n");
 
     //This is not a public function, can assume that preconditions have been checked.
-    bring_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
+    bring_channel_priv_t* priv = STREAM_GET_PRIVATE(this);
 
     if(priv->rd_buff){ //There is a ready already waiting
         return CAMIO_ENOERROR;
@@ -154,7 +154,7 @@ static camio_error_t bring_read_ready(camio_muxable_t* this)
     }
 
     //OK now the fun begins
-    bring_stream_priv_t* priv = STREAM_GET_PRIVATE(this->parent.stream);
+    bring_channel_priv_t* priv = STREAM_GET_PRIVATE(this->parent.channel);
 
     if(!priv->read_registered){ //Even if there is data waiting, nobody want's it, so ignore for now.
         DBG("Nobody wants the data\n");
@@ -168,7 +168,7 @@ static camio_error_t bring_read_ready(camio_muxable_t* this)
     }
 
     //Nope, OK, see if we can get some
-    camio_error_t err = bring_read_peek(this->parent.stream);
+    camio_error_t err = bring_read_peek(this->parent.channel);
     if(err == CAMIO_ENOERROR ){
         DBG("There is new data waiting!\n");
         return CAMIO_EREADY;
@@ -185,7 +185,7 @@ static camio_error_t bring_read_ready(camio_muxable_t* this)
 
 }
 
-static camio_error_t bring_read_request( camio_stream_t* this, camio_read_req_t* req_vec, ch_word req_vec_len )
+static camio_error_t bring_read_request( camio_channel_t* this, camio_read_req_t* req_vec, ch_word req_vec_len )
 {
     DBG("Doing bring read request...!\n");
     //Basic sanity checks -- TODO XXX: Should these be made into (compile time optional?) asserts for runtime performance?
@@ -193,7 +193,7 @@ static camio_error_t bring_read_request( camio_stream_t* this, camio_read_req_t*
         DBG("This null???\n"); //WTF?
         return CAMIO_EINVALID;
     }
-    bring_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
+    bring_channel_priv_t* priv = STREAM_GET_PRIVATE(this);
 
     if(req_vec_len != 1){
         DBG("Stream currently only supports read requests of size 1\n"); //TODO this should be coded in the features struct
@@ -201,7 +201,7 @@ static camio_error_t bring_read_request( camio_stream_t* this, camio_read_req_t*
     }
 
     if(priv->read_registered){
-        DBG("Already registered a read request. Currently this stream only handles one outstanding request at a time\n");
+        DBG("Already registered a read request. Currently this channel only handles one outstanding request at a time\n");
         return CAMIO_ETOOMANY; //TODO XXX better error code
     }
 
@@ -216,7 +216,7 @@ static camio_error_t bring_read_request( camio_stream_t* this, camio_read_req_t*
 }
 
 
-static camio_error_t bring_read_acquire( camio_stream_t* this,  camio_rd_buffer_t** buffer_o)
+static camio_error_t bring_read_acquire( camio_channel_t* this,  camio_rd_buffer_t** buffer_o)
 {
 
     //Basic sanity checks -- TODO XXX: Should these be made into (compile time optional?) asserts for runtime performance?
@@ -243,7 +243,7 @@ static camio_error_t bring_read_acquire( camio_stream_t* this,  camio_rd_buffer_
         return err;
     }
 
-    bring_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
+    bring_channel_priv_t* priv = STREAM_GET_PRIVATE(this);
 
     *buffer_o = priv->rd_buff;
     priv->read_registered = false; //Release the read now. This means that read req can be called again
@@ -254,7 +254,7 @@ static camio_error_t bring_read_acquire( camio_stream_t* this,  camio_rd_buffer_
 }
 
 
-static camio_error_t bring_read_release(camio_stream_t* this, camio_rd_buffer_t** buffer)
+static camio_error_t bring_read_release(camio_channel_t* this, camio_rd_buffer_t** buffer)
 {
     DBG("Doing read release\n");
 
@@ -280,7 +280,7 @@ static camio_error_t bring_read_release(camio_stream_t* this, camio_rd_buffer_t*
         return CAMIO_EINVALID;
     }
 
-    bring_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
+    bring_channel_priv_t* priv = STREAM_GET_PRIVATE(this);
     camio_rd_buffer_t* bring_buffer = *buffer;
 
     //Check that the buffers are being freed in order
@@ -327,7 +327,7 @@ static camio_error_t bring_read_release(camio_stream_t* this, camio_rd_buffer_t*
 /**************************************************************************************************************************
  * WRITE FUNCTIONS
  **************************************************************************************************************************/
-static camio_error_t try_write_acquire(camio_stream_t* this){
+static camio_error_t try_write_acquire(camio_channel_t* this){
     DBG("Doing write acquire\n");
 
     //Basic sanity checks -- TODO XXX: Should these be made into (compile time optional?) asserts for runtime performance?
@@ -335,7 +335,7 @@ static camio_error_t try_write_acquire(camio_stream_t* this){
           DBG("This null???\n"); //WTF?
           return CAMIO_EINVALID;
       }
-      bring_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
+      bring_channel_priv_t* priv = STREAM_GET_PRIVATE(this);
 
       DBG("Trying to do a write acquire at index=%lli\n", priv->wr_rel_index);
 
@@ -363,7 +363,7 @@ static camio_error_t try_write_acquire(camio_stream_t* this){
 
 
 //This should return a buffer when there is one available.
-static camio_error_t bring_write_acquire(camio_stream_t* this, camio_wr_buffer_t** buffer_o)
+static camio_error_t bring_write_acquire(camio_channel_t* this, camio_wr_buffer_t** buffer_o)
 {
     DBG("Doing write acquire\n");
 
@@ -383,7 +383,7 @@ static camio_error_t bring_write_acquire(camio_stream_t* this, camio_wr_buffer_t
         return err;
     }
 
-    bring_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
+    bring_channel_priv_t* priv = STREAM_GET_PRIVATE(this);
 
     camio_buffer_t* result      = &priv->wr_buffers[priv->wr_rel_index];
     volatile char* slot_mem     = (volatile void*)result->__internal.__mem_start;
@@ -400,10 +400,10 @@ static camio_error_t bring_write_acquire(camio_stream_t* this, camio_wr_buffer_t
 }
 
 
-//Try to write to the underlying, stream. This function is private, so no precondition checks necessary
-static camio_error_t bring_write_try(camio_stream_t* this)
+//Try to write to the underlying, channel. This function is private, so no precondition checks necessary
+static camio_error_t bring_write_try(camio_channel_t* this)
 {
-    bring_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
+    bring_channel_priv_t* priv = STREAM_GET_PRIVATE(this);
 
     for(int i = priv->write_req_curr; i < priv->write_req_len; i++, priv->write_req_curr++){
         camio_write_req_t* req = priv->write_req + i;
@@ -459,7 +459,7 @@ static camio_error_t bring_write_try(camio_stream_t* this)
 
 
 //This should queue up a new request or requests.
-static camio_error_t bring_write_request(camio_stream_t* this, camio_write_req_t* req_vec, ch_word req_vec_len)
+static camio_error_t bring_write_request(camio_channel_t* this, camio_write_req_t* req_vec, ch_word req_vec_len)
 {
     //Basic sanity checks -- TODO XXX: Should these be made into (compile time optional?) asserts for runtime performance?
     if( NULL == this){
@@ -467,9 +467,9 @@ static camio_error_t bring_write_request(camio_stream_t* this, camio_write_req_t
         return CAMIO_EINVALID;
     }
 
-    bring_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
+    bring_channel_priv_t* priv = STREAM_GET_PRIVATE(this);
     if(priv->write_registered){
-        ERR("Already registered a write request. Currently this stream only handles one outstanding request at a time\n");
+        ERR("Already registered a write request. Currently this channel only handles one outstanding request at a time\n");
         return CAMIO_EINVALID; //TODO XXX better error code
     }
 
@@ -490,7 +490,7 @@ static camio_error_t bring_write_request(camio_stream_t* this, camio_write_req_t
 
 
 
-//Is the underlying stream done writing and ready for more?
+//Is the underlying channel done writing and ready for more?
 static camio_error_t bring_write_ready(camio_muxable_t* this)
 {
     //Basic sanity checks -- TODO XXX: Should these be made into (compile time optional?) asserts for runtime performance?
@@ -504,7 +504,7 @@ static camio_error_t bring_write_ready(camio_muxable_t* this)
         return CAMIO_EINVALID;
     }
 
-    bring_stream_priv_t* priv = STREAM_GET_PRIVATE(this->parent.stream);
+    bring_channel_priv_t* priv = STREAM_GET_PRIVATE(this->parent.channel);
     if(!priv->write_registered){ //No body has asked us to write anything, so we're not ready
         return CAMIO_ENOTREADY;
     }
@@ -539,8 +539,8 @@ static camio_error_t bring_write_ready(camio_muxable_t* this)
             return CAMIO_ENOTREADY;
         }
 
-        //This is an auto release stream, once you've used the buffer it goes away, you'll need to acquire another
-        camio_error_t err = camio_write_release(this->parent.stream,&req->buffer);
+        //This is an auto release channel, once you've used the buffer it goes away, you'll need to acquire another
+        camio_error_t err = camio_write_release(this->parent.channel,&req->buffer);
         if(err){
             return err;
         }
@@ -558,7 +558,7 @@ static camio_error_t bring_write_ready(camio_muxable_t* this)
 }
 
 
-static camio_error_t bring_write_release(camio_stream_t* this, camio_wr_buffer_t** buffer)
+static camio_error_t bring_write_release(camio_channel_t* this, camio_wr_buffer_t** buffer)
 {
     DBG("Doing write release\n");
 
@@ -585,7 +585,7 @@ static camio_error_t bring_write_release(camio_stream_t* this, camio_wr_buffer_t
         return CAMIO_ENOERROR; //Buffer has already been released
     }
 
-    bring_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
+    bring_channel_priv_t* priv = STREAM_GET_PRIVATE(this);
     //Check that the buffers are being released in order
     if(bring_buffer->__internal.__buffer_id != priv->wr_rel_index){
         ERR("Cannot release this buffer (id=%lli) until buffer with id=%lli is released\n",
@@ -618,14 +618,14 @@ static camio_error_t bring_write_release(camio_stream_t* this, camio_wr_buffer_t
  * SETUP/CLEANUP FUNCTIONS
  **************************************************************************************************************************/
 
-static void bring_destroy(camio_stream_t* this)
+static void bring_destroy(camio_channel_t* this)
 {
     //Basic sanity checks -- TODO XXX: Should these be made into (compile time optional?) asserts for runtime performance?
     if( NULL == this){
         DBG("This null???\n"); //WTF?
         return;
     }
-    bring_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
+    bring_channel_priv_t* priv = STREAM_GET_PRIVATE(this);
 
     if(priv->bring_head){
         munlock((void*)priv->bring_head,priv->bring_head->total_mem);
@@ -643,24 +643,24 @@ static void bring_destroy(camio_stream_t* this)
 
 
 
-camio_error_t bring_stream_construct(
-    camio_stream_t* this,
-    camio_controller_t* connector,
+camio_error_t bring_channel_construct(
+    camio_channel_t* this,
+    camio_controller_t* controller,
     volatile bring_header_t* bring_head,
     bring_params_t* params,
     int fd
 )
 {
 
-    DBG("Constructing bring stream\n");
+    DBG("Constructing bring channel\n");
     //Basic sanity checks -- TODO XXX: Should these be made into (compile time optional?) asserts for runtime performance?
     if( NULL == this){
         ERR("This null???\n"); //WTF?
         return CAMIO_EINVALID;
     }
-    bring_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
+    bring_channel_priv_t* priv = STREAM_GET_PRIVATE(this);
 
-    priv->connector  = *connector; //Keep a copy of the connector state
+    priv->controller  = *controller; //Keep a copy of the controller state
     priv->params     = *params;
     priv->bring_head = bring_head;
 
@@ -719,18 +719,18 @@ camio_error_t bring_stream_construct(
 
 
     this->rd_muxable.mode              = CAMIO_MUX_MODE_READ;
-    this->rd_muxable.parent.stream     = this;
+    this->rd_muxable.parent.channel     = this;
     this->rd_muxable.vtable.ready      = bring_read_ready;
     this->rd_muxable.fd                = fd;
 
     this->wr_muxable.mode              = CAMIO_MUX_MODE_WRITE;
-    this->wr_muxable.parent.stream     = this;
+    this->wr_muxable.parent.channel     = this;
     this->wr_muxable.vtable.ready      = bring_write_ready;
     this->wr_muxable.fd                = fd;
 
-    DBG("Done constructing BRING stream with fd=%i\n", fd);
+    DBG("Done constructing BRING channel with fd=%i\n", fd);
     return CAMIO_ENOERROR;
 }
 
 
-NEW_STREAM_DEFINE(bring,bring_stream_priv_t)
+NEW_STREAM_DEFINE(bring,bring_channel_priv_t)

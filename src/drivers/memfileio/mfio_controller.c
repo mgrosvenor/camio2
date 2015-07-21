@@ -4,7 +4,7 @@
  * See LICENSE.txt for full details. 
  * 
  *  Created:   01 Jul 2015
- *  File name: mfio_connector.h
+ *  File name: mfio_controller.h
  *  Description:
  *  <INSERT DESCRIPTION HERE> 
  */
@@ -18,13 +18,13 @@
 #include <memory.h>
 #include <sys/stat.h>
 
-#include <src/transports/connector.h>
+#include <src/devices/controller.h>
 #include <src/camio.h>
 #include <src/camio_debug.h>
 
-#include "mfio_transport.h"
-#include "mfio_connector.h"
-#include "mfio_stream.h"
+#include "mfio_device.h"
+#include "mfio_controller.h"
+#include "mfio_channel.h"
 
 
 /**************************************************************************************************************************
@@ -39,7 +39,7 @@ typedef struct mfio_priv_s {
     ch_word base_mem_len;         //
     int base_fd;                //File descriptor for the backing buffer
 
-} mfio_connector_priv_t;
+} mfio_controller_priv_t;
 
 
 
@@ -52,7 +52,7 @@ typedef struct mfio_priv_s {
 static camio_error_t mfio_connect_peek(camio_controller_t* this)
 {
     DBG("Doing connect peek\n");
-    mfio_connector_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
+    mfio_controller_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
 
     if(priv->base_fd > -1 ){
         return CAMIO_ENOERROR; //Ready to go, please call connect!
@@ -89,13 +89,13 @@ static camio_error_t mfio_connect_peek(camio_controller_t* this)
 
 }
 
-static camio_error_t mfio_connector_ready(camio_muxable_t* this)
+static camio_error_t mfio_controller_ready(camio_muxable_t* this)
 {
     if(this->fd > -1){
         return CAMIO_EREADY;
     }
 
-    camio_error_t err = mfio_connect_peek(this->parent.connector);
+    camio_error_t err = mfio_connect_peek(this->parent.controller);
     if(err != CAMIO_ENOERROR){
         return err;
     }
@@ -103,9 +103,9 @@ static camio_error_t mfio_connector_ready(camio_muxable_t* this)
     return CAMIO_EREADY;
 }
 
-static camio_error_t mfio_connect(camio_controller_t* this, camio_stream_t** stream_o )
+static camio_error_t mfio_connect(camio_controller_t* this, camio_channel_t** channel_o )
 {
-    mfio_connector_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
+    mfio_controller_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
     camio_error_t err = mfio_connect_peek(this);
     if(err != CAMIO_ENOERROR){
         return err;
@@ -116,15 +116,15 @@ static camio_error_t mfio_connect(camio_controller_t* this, camio_stream_t** str
         return CAMIO_EALLREADYCONNECTED; // We're already connected!
     }
 
-    //DBG("Done connecting, now constructing UDP stream...\n");
-    camio_stream_t* stream = NEW_STREAM(mfio);
-    if(!stream){
-        *stream_o = NULL;
+    //DBG("Done connecting, now constructing UDP channel...\n");
+    camio_channel_t* channel = NEW_STREAM(mfio);
+    if(!channel){
+        *channel_o = NULL;
         return CAMIO_ENOMEM;
     }
-    *stream_o = stream;
+    *channel_o = channel;
 
-    err = mfio_stream_construct(stream, this, priv->base_fd, priv->base_mem_start, priv->base_mem_len);
+    err = mfio_channel_construct(channel, this, priv->base_fd, priv->base_mem_start, priv->base_mem_len);
     if(err){
        return err;
     }
@@ -142,7 +142,7 @@ static camio_error_t mfio_connect(camio_controller_t* this, camio_stream_t** str
 static camio_error_t mfio_construct(camio_controller_t* this, void** params, ch_word params_size)
 {
 
-    mfio_connector_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
+    mfio_controller_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
     //Basic sanity check that the params is the right one.
     if(params_size != sizeof(mfio_params_t)){
         DBG("Bad parameters structure passed\n");
@@ -161,8 +161,8 @@ static camio_error_t mfio_construct(camio_controller_t* this, void** params, ch_
 
     //Populate the rest of the muxable structure
     this->muxable.mode              = CAMIO_MUX_MODE_CONNECT;
-    this->muxable.parent.connector  = this;
-    this->muxable.vtable.ready      = mfio_connector_ready;
+    this->muxable.parent.controller  = this;
+    this->muxable.vtable.ready      = mfio_controller_ready;
     this->muxable.fd                = -1;
 
     return CAMIO_ENOERROR;
@@ -171,14 +171,14 @@ static camio_error_t mfio_construct(camio_controller_t* this, void** params, ch_
 
 static void mfio_destroy(camio_controller_t* this)
 {
-    DBG("Destorying mfio connector\n");
-    mfio_connector_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
+    DBG("Destorying mfio controller\n");
+    mfio_controller_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
 
     if(priv->params) { free(priv->params); }
     DBG("Freed params\n");
     free(this);
-    DBG("Freed connector structure\n");
+    DBG("Freed controller structure\n");
 }
 
-NEW_CONNECTOR_DEFINE(mfio, mfio_connector_priv_t)
+NEW_CONNECTOR_DEFINE(mfio, mfio_controller_priv_t)
 

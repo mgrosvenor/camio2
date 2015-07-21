@@ -4,14 +4,14 @@
  * See LICENSE.txt for full details. 
  * 
  *  Created:   Aug 15, 2014
- *  File name: netmap_connector.c
+ *  File name: netmap_controller.c
  *  Description:
  *  <INSERT DESCRIPTION HERE> 
  */
 
 
-#include "netmap_connector.h"
-#include "netmap_stream.h"
+#include "netmap_controller.h"
+#include "netmap_channel.h"
 #include "../../camio.h"
 #include "../../camio_debug.h"
 #include "netmap.h"
@@ -44,7 +44,7 @@ static camio_error_t netmap_construct(camio_controller_t* this, ch_cstr dev, ch_
 
     netmap_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
 
-    //Not much to do here. The connector doesn't have much internal state that it needs.
+    //Not much to do here. The controller doesn't have much internal state that it needs.
 
     //TODO Should think about making a copy here since these strings could go away between now and when we want to use them
     priv->dev       = dev;
@@ -110,7 +110,7 @@ static camio_error_t netmap_construct_bin(camio_controller_t* this, va_list args
 
 
 
-static camio_error_t netmap_connect(camio_controller_t* this, camio_stream_t** stream_o )
+static camio_error_t netmap_connect(camio_controller_t* this, camio_channel_t** channel_o )
 {
     netmap_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
 
@@ -222,16 +222,16 @@ static camio_error_t netmap_connect(camio_controller_t* this, camio_stream_t** s
     }
     struct netmap_if* net_if = NETMAP_IF(netmap_region, req.nr_offset);
 
-    camio_stream_t* stream = NEW_STREAM(netmap);
-    if(!stream){
-        *stream_o = NULL;
+    camio_channel_t* channel = NEW_STREAM(netmap);
+    if(!channel){
+        *channel_o = NULL;
         return CAMIO_ENOMEM;
     }
-    *stream_o = stream;
-    DBG("Stream address=%p (%p)\n",stream, *stream_o);
+    *channel_o = channel;
+    DBG("Stream address=%p (%p)\n",channel, *channel_o);
 
 
-    return netmap_stream_construct(stream,netmap_fd,net_if,rings_start, rings_end);
+    return netmap_channel_construct(channel,netmap_fd,net_if,rings_start, rings_end);
 }
 
 

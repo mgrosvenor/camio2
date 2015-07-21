@@ -4,7 +4,7 @@
  * See LICENSE.txt for full details. 
  * 
  *  Created:   03 Jul 2015
- *  File name: fio_transport.h
+ *  File name: fio_device.h
  *  Description:
  *  <INSERT DESCRIPTION HERE> 
  */

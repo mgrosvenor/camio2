@@ -23,10 +23,10 @@ typedef struct {
 typedef struct {
     //XXX TODO: Convert to using chaste vector type for more flexibility and power
 
-    //Statically allow up to n streams on this (simple) selector
+    //Statically allow up to n channels on this (simple) selector
     selector_spin_item_t items[SELECTOR_SPIN_MAX_ITEMS];
-    //Number of streams added to the selector
-    int64_t stream_count;
+    //Number of channels added to the selector
+    int64_t channel_count;
     int64_t last;
 } selector_spin_priv;
 

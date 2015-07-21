@@ -5,21 +5,21 @@
  * See LICENSE.txt for full details. 
  * 
  *  Created:   Aug 15, 2014
- *  File name: netmap_stream.c
+ *  File name: netmap_channel.c
  *  Description:
- *  Implements the CamIO netmap stream
+ *  Implements the CamIO netmap channel
  */
 
 
-#include <src/transports/stream.h>
+#include <src/devices/channel.h>
 
 #include "../../camio_debug.h"
 
-#include "netmap_stream.h"
+#include "netmap_channel.h"
 #include "netmap_user.h"
 #include "netmap_buffer.h"
 
-typedef struct netmap_stream_priv_s {
+typedef struct netmap_channel_priv_s {
     ch_word netmap_fd;
     ch_word rings_start;
     ch_word rings_end;
@@ -36,15 +36,15 @@ typedef struct netmap_stream_priv_s {
     ch_word slots_per_buff;
     ch_word total_slots;
 
-} netmap_stream_priv_t;
+} netmap_channel_priv_t;
 
 
-camio_error_t netmap_stream_construct(camio_stream_t* this, ch_word netmap_fd, struct netmap_if* net_if, ch_word rings_start,
+camio_error_t netmap_channel_construct(camio_channel_t* this, ch_word netmap_fd, struct netmap_if* net_if, ch_word rings_start,
         ch_word rings_end)
 {
     DBG("rings_start=%i,rings_end=%i\n", rings_start, rings_end);
 
-    netmap_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
+    netmap_channel_priv_t* priv = STREAM_GET_PRIVATE(this);
     priv->netmap_fd     = netmap_fd;
     priv->net_if        = net_if;
     priv->rings_start   = rings_start;
@@ -132,9 +132,9 @@ camio_error_t netmap_stream_construct(camio_stream_t* this, ch_word netmap_fd, s
 }
 
 
-static void netmap_destroy(camio_stream_t* this)
+static void netmap_destroy(camio_channel_t* this)
 {
-    netmap_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
+    netmap_channel_priv_t* priv = STREAM_GET_PRIVATE(this);
     if(priv->tx_buffers){
         free(priv->tx_buffers);
         priv->tx_buffers = NULL;
@@ -187,10 +187,10 @@ static void netmap_destroy(camio_stream_t* this)
 // RX  [.......hhhRRRRRRRRRRRR....]
 
 
-static camio_error_t netmap_read_acquire( camio_stream_t* this,  camio_rd_buffer_t** buffer_chain_o,  ch_word* chain_len_o,
+static camio_error_t netmap_read_acquire( camio_channel_t* this,  camio_rd_buffer_t** buffer_chain_o,  ch_word* chain_len_o,
         ch_word buffer_offset, ch_word source_offset)
 {
-    netmap_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
+    netmap_channel_priv_t* priv = STREAM_GET_PRIVATE(this);
 
     (void)buffer_offset; //Not supported
     (void)source_offset; //Not supported
@@ -236,9 +236,9 @@ static camio_error_t netmap_read_acquire( camio_stream_t* this,  camio_rd_buffer
 }
 
 
-static camio_error_t netmap_read_release(camio_stream_t* this, camio_rd_buffer_t* buffer_chain)
+static camio_error_t netmap_read_release(camio_channel_t* this, camio_rd_buffer_t* buffer_chain)
 {
-    netmap_stream_priv_t* priv = STREAM_GET_PRIVATE(this);
+    netmap_channel_priv_t* priv = STREAM_GET_PRIVATE(this);
 
     //Walk to the end of the chain,
     camio_rd_buffer_t* buffer_curr = buffer_chain;
@@ -262,7 +262,7 @@ static camio_error_t netmap_read_release(camio_stream_t* this, camio_rd_buffer_t
 }
 
 
-static camio_error_t netmap_write_acquire(camio_stream_t* this, camio_wr_buffer_t** buffer_chain_o, ch_word* count_io)
+static camio_error_t netmap_write_acquire(camio_channel_t* this, camio_wr_buffer_t** buffer_chain_o, ch_word* count_io)
 {
     (void)this;
     (void)buffer_chain_o;
@@ -271,7 +271,7 @@ static camio_error_t netmap_write_acquire(camio_stream_t* this, camio_wr_buffer_
 }
 
 
-static camio_error_t netmap_write_commit(camio_stream_t* this, camio_wr_buffer_t* buffer_chain, ch_word buffer_offset,
+static camio_error_t netmap_write_commit(camio_channel_t* this, camio_wr_buffer_t* buffer_chain, ch_word buffer_offset,
         ch_word dest_offset)
 {
     (void)this;
@@ -282,7 +282,7 @@ static camio_error_t netmap_write_commit(camio_stream_t* this, camio_wr_buffer_t
 }
 
 
-static camio_error_t netmap_write_release(camio_stream_t* this, camio_wr_buffer_t* buffers_chain)
+static camio_error_t netmap_write_release(camio_channel_t* this, camio_wr_buffer_t* buffers_chain)
 {
     (void)this;
     (void)buffers_chain;
@@ -290,6 +290,6 @@ static camio_error_t netmap_write_release(camio_stream_t* this, camio_wr_buffer_
 }
 
 
-NEW_STREAM_DEFINE(netmap,netmap_stream_priv_t)
+NEW_STREAM_DEFINE(netmap,netmap_channel_priv_t)
 
 

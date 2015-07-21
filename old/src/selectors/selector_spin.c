@@ -11,14 +11,14 @@
 #include "selector_spin.h"
 
 
-//Insert an istream at index specified
+//Insert an ichannel at index specified
 static int insert(ciosel* this, cioselable* item, size_t index){
     selector_spin_priv* priv = this->__priv;
     if(!item){
         return CIO_NOTSELECTABLE;
     }
 
-    if(priv->stream_count >= SELECTOR_SPIN_MAX_ITEMS){
+    if(priv->channel_count >= SELECTOR_SPIN_MAX_ITEMS){
         return CIO_SELECTORFULL;
     }
 
@@ -27,9 +27,9 @@ static int insert(ciosel* this, cioselable* item, size_t index){
         if(priv->items[i].selectable == NULL){
             priv->items[i].index = index;
             priv->items[i].selectable = item;
-            priv->stream_count++;
-            //printf("[0x%016lx] selector added at index %i\n", priv->streams[i].index, i);
-            return priv->stream_count;
+            priv->channel_count++;
+            //printf("[0x%016lx] selector added at index %i\n", priv->channels[i].index, i);
+            return priv->channel_count;
         }
     }
 
@@ -39,11 +39,11 @@ static int insert(ciosel* this, cioselable* item, size_t index){
 
 static size_t count(ciosel* this){
     selector_spin_priv* priv = this->__priv;
-    return priv->stream_count;
+    return priv->channel_count;
 }
 
 
-//Remove the istream at index specified
+//Remove the ichannel at index specified
 static remove(ciosel* this, size_t index){
     selector_spin_priv* priv = this->__priv;
 
@@ -51,8 +51,8 @@ static remove(ciosel* this, size_t index){
     for(i = 0; i < SELECTOR_SPIN_MAX_ITEMS; i++ ){
         if(priv->items[i].index == index){
             priv->items[i].selectable = NULL;
-            //printf("[0x%016lx] selector removed at index %lu\n", priv->streams[i].index, i);
-            priv->stream_count--;
+            //printf("[0x%016lx] selector removed at index %lu\n", priv->channels[i].index, i);
+            priv->channel_count--;
             return 0;
         }
     }
@@ -66,14 +66,14 @@ static remove(ciosel* this, size_t index){
 }
 
 //Block waiting for a change on a given selectable
-//return the stream index that changed
+//return the channel index that changed
 //Stream indexes are maintained by the user
 static size_t select(ciosel* this){
     selector_spin_priv* priv = this->__priv;
 
-    size_t i = (priv->last + 1) % priv->stream_count; //Start from the next stream to avoid starvation
+    size_t i = (priv->last + 1) % priv->channel_count; //Start from the next channel to avoid starvation
     while(1){
-        for(; i < priv->stream_count; i++){
+        for(; i < priv->channel_count; i++){
             if(likely(priv->items[i].selectable != NULL)){
                 if(likely(priv->items[i].selectable->ready(priv->items[i].selectable))){
                     priv->last = i;
@@ -128,7 +128,7 @@ ciosel* new_selector_spin(){
 
     //Set up private data
     selector->__priv       = priv;
-    priv->stream_count     = 0;
+    priv->channel_count     = 0;
     priv->last             = 0;
     bzero(&priv->items,sizeof(selector_spin_item_t) * SELECTOR_SPIN_MAX_ITEMS) ;
 

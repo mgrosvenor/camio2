@@ -4,24 +4,24 @@
  * See LICENSE.txt for full details. 
  * 
  *  Created:   03 Jul 2015
- *  File name: stdio_connector.h
+ *  File name: stdio_controller.h
  *  Description:
  *  <INSERT DESCRIPTION HERE> 
  */
 
-#include <src/transports/connector.h>
+#include <src/devices/controller.h>
 #include <src/camio.h>
 #include <src/camio_debug.h>
 
-#include <src/drivers/fileio/fio_connector.h>
-#include "stdio_transport.h"
-#include "stdio_connector.h"
+#include <src/drivers/fileio/fio_controller.h>
+#include "stdio_device.h"
+#include "stdio_controller.h"
 
 
 /**************************************************************************************************************************
  * Connect functions --proxy all of these functions and data through to fio. Doing this means there's no runtime cost
  **************************************************************************************************************************/
-typedef fio_connector_priv_t stdio_connector_priv_t;
+typedef fio_controller_priv_t stdio_controller_priv_t;
 
 extern camio_error_t fio_connect_peek(camio_controller_t* this);
 #define stdio_connect_peek fio_connect_peek
@@ -29,7 +29,7 @@ extern camio_error_t fio_connect_peek(camio_controller_t* this);
 extern camio_error_t fio_connect_ready(camio_controller_t* this);
 #define stdio_connect_ready fio_connect_ready
 
-extern camio_error_t fio_connect(camio_controller_t* this, camio_stream_t** stream_o );
+extern camio_error_t fio_connect(camio_controller_t* this, camio_channel_t** channel_o );
 #define stdio_connect fio_connect
 
 
@@ -87,4 +87,4 @@ static camio_error_t stdio_construct(camio_controller_t* this, void** params, ch
 extern void fio_destroy(camio_controller_t* this);
 #define stdio_destroy fio_destroy
 
-NEW_CONNECTOR_DEFINE(stdio, stdio_connector_priv_t)
+NEW_CONNECTOR_DEFINE(stdio, stdio_controller_priv_t)

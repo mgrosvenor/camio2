@@ -4,7 +4,7 @@
 
 
 #include <stdio.h>
-#include "ciostreams/ciostream.h"
+#include "ciochannels/ciochannel.h"
 
 int main(int argc, char** argv)
 {

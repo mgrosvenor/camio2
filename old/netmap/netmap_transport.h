@@ -4,7 +4,7 @@
  * See LICENSE.txt for full details. 
  * 
  *  Created:   Aug 16, 2014
- *  File name: netmap_transport.h
+ *  File name: netmap_device.h
  *  Description:
  *  <INSERT DESCRIPTION HERE> 
  */
@@ -12,7 +12,7 @@
 #ifndef NETMAP_TRANSPORT_H_
 #define NETMAP_TRANSPORT_H_
 
-#include <src/drivers/netmap/netmap_connector.h>
+#include <src/drivers/netmap/netmap_controller.h>
 
 
 typedef struct netmap_global_s{

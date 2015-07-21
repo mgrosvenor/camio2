@@ -4,19 +4,19 @@
  * See LICENSE.txt for full details. 
  * 
  *  Created:   17 Nov 2014
- *  File name: udp_stream.h
+ *  File name: udp_channel.h
  *  Description:
  *  <INSERT DESCRIPTION HERE> 
  */
 #ifndef SRC_DRIVERS_UDP_UDP_STREAM_H_
 #define SRC_DRIVERS_UDP_UDP_STREAM_H_
 
-#include <src/transports/stream.h>
-#include <src/transports/connector.h>
-#include "udp_transport.h"
+#include <src/devices/channel.h>
+#include <src/devices/controller.h>
+#include "udp_device.h"
 
 NEW_STREAM_DECLARE(udp);
 
-camio_error_t udp_stream_construct(camio_stream_t* this, camio_controller_t* connector, udp_params_t* params, int rd_fd, int wr_fd);
+camio_error_t udp_channel_construct(camio_channel_t* this, camio_controller_t* controller, udp_params_t* params, int rd_fd, int wr_fd);
 
 #endif /* SRC_DRIVERS_UDP_UDP_STREAM_H_ */

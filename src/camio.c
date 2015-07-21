@@ -342,7 +342,7 @@ exit_uri:
 
 
 
-camio_error_t camio_device_constr(ch_word id, void** params, ch_word params_size, camio_controller_t** connector_o)
+camio_error_t camio_device_constr(ch_word id, void** params, ch_word params_size, camio_controller_t** controller_o)
 {
     CH_VECTOR(CAMIO_TRANSPORT_STATE_VEC)* trans_state = __camio_state_container.trans_state;
     camio_device_state_t* state = trans_state->off(trans_state,id);
@@ -351,7 +351,7 @@ camio_error_t camio_device_constr(ch_word id, void** params, ch_word params_size
         return CAMIO_EINDEXNOTFOUND;
     }
 
-    return state->construct(params,params_size,connector_o);
+    return state->construct(params,params_size,controller_o);
 }
 
 

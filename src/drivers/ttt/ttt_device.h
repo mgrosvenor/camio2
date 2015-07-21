@@ -4,7 +4,7 @@
  * See LICENSE.txt for full details. 
  * 
  *  Created:   PPP ZZZZ
- *  File name: ttt_transport.h
+ *  File name: ttt_device.h
  *  Description:
  *  <INSERT DESCRIPTION HERE> 
  */
@@ -13,7 +13,7 @@
 
 #include <src/types/len_string.h>
 
-#include "ttt_connector.h"
+#include "ttt_controller.h"
 
 typedef struct ttt_global_s{
     ch_bool is_init;
