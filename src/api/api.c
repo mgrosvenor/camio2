@@ -49,7 +49,7 @@ inline camio_error_t camio_controller_ready( camio_controller_t* this)
 }
 
 
-inline camio_error_t camio_read_request(camio_channel_t* this, camio_read_req_t* req_vec, ch_word req_vec_len )
+inline camio_error_t camio_read_request(camio_channel_t* this, camio_rd_req_t* req_vec, ch_word req_vec_len )
 {
     return this->vtable.read_request(this, req_vec, req_vec_len);
 }
@@ -79,7 +79,7 @@ inline camio_error_t camio_write_acquire(camio_channel_t* this, camio_wr_buffer_
 }
 
 
-inline camio_error_t camio_write_request(camio_channel_t* this, camio_write_req_t* req_vec, ch_word req_vec_len)
+inline camio_error_t camio_write_request(camio_channel_t* this, camio_wr_req_t* req_vec, ch_word req_vec_len)
 {
     return this->vtable.write_request(this, req_vec, req_vec_len);
 }

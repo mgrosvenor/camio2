@@ -37,7 +37,7 @@ typedef struct delim_channel_priv_s {
 
     //The base variables are used to gather data from the underlying channel
     camio_buffer_t* rd_base_buff;
-    camio_read_req_t* rd_base_req_vec;
+    camio_rd_req_t* rd_base_req_vec;
     ch_word rd_base_req_vec_len;
     ch_bool rd_base_registered;
 
@@ -252,7 +252,7 @@ static camio_error_t delim_read_ready(camio_muxable_t* this)
 
 }
 
-static camio_error_t delim_read_request(camio_channel_t* this, camio_read_req_t* req_vec, ch_word req_vec_len)
+static camio_error_t delim_read_request(camio_channel_t* this, camio_rd_req_t* req_vec, ch_word req_vec_len)
 {
     DBG("Doing delim read request...!\n");
    /* //Basic sanity checks -- TODO  Should these be made into (compile time optional?) asserts for runtime performance?
@@ -505,7 +505,7 @@ static camio_error_t delim_write_acquire(camio_channel_t* this, camio_wr_buffer_
 }
 
 
-static camio_error_t delim_write_request(camio_channel_t* this, camio_write_req_t* req_vec, ch_word req_vec_len)
+static camio_error_t delim_write_request(camio_channel_t* this, camio_wr_req_t* req_vec, ch_word req_vec_len)
 {
     //Basic sanity checks -- TODO DELIM: Should these be made into (compile time optional?) asserts for runtime performance?
     if( NULL == this){

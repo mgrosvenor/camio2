@@ -35,7 +35,7 @@ typedef struct mfio_channel_priv_s {
     camio_buffer_t mmap_rd_buff;
     ch_bool read_registered;    //Has a read been registered?
     ch_bool read_ready;         //Is the channel ready for reading? (for edge triggered multiplexers)
-    camio_read_req_t* read_req;  //Read request vector to put data into when there is new data
+    camio_rd_req_t* read_req;  //Read request vector to put data into when there is new data
     ch_word read_req_len;       //size of the request vector
     ch_word read_req_curr;      //This will be needed later
 
@@ -45,7 +45,7 @@ typedef struct mfio_channel_priv_s {
     ch_bool write_acquired;       //Has a write alreay been acquired?
     ch_bool write_registered;     //Has a write been registered?
     ch_bool write_ready;          //Is the channel ready for writing (for edge triggered multiplexers)
-    camio_write_req_t* write_req;  //Write request vector to take data out of when there is new data.
+    camio_wr_req_t* write_req;  //Write request vector to take data out of when there is new data.
     ch_word write_req_len;        //size of the request vector
     ch_word write_req_curr;
 
@@ -76,7 +76,7 @@ static camio_error_t mfio_read_peek( camio_channel_t* this)
         return CAMIO_ECLOSED;
     }
 
-    camio_read_req_t* req = &priv->read_req[0]; //Assume that req_len == 1
+    camio_rd_req_t* req = &priv->read_req[0]; //Assume that req_len == 1
 
     //WARNING: Code below here assumes that req len == 1!!
     if( req->src_offset_hint != CAMIO_READ_REQ_SRC_OFFSET_NONE){
@@ -173,7 +173,7 @@ static camio_error_t mfio_read_ready(camio_muxable_t* this)
 
 }
 
-static camio_error_t mfio_read_request( camio_channel_t* this, camio_read_req_t* req_vec, ch_word req_vec_len )
+static camio_error_t mfio_read_request( camio_channel_t* this, camio_rd_req_t* req_vec, ch_word req_vec_len )
 {
     DBG("Doing MFIO read request...!\n");
     //Basic sanity checks -- TODO XXX: Should these be made into (compile time optional?) asserts for runtime performance?
@@ -331,7 +331,7 @@ static camio_error_t mfio_write_acquire(camio_channel_t* this, camio_wr_buffer_t
 }
 
 
-static camio_error_t mfio_write_request(camio_channel_t* this, camio_write_req_t* req_vec, ch_word req_vec_len)
+static camio_error_t mfio_write_request(camio_channel_t* this, camio_wr_req_t* req_vec, ch_word req_vec_len)
 {
     //Basic sanity checks -- TODO XXX: Should these be made into (compile time optional?) asserts for runtime performance?
     if( NULL == this){
@@ -367,7 +367,7 @@ static camio_error_t mfio_write_try(camio_channel_t* this)
 {
     mfio_channel_priv_t* priv = STREAM_GET_PRIVATE(this);
 
-    camio_write_req_t* req = &priv->write_req[0];
+    camio_wr_req_t* req = &priv->write_req[0];
 
     if(req->buffer->__internal.__parent != this){
         //TODO XXX could add this feature but it would be non-trivial

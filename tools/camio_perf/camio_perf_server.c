@@ -67,7 +67,7 @@ static camio_error_t connect_delim(ch_cstr client_channel_uri, camio_controller_
     return CAMIO_ENOERROR;
 }
 
-static camio_read_req_t rreq;
+static camio_rd_req_t rreq;
 
 int camio_perf_server(ch_cstr client_channel_uri, ch_word* stop)
 {

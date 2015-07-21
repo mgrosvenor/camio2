@@ -44,7 +44,7 @@ typedef struct bring_channel_priv_s {
     camio_buffer_t* rd_buffers;     //All buffers for the read side;
     ch_word rd_buffers_count;
     camio_buffer_t* rd_buff;        //A place to keep a read buffer until it's ready to be consumed
-    camio_read_req_t* read_req;     //Read request vector to put data into when there is new data
+    camio_rd_req_t* read_req;     //Read request vector to put data into when there is new data
     ch_word read_req_len;           //size of the request vector
     ch_word read_req_curr;          //This will be needed later
     ch_word rd_sync_counter;            //Synchronization counter
@@ -57,7 +57,7 @@ typedef struct bring_channel_priv_s {
     ch_bool write_ready;          //Is the channel ready for writing (for edge triggered multiplexers)
     camio_buffer_t* wr_buffers;   //All buffers for the write side;
     ch_word wr_buffers_count;
-    camio_write_req_t* write_req; //Write request vector to take data out of when there is new data.
+    camio_wr_req_t* write_req; //Write request vector to take data out of when there is new data.
     ch_word write_req_len;        //size of the request vector
     ch_word write_req_curr;
     ch_word write_ready_curr;
@@ -185,7 +185,7 @@ static camio_error_t bring_read_ready(camio_muxable_t* this)
 
 }
 
-static camio_error_t bring_read_request( camio_channel_t* this, camio_read_req_t* req_vec, ch_word req_vec_len )
+static camio_error_t bring_read_request( camio_channel_t* this, camio_rd_req_t* req_vec, ch_word req_vec_len )
 {
     DBG("Doing bring read request...!\n");
     //Basic sanity checks -- TODO XXX: Should these be made into (compile time optional?) asserts for runtime performance?
@@ -406,7 +406,7 @@ static camio_error_t bring_write_try(camio_channel_t* this)
     bring_channel_priv_t* priv = STREAM_GET_PRIVATE(this);
 
     for(int i = priv->write_req_curr; i < priv->write_req_len; i++, priv->write_req_curr++){
-        camio_write_req_t* req = priv->write_req + i;
+        camio_wr_req_t* req = priv->write_req + i;
         camio_buffer_t* buff   = req->buffer;
 
         //Check that the buffers are being used in order
@@ -459,7 +459,7 @@ static camio_error_t bring_write_try(camio_channel_t* this)
 
 
 //This should queue up a new request or requests.
-static camio_error_t bring_write_request(camio_channel_t* this, camio_write_req_t* req_vec, ch_word req_vec_len)
+static camio_error_t bring_write_request(camio_channel_t* this, camio_wr_req_t* req_vec, ch_word req_vec_len)
 {
     //Basic sanity checks -- TODO XXX: Should these be made into (compile time optional?) asserts for runtime performance?
     if( NULL == this){
@@ -510,7 +510,7 @@ static camio_error_t bring_write_ready(camio_muxable_t* this)
     }
 
     for(int i = priv->write_ready_curr; i < priv->write_req_len; i++ ){
-        camio_write_req_t* req = priv->write_req + i;
+        camio_wr_req_t* req = priv->write_req + i;
         camio_buffer_t* buff   = req->buffer;
 
         //Check that the buffers are being used in order

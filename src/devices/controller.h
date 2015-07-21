@@ -18,6 +18,14 @@
 #include <src/multiplexers/muxable.h>
 #include <src/utils/uri_parser/uri_parser.h>
 
+typedef struct camio_chan_req_s {
+    camio_channel_t* channel;
+    ch_word id;
+    ch_word status;
+} camio_chan_req_t;
+
+#define CAMIO_CTRL_REQ_INF 0x001
+
 
 typedef camio_error_t (*camio_conn_construct_f)(camio_controller_t* controller_o, void** params, ch_word params_size);
 

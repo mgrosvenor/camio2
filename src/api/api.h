@@ -21,31 +21,51 @@
 #include <src/devices/features.h>
 #include <src/multiplexers/mux.h>
 #include <src/devices/channel.h>
+#include <src/devices/controller.h>
 
 
 /**************************************************************************************************************************
  * Control Plane Operations - Controller
  **************************************************************************************************************************/
-
-camio_error_t camio_configure( camio_controller_t* this, void* params, size_t param_size);
-
-
-typedef struct camio_channel_req_s {
-    camio_channel_t* channel;
-    ch_word id;
-} camio_channel_req_t;
+/**
+ *  CamIO Control, Channel Request
+ *  Tell the controller that we would like to obtain a communication channel on this device. Some devices will support many
+ *  channels. Some devices will support only one. The request is issued as a vector of request structures, with length
+ *  vec_len. The device may have a limited number of request slots.
+ *  Return values:
+ *  CAMIO_ENOERROR - the request was accepted into the queue
+ *  CAMIO_ETOOMANY - the request slots have run-out
+ *  CAMIO_ENOMORE  - the device has run out of communication channels, no more requests will succeed.
+ */
+camio_error_t camio_ctrl_chan_req( camio_controller_t* this, camio_chan_req_t* req_vec, ch_word vec_len, ch_word flags );
 
 
 /**
- *  Tell the controller that we would like an unlerlying channel.
+ * CamIO Control, Channel Request Ready
+ * The ready function checks to see if there is a new response (to a channel request) waiting. It will return
+ * CAMIO_ENOERROR if there is a response waiting, or CAMIO_ETRYAGAIN if there is no response waiting.
+ * Return values:
+ * CAMIO_NOERROR - there is a new channel request response waiting
+ *
  */
-camio_error_t camio_channel_request( camio_controller_t* this, camio_channel_req_t* req_vec, ch_word vec_len );
+camio_error_t camio_ctrl_chan_ready( camio_controller_t* this );
 
 
 /**
- * When the channel_ is ready to connect. A controller is ready if calling connect will be non-blocking.
+ *  CamIO Control, Channel Response / Result
+ * When a channel status available, the  will return CAMIO_ENOERROR and the req_vec_o pointer will be populated with a
+ * pointer to a valid channel. Otherwise, the result in req_vec_o is unspecified.
+ *
+ * Return values:
+ * CAMIO_ENOERROR
  */
-camio_error_t camio_channel_req_ready( camio_controller_t* this, ch_word* id_o);
+camio_error_t camio_ctrl_chan_res( camio_controller_t* this, camio_chan_req_t** req_o );
+
+
+/**
+ * Configure properties of the device
+ */
+camio_error_t camio_ctrl_config( camio_controller_t* this, void* params, size_t param_size);
 
 
 /**
@@ -89,11 +109,7 @@ camio_error_t camio_mux_remove(camio_mux_t* this, camio_muxable_t* muxable);
  * - ENOERROR: All good, please continue.
  * - TODO XXX: More errors here
  */
-camio_error_t camio_mux_select(camio_mux_t* this,
-    /*struct timespec timeout,*/
-    camio_muxable_t** muxable_o,
-    ch_word id;
-);
+camio_error_t camio_mux_select(camio_mux_t* this, camio_muxable_t** muxable_o, ch_word* id );
 
 
 ch_word camio_mux_count(camio_mux_t* this);
@@ -140,17 +156,17 @@ void camio_mux_destroy(camio_mux_t* this);
  * TODO XXX: Another way to build this interface would be to register the buffer pointer here as well. I feel that it is less
  * elegant as the meaning of the API is now obscured, but it could be faster. Hmmm.. Defer to a later decision point
  */
-camio_error_t camio_read_request( camio_channel_t* this, camio_read_req_t* req_vec, ch_word req_vec_len );
+camio_error_t camio_chan_rd_req( camio_channel_t* this, camio_rd_req_t* req_vec, ch_word vec_len );
 
 
 /**
  * Check if the channel is ready to read. A controller is ready if calling read will be non-blocking.
  * Return values:
- * - EREADY - the channel is ready to be read
- * - ENOTREDY - the channel is not ready to be read, try again later
+ * - ENOERROR - the channel is ready to be read
+ * - ETRYAGAIN - the channel is not ready to be read, try again later
  * - other - some other error has happened on the underlying channel
  */
-camio_error_t camio_read_ready( camio_channel_t* this);
+camio_error_t camio_chan_rd_ready( camio_channel_t* this);
 
 
 /**
@@ -163,7 +179,7 @@ camio_error_t camio_read_ready( camio_channel_t* this);
  * - ENOBUFFS:  The channel could not allocate more buffers for the read. Free some buffers by releasing an outstanding read
  *              or write transaction.
  */
-camio_error_t camio_read_acquire( camio_channel_t* this,  camio_rd_buffer_t** buffer_o);
+camio_error_t camio_chan_rd_res( camio_channel_t* this, camio_rd_req_t** req_o);
 
 
 /**
@@ -178,7 +194,7 @@ camio_error_t camio_read_acquire( camio_channel_t* this,  camio_rd_buffer_t** bu
  * - EINVALID: Your data got trashed, time to recover!
  * - EBADSEQ:  You cannot release this buffer without releasing previous buffers in the sequence too
  */
-camio_error_t camio_read_release(camio_channel_t* this, camio_rd_buffer_t** buffer);
+camio_error_t camio_chan_rd_rel(camio_channel_t* this, camio_rd_buffer_t** buffer);
 
 
 /**************************************************************************************************************************
@@ -194,13 +210,24 @@ camio_error_t camio_read_release(camio_channel_t* this, camio_rd_buffer_t** buff
  *  - ENOSLOTS: The channel could not allocate more slots for the read. Free some slots by releasing a read or write
  *              transaction.
  */
-camio_error_t camio_write_acquire(camio_channel_t* this, camio_wr_buffer_t** buffer_o);
+camio_error_t camio_chan_wr_buff_req(camio_channel_t* this, camio_wr_req_t* req_vec, ch_word vec_len);
 
 /**
- * Check if the channel is ready to write. A controller is ready if calling write will be non-blocking.
+ * Try to acquire a buffer for writing data into. You can hang on to this buffers as long as the channel permits, but beware,
+ * most channels offer a limited number of buffers, some channels can only acquire and release buffers sequentially and some
+ * channels offer only one buffer. If you are using channel association for zero-copy data movement, calling read_aquire has
+ * the effect of calling write_acquire.
+ * Returns:
+ *  - ENOERROR: Completed successfully, buffer_o contains a valid structure.
+ *  - ENOSLOTS: The channel could not allocate more slots for the read. Free some slots by releasing a read or write
+ *              transaction.
  */
-camio_error_t camio_write_ready( camio_channel_t* this);
+camio_error_t camio_chan_wr_buff_ready(camio_channel_t* this);
 
+/**
+ * Try get the results of a write buffer request
+ */
+camio_error_t camio_chan_wr_buff_res(camio_channel_t* this, camio_wr_req_t** req_O);
 
 
 /* Write data described by the , or buffer_chain to the channel called 'this'. Write may or may not block. Use a
@@ -211,7 +238,18 @@ camio_error_t camio_write_ready( camio_channel_t* this);
  * - ENOERROR: Completed successfully.
  * - TODO XXX: Add more here
  */
-camio_error_t camio_write_request(camio_channel_t* this, camio_write_req_t* req_vec, ch_word req_vec_len);
+camio_error_t camio_chan_wr_req(camio_channel_t* this, camio_wr_req_t* req_vec, ch_word vec_len);
+
+/**
+ * Check if the channel is ready to write.
+ */
+camio_error_t camio_write_ready( camio_channel_t* this);
+
+/**
+ * Try get the results of a write request
+ */
+camio_error_t camio_chan_wr_res(camio_channel_t* this, camio_wr_req_t** req_o);
+
 
 
 /**
@@ -221,7 +259,7 @@ camio_error_t camio_write_request(camio_channel_t* this, camio_write_req_t* req_
  * - ENOERROR: All good, please continue.
  * - EBADSEQ:  You cannot release this buffer without releasing previous buffers in the sequence too.
  */
-camio_error_t camio_write_release(camio_channel_t* this, camio_wr_buffer_t** buffer);
+camio_error_t camio_chan_wr_rel(camio_channel_t* this, camio_wr_buffer_t** buffer);
 
 
 /**
@@ -231,7 +269,7 @@ void camio_channel_destroy(camio_channel_t* this);
 
 
 /**************************************************************************************************************************
- * Data Plane Operations - Write
+ * Data Plane Operations - Read <--> Write
  **************************************************************************************************************************/
 
 /**

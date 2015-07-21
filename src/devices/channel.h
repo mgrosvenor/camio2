@@ -26,7 +26,8 @@ typedef struct camio_read_req_s {
     ch_word src_offset_hint;
     ch_word dst_offset_hint;
     ch_word read_size_hint;
-} camio_read_req_t;
+    ch_word status;
+} camio_rd_req_t;
 
 #define CAMIO_WRITE_REQ_DST_OFFSET_NONE (-1)
 #define CAMIO_WRITE_REQ_SRC_OFFSET_NONE (0)
@@ -34,7 +35,8 @@ typedef struct camio_write_req_s {
     ch_word src_offset_hint;
     ch_word dst_offset_hint;
     camio_wr_buffer_t* buffer;
-} camio_write_req_t;
+    ch_word status;
+} camio_wr_req_t;
 
 
 /**
@@ -45,13 +47,13 @@ typedef struct camio_channel_interface_s{
     void (*destroy)(camio_channel_t* this);
 
     //Read operations
-    camio_error_t (*read_request)(camio_channel_t* this, camio_read_req_t* req_vec, ch_word req_vec_len );
+    camio_error_t (*read_request)(camio_channel_t* this, camio_rd_req_t* req_vec, ch_word req_vec_len );
     camio_error_t (*read_acquire)(camio_channel_t* this, camio_rd_buffer_t** buffer_o);
     camio_error_t (*read_release)(camio_channel_t* this, camio_wr_buffer_t** buffer_o);
 
     //Write operations
     camio_error_t (*write_acquire)(camio_channel_t* this, camio_wr_buffer_t** buffer_o);
-    camio_error_t (*write_request)(camio_channel_t* this, camio_write_req_t* req_vec, ch_word req_vec_len);
+    camio_error_t (*write_request)(camio_channel_t* this, camio_wr_req_t* req_vec, ch_word req_vec_len);
     camio_error_t (*write_release)(camio_channel_t* this, camio_wr_buffer_t** buffer);
 
 } camio_channel_interface_t;

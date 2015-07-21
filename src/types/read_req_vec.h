@@ -18,8 +18,8 @@
 #include <deps/chaste/data_structs/vector/vector_typed_declare_template.h>
 #include <src/utils/uri_parser/uri_parser.h>
 
-declare_ch_vector(CAMIO_RREQ,camio_read_req_t)
-declare_ch_vector_cmp(CAMIO_RREQ,camio_read_req_t)
+declare_ch_vector(CAMIO_RREQ,camio_rd_req_t)
+declare_ch_vector_cmp(CAMIO_RREQ,camio_rd_req_t)
 
 
 #endif /* SRC_TYPES_CHANNEL_STATE_VEC_H_ */

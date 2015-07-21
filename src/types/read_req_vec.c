@@ -17,11 +17,11 @@
 
 //TODO XXX: Rename this to "device state" to make the naming consistent.
 
-define_ch_vector(CAMIO_RREQ,camio_read_req_t)
+define_ch_vector(CAMIO_RREQ,camio_rd_req_t)
 
 //Compare only the scheme name and length
 //TODO XXX: Port this to using the chaste generic hash map ... when it exists
-define_ch_vector_compare(CAMIO_RREQ,camio_read_req_t)
+define_ch_vector_compare(CAMIO_RREQ,camio_rd_req_t)
 {
 
 //    printf("Comparing %.*s [%i] with %.*s [%i]\n",

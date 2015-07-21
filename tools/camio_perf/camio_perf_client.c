@@ -64,7 +64,7 @@ static camio_error_t connect_delim(ch_cstr client_channel_uri, camio_controller_
     return CAMIO_ENOERROR;
 }
 
-static camio_write_req_t wreq;
+static camio_wr_req_t wreq;
 static camio_error_t send_message(camio_muxable_t* muxable, ch_word ts, ch_word seq)
 {
     camio_error_t err = CAMIO_ENOERROR;

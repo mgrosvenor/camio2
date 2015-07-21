@@ -94,7 +94,7 @@ int main(int argc, char** argv)
     camio_rd_buffer_t* rd_buffer = NULL;
     camio_muxable_t* muxable     = NULL;
     ch_word which                = -1;
-    camio_read_req_t  rd_req = {
+    camio_rd_req_t  rd_req = {
             .src_offset_hint = CAMIO_READ_REQ_SRC_OFFSET_NONE,
             .dst_offset_hint = CAMIO_READ_REQ_DST_OFFSET_NONE,
             .read_size_hint  = CAMIO_READ_REQ_SIZE_ANY
