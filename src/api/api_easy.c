@@ -12,13 +12,13 @@
 #include <src/camio_debug.h>
 #include <assert.h>
 
-camio_error_t camio_stream_new(char* uri, camio_stream_t** stream)
+camio_error_t camio_channel_new(char* uri, camio_channel_t** channel)
 {
    //Make and populate a parameters structure
    void* params;
    ch_word params_size;
    ch_word id;
-   camio_error_t err = camio_transport_params_new(uri,&params, &params_size, &id);
+   camio_error_t err = camio_device_params_new(uri,&params, &params_size, &id);
    if(err){
        DBG("Could not convert parameters into structure\n");
        return CAMIO_EINVALID; //TODO XXX put a better error here
@@ -26,8 +26,8 @@ camio_error_t camio_stream_new(char* uri, camio_stream_t** stream)
    //DBG("Got parameter at %p with size %i and id=%i\n", params, params_size, id);
 
    //Use the parameters structure to construct a new connector object
-   camio_connector_t* connector = NULL;
-   err = camio_transport_constr(id,&params,params_size,&connector);
+   camio_controller_t* connector = NULL;
+   err = camio_device_constr(id,&params,params_size,&connector);
    if(err){
        DBG("Could not construct connector\n");
        return CAMIO_EINVALID; //TODO XXX put a better error here
@@ -59,14 +59,14 @@ camio_error_t camio_stream_new(char* uri, camio_stream_t** stream)
 //   //If not true, we have a problem!
 //   assert(muxable->parent.connector == connector);
 
-   while( (err = camio_connect(connector,stream)) == CAMIO_ETRYAGAIN ){}
+   while( (err = camio_connect(connector,channel)) == CAMIO_ETRYAGAIN ){}
    if(err){
-       DBG("Could not connect to stream\n");
+       DBG("Could not connect to channel\n");
        return CAMIO_EINVALID; //TODO XXX put a better error here
    }
 
 
-   DBG("## Got new stream at address %p\n", stream);
+   DBG("## Got new channel at address %p\n", channel);
 
    //Clean up our mess
    //camio_mux_destroy(mux);
@@ -74,19 +74,19 @@ camio_error_t camio_stream_new(char* uri, camio_stream_t** stream)
    return CAMIO_ENOERROR;
 }
 
-camio_error_t camio_connector_new(char* uri, camio_connector_t** connector_o)
+camio_error_t camio_connector_new(char* uri, camio_controller_t** connector_o)
 {
     ch_word id = -1;
     void* params = NULL;
     ch_word params_size = 0;
-    camio_error_t err = camio_transport_params_new(uri,&params,&params_size, &id);
+    camio_error_t err = camio_device_params_new(uri,&params,&params_size, &id);
     if(err){
-        ERR("Invalid transport specification %s\n", uri);
+        ERR("Invalid device specification %s\n", uri);
         return CAMIO_EINVALID; //TODO XXX put a better error here
     }
 
     //Use the parameters structure to construct a new connector object
-    err = camio_transport_constr(id,&params,params_size,connector_o);
+    err = camio_device_constr(id,&params,params_size,connector_o);
     if(err){
         DBG("Could not construct connector\n");
         return CAMIO_EINVALID; //TODO XXX put a better error here

@@ -6,8 +6,8 @@
  *  Created:   Aug 17, 2014
  *  File name: muxable.h
  *  Description:
- *  Every stream and connector implements a "muxable" interface. This interface allows the stream or connector to be put
- *  into a "muxor object" for runtime nonblocking multiplexing of transports
+ *  Every channel and connector implements a "muxable" interface. This interface allows the channel or connector to be put
+ *  into a "muxor object" for runtime nonblocking multiplexing of devices
  */
 
 #ifndef MUXABLE_H_
@@ -50,8 +50,8 @@ typedef struct camio_muxable_s {
     int fd;
 
     union{
-        camio_stream_t*    stream;    //Gives access back to the stream or connector which is the parent of this
-        camio_connector_t* connector;
+        camio_channel_t*    channel;    //Gives access back to the channel or connector which is the parent of this
+        camio_controller_t* connector;
     } parent;
 
     /**
@@ -60,7 +60,7 @@ typedef struct camio_muxable_s {
     camio_mux_mode_e mode;
 
     /**
-     * Store an ID here for a simple way to know which stream this is. This is kind of a hack.
+     * Store an ID here for a simple way to know which channel this is. This is kind of a hack.
      */
     ch_word id;
 } camio_muxable_t;

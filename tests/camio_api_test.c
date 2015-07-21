@@ -21,7 +21,7 @@ int main(int argc, char** argv)
     (void)argc; //We don't use these for the test ... yet
     (void)argv;
 
-    camio_connector_t* connector = NULL;
+    camio_controller_t* connector = NULL;
 
     new_camio_transport_bin("netm",NULL,&connector);
 

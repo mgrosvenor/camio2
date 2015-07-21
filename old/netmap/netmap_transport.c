@@ -16,9 +16,9 @@
 
 const char * const scheme = "netm";
 
-static camio_error_t construct_str(camio_uri_t* uri, camio_connector_t** connector_o)
+static camio_error_t construct_str(camio_uri_t* uri, camio_controller_t** connector_o)
 {
-    camio_connector_t* conn = NEW_CONNECTOR(netmap);
+    camio_controller_t* conn = NEW_CONNECTOR(netmap);
     if(!conn){
         *connector_o = NULL;
         return CAMIO_ENOMEM;
@@ -30,9 +30,9 @@ static camio_error_t construct_str(camio_uri_t* uri, camio_connector_t** connect
     return conn->vtable.construct_str(conn,uri);
 }
 
-static camio_error_t construct_bin(camio_connector_t** connector_o, va_list args)
+static camio_error_t construct_bin(camio_controller_t** connector_o, va_list args)
 {
-    camio_connector_t* conn = NEW_CONNECTOR(netmap);
+    camio_controller_t* conn = NEW_CONNECTOR(netmap);
     if(!conn){
         *connector_o = NULL;
         return CAMIO_ENOMEM;

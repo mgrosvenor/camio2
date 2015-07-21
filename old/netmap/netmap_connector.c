@@ -38,7 +38,7 @@ typedef struct netmap_priv_s {
 
 
 
-static camio_error_t netmap_construct(camio_connector_t* this, ch_cstr dev, ch_cstr path, ch_bool sw_ring, ch_bool hw_ring,
+static camio_error_t netmap_construct(camio_controller_t* this, ch_cstr dev, ch_cstr path, ch_bool sw_ring, ch_bool hw_ring,
         ch_word ring_id)
 {
 
@@ -60,7 +60,7 @@ static camio_error_t netmap_construct(camio_connector_t* this, ch_cstr dev, ch_c
 
 
 
-static void netmap_destroy(camio_connector_t* this)
+static void netmap_destroy(camio_controller_t* this)
 {
     netmap_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
     (void)priv;
@@ -69,7 +69,7 @@ static void netmap_destroy(camio_connector_t* this)
 
 
 
-static camio_error_t netmap_construct_str(camio_connector_t* this, camio_uri_t* uri)
+static camio_error_t netmap_construct_str(camio_controller_t* this, camio_uri_t* uri)
 {
     netmap_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
     (void)priv;
@@ -89,7 +89,7 @@ static camio_error_t netmap_construct_str(camio_connector_t* this, camio_uri_t* 
 
 
 
-static camio_error_t netmap_construct_bin(camio_connector_t* this, va_list args)
+static camio_error_t netmap_construct_bin(camio_controller_t* this, va_list args)
 {
     netmap_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
     (void)priv;
@@ -110,7 +110,7 @@ static camio_error_t netmap_construct_bin(camio_connector_t* this, va_list args)
 
 
 
-static camio_error_t netmap_connect(camio_connector_t* this, camio_stream_t** stream_o )
+static camio_error_t netmap_connect(camio_controller_t* this, camio_stream_t** stream_o )
 {
     netmap_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
 

@@ -38,7 +38,7 @@ static ch_word delimit(char* buffer, ch_word len)
     return head->size;
 }
 
-static camio_error_t connect_delim(ch_cstr client_stream_uri, camio_connector_t** connector) {
+static camio_error_t connect_delim(ch_cstr client_stream_uri, camio_controller_t** connector) {
 
     //Find the ID of the delim stream
     ch_word id;
@@ -126,7 +126,7 @@ int camio_perf_clinet(ch_cstr client_stream_uri, ch_word* stop)
     camio_error_t err = camio_mux_new(CAMIO_MUX_HINT_PERFORMANCE, &mux);
 
     //Construct a delimiter
-    camio_connector_t* connector = NULL;
+    camio_controller_t* connector = NULL;
     err = connect_delim(client_stream_uri, &connector);
     if(err){
         DBG("Could not create delimiter!\n");
@@ -157,7 +157,6 @@ int camio_perf_clinet(ch_cstr client_stream_uri, ch_word* stop)
     ch_word seq                  = 0;
 
     while(!*stop){
-
         gettimeofday(&now, NULL);
         time_now_ns = now.tv_sec * 1000 * 1000 * 1000 + now.tv_usec * 1000;
         if(time_now_ns >= time_int_start_ns + time_interval_ns){

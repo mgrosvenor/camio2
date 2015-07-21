@@ -6,8 +6,8 @@
  *  Created:    Jun 14, 2015
  *  File name:  mux.h
  *  Description:
- *  Every stream and connector implements a "mux" interface. This interface allows the stream or connector to be put
- *  into a "mux object" for runtime nonblocking multiplexing of transports
+ *  Every channel and connector implements a "mux" interface. This interface allows the channel or connector to be put
+ *  into a "mux object" for runtime nonblocking multiplexing of devices
  */
 #ifndef MUX_H_
 #define MUX_H_

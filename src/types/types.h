@@ -22,20 +22,20 @@
 #include <deps/chaste/types/types.h>
 #include <src/errors/camio_errors.h>
 
-//Forward declaration, the real definition is found in streams/features.h
-struct camio_stream_s;
-typedef struct camio_stream_s camio_stream_t;
+//Forward declaration, the real definition is found in channels/features.h
+struct camio_channel_s;
+typedef struct camio_channel_s camio_channel_t;
 
 
-//Forward declaration, the real definition is found in streams/stream.h
-struct camio_stream_s;
-typedef struct camio_stream_s camio_stream_t;
+//Forward declaration, the real definition is found in channels/channel.h
+struct camio_channel_s;
+typedef struct camio_channel_s camio_channel_t;
 
-//Forward declaration, the real definition is found in streams/connector.h
-struct camio_connector_s;
-typedef struct camio_connector_s camio_connector_t;
+//Forward declaration, the real definition is found in channels/connector.h
+struct camio_controller_s;
+typedef struct camio_controller_s camio_controller_t;
 
-//Forward declaration, the real definition is found in streams/connector.h
+//Forward declaration, the real definition is found in channels/connector.h
 struct camio_connector_interface_s;
 typedef struct camio_connector_interface_s camio_connector_interface_t;
 

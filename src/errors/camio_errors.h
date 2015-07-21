@@ -23,7 +23,7 @@ typedef enum camio_error_e {
     CAMIO_EQFU,                 //5
     CAMIO_ECOPYOP,              //6
     CAMIO_EBADURI,              //7
-    CAMIO_ENOSTREAM,            //8
+    CAMIO_ENOCHANNEL,            //8
     CAMIO_EBADOPT,              //9
     CAMIO_EBUFFINUSE,           //10
     CAMIO_EBUFFERROR,           //11

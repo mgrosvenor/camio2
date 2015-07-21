@@ -15,8 +15,8 @@
 #include "camio.h"
 #include "camio_debug.h"
 #include "camio_init_all.h"
-#include <src/types/transport_state_vec.h>
-#include <src/types/transport_params_vec.h>
+#include <src/types/device_state_vec.h>
+#include <src/types/device_params_vec.h>
 #include <src/utils/uri_parser/uri_parser.h>
 #include <src/errors/camio_errors.h>
 #include <deps/chaste/parsing/numeric_parser.h>
@@ -31,13 +31,13 @@ camio_t* init_camio()
 {
     DBG("Initializing CamIO 2.0...\n");
 
-    //Set up the transport state list, this could be a hashmap one day....
+    //Set up the device state list, this could be a hashmap one day....
     CH_VECTOR(CAMIO_TRANSPORT_STATE_VEC)* trans_state =
         CH_VECTOR_NEW(CAMIO_TRANSPORT_STATE_VEC,1024,CH_VECTOR_CMP(CAMIO_TRANSPORT_STATE_VEC));
 
     __camio_state_container.trans_state = trans_state;
 
-    camio_init_all_transports();
+    camio_init_all_devices();
 
     __camio_state_container.is_initialized = true;
 
@@ -50,11 +50,11 @@ camio_t* init_camio()
 
 /**
  * Streams call this function to add themselves into the CamIO string parsing system and to register desires for global
- * resources. The register transport function will assign a unique ID to a stream type that can be used for fast access to
+ * resources. The register device function will assign a unique ID to a channel type that can be used for fast access to
  * it in the future using the binary only interface.
  * TODO XXX: This function should probably be split so that string based interface is not necessary.
  */
-camio_error_t register_new_transport(
+camio_error_t register_new_device(
     ch_ccstr scheme,
     ch_word scheme_len,
     ch_word param_struct_hier_offset,
@@ -69,16 +69,16 @@ camio_error_t register_new_transport(
     //First check that the scheme hasn't already been registered
     CH_VECTOR(CAMIO_TRANSPORT_STATE_VEC)* trans_state = __camio_state_container.trans_state;
 
-    camio_transport_state_t tmp = {
+    camio_device_state_t tmp = {
         .scheme             = scheme,
         .scheme_len         = scheme_len
     };
 
-    camio_transport_state_t* found = trans_state->find(trans_state,trans_state->first,trans_state->end,tmp);
+    camio_device_state_t* found = trans_state->find(trans_state,trans_state->first,trans_state->end,tmp);
 
     if(NULL == found){//Transport has not yet been registered
 
-        camio_transport_state_t state = {
+        camio_device_state_t state = {
             .scheme                     = scheme,
             .scheme_len                 = scheme_len,
             .param_struct_hier_offset   = param_struct_hier_offset,
@@ -90,7 +90,7 @@ camio_error_t register_new_transport(
         };
 
 
-        //If the transport wants a global store, allocate it
+        //If the device wants a global store, allocate it
         if(global_store_size > 0){
             state.global_store = calloc(1,global_store_size);
             if(NULL == state.global_store){
@@ -112,7 +112,7 @@ camio_error_t register_new_transport(
 
 
 
-camio_error_t camio_transport_params_new( ch_cstr uri_str, void** params_o, ch_word* params_size_o, ch_word* id_o )
+camio_error_t camio_device_params_new( ch_cstr uri_str, void** params_o, ch_word* params_size_o, ch_word* id_o )
 {
     //DBG("Making new params\n");
     if(!__camio_state_container.is_initialized){
@@ -131,17 +131,17 @@ camio_error_t camio_transport_params_new( ch_cstr uri_str, void** params_o, ch_w
 
     //Parsing gives us a scheme. Now check that the scheme has been registered and find it if it has
     CH_VECTOR(CAMIO_TRANSPORT_STATE_VEC)* trans_state = __camio_state_container.trans_state;
-    camio_transport_state_t  tmp = { 0 };
+    camio_device_state_t  tmp = { 0 };
     tmp.scheme     = uri->scheme_name;
     tmp.scheme_len = uri->scheme_name_len;
-    camio_transport_state_t* state = trans_state->find(trans_state,trans_state->first,trans_state->end, tmp);
-    if(NULL == state){//transport has not yet been registered
+    camio_device_state_t* state = trans_state->find(trans_state,trans_state->first,trans_state->end, tmp);
+    if(NULL == state){//device has not yet been registered
         result = CAMIO_NOTIMPLEMENTED;
         goto exit_uri;
     }
     DBG("Got state scheme:%.*s\n", state->scheme_len, state->scheme);
 
-    //There is a valid scheme -> transport mapping. Now make a parameters structure and try to populate it
+    //There is a valid scheme -> device mapping. Now make a parameters structure and try to populate it
     DBG("making params_struct of size %lli\n", state->param_struct_size );
     char* params_struct = calloc(1, state->param_struct_size);
     void* params_struct_value = &params_struct[state->param_struct_hier_offset];
@@ -163,12 +163,12 @@ camio_error_t camio_transport_params_new( ch_cstr uri_str, void** params_o, ch_w
                 goto exit_params;
             }
             strncpy(search_name, i.value->key, i.value->key_len);
-            camio_transport_param_t search = {0};
+            camio_device_param_t search = {0};
             search.param_name = search_name;
-            camio_transport_param_t* found = params->find(params,params->first,params->end, search);
+            camio_device_param_t* found = params->find(params,params->first,params->end, search);
             free(search_name);
             if(!found){
-                ERR("The supplied parameter \"%.*s\" is not a valid option for this transport\n", i.value->key_len, i.value->key);
+                ERR("The supplied parameter \"%.*s\" is not a valid option for this device\n", i.value->key_len, i.value->key);
                 result = CAMIO_EINVALID; //TODO XXX make a better return value
                 goto exit_params;
             }
@@ -177,7 +177,7 @@ camio_error_t camio_transport_params_new( ch_cstr uri_str, void** params_o, ch_w
     //Now, iterate over the parameters list, checking and initializing parameters
     DBG("Iterating over %i parameters...\n", params->count);
     //DBG("params->first=%p, params->end=%p, uri_opts=%p\n", params->first, params->end, uri_opts);
-    for( camio_transport_param_t* param = params->first; param != params->end; param = params->next(params,param) ){
+    for( camio_device_param_t* param = params->first; param != params->end; param = params->next(params,param) ){
         //Search for the parameter name (ie key) in the key/value uri options list. This should answer the question,
         //"Was the parameter with a given name present in the URI supplied".
         CH_LIST_IT(KV) found = {0};
@@ -342,12 +342,12 @@ exit_uri:
 
 
 
-camio_error_t camio_transport_constr(ch_word id, void** params, ch_word params_size, camio_connector_t** connector_o)
+camio_error_t camio_device_constr(ch_word id, void** params, ch_word params_size, camio_controller_t** connector_o)
 {
     CH_VECTOR(CAMIO_TRANSPORT_STATE_VEC)* trans_state = __camio_state_container.trans_state;
-    camio_transport_state_t* state = trans_state->off(trans_state,id);
+    camio_device_state_t* state = trans_state->off(trans_state,id);
     if(state == NULL){
-        DBG("Could not find transport at ID=%i\n",id);
+        DBG("Could not find device at ID=%i\n",id);
         return CAMIO_EINDEXNOTFOUND;
     }
 
@@ -356,7 +356,7 @@ camio_error_t camio_transport_constr(ch_word id, void** params, ch_word params_s
 
 
 
-camio_error_t camio_transport_get_id( ch_cstr scheme_name, ch_word* id_o)
+camio_error_t camio_device_get_id( ch_cstr scheme_name, ch_word* id_o)
 {
     DBG("Searching for scheme named %s\n",scheme_name);
     if(!__camio_state_container.is_initialized){
@@ -364,11 +364,11 @@ camio_error_t camio_transport_get_id( ch_cstr scheme_name, ch_word* id_o)
     }
 
     CH_VECTOR(CAMIO_TRANSPORT_STATE_VEC)* trans_state = __camio_state_container.trans_state;
-    camio_transport_state_t  tmp = { 0 };
+    camio_device_state_t  tmp = { 0 };
     tmp.scheme     = scheme_name;
     tmp.scheme_len = strlen(scheme_name);
-    camio_transport_state_t* state = trans_state->find(trans_state,trans_state->first,trans_state->end, tmp);
-    if(NULL == state){//transport has not yet been registered
+    camio_device_state_t* state = trans_state->find(trans_state,trans_state->first,trans_state->end, tmp);
+    if(NULL == state){//device has not yet been registered
         DBG("Could not find scheme named %s\n", scheme_name);
         return CAMIO_NOTIMPLEMENTED;
     }
@@ -379,13 +379,13 @@ camio_error_t camio_transport_get_id( ch_cstr scheme_name, ch_word* id_o)
 }
 
 
-camio_error_t camio_transport_get_global(ch_ccstr scheme, void** global_store)
+camio_error_t camio_device_get_global(ch_ccstr scheme, void** global_store)
 {
 
-    //Find the transport
+    //Find the device
     CH_VECTOR(CAMIO_TRANSPORT_STATE_VEC)* trans_state = __camio_state_container.trans_state;
 
-    camio_transport_state_t state = {
+    camio_device_state_t state = {
         .scheme             = scheme,
         .scheme_len         = strlen(scheme),
         .construct          = NULL,
@@ -393,9 +393,9 @@ camio_error_t camio_transport_get_global(ch_ccstr scheme, void** global_store)
         .global_store       = NULL
     };
 
-    camio_transport_state_t* found = trans_state->find(trans_state,trans_state->first,trans_state->end,state);
+    camio_device_state_t* found = trans_state->find(trans_state,trans_state->first,trans_state->end,state);
 
-    if(NULL == found){//transport has not yet been registered
+    if(NULL == found){//device has not yet been registered
         return CAMIO_EINDEXNOTFOUND;
     }
 

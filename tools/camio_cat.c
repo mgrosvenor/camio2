@@ -32,7 +32,7 @@ camio_error_t populate_mux( camio_mux_t* mux, CH_VECTOR(cstr)* uris, ch_word* mu
     DBG("populate mux count=%lli\n", uris->count);
     for (int i = 0; i < uris->count; i++) {
         ch_cstr* uri = uris->off(uris, i);
-        camio_connector_t* connector = NULL;
+        camio_controller_t* connector = NULL;
         DBG("Adding connector with uri=%s\n", *uri);
         camio_error_t err = camio_connector_new(*uri, &connector);
         if (err) {

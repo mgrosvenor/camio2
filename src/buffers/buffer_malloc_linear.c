@@ -30,7 +30,7 @@ void buffer_malloc_linear_DBG(buffer_malloc_linear_t* buff){
     DBG2("\n");
 }
 
-static void init_buffer_hdr(camio_stream_t* parent, camio_buffer_t* buffer_hdr, char* buffer_data, ch_word buffer_size,
+static void init_buffer_hdr(camio_channel_t* parent, camio_buffer_t* buffer_hdr, char* buffer_data, ch_word buffer_size,
         ch_word buffer_id, ch_bool readonly){
     buffer_hdr->__internal.__mem_len           = buffer_size;
     buffer_hdr->__internal.__mem_start         = buffer_data;
@@ -72,7 +72,7 @@ void buffer_malloc_linear_destroy(buffer_malloc_linear_t** lin_buff_io)
 }
 
 
-camio_error_t buffer_malloc_linear_new(camio_stream_t* parent, ch_word buffer_size, ch_word buffer_count,
+camio_error_t buffer_malloc_linear_new(camio_channel_t* parent, ch_word buffer_size, ch_word buffer_count,
         ch_bool readonly, buffer_malloc_linear_t** lin_buff_o)
 {
     if(!lin_buff_o){

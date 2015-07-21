@@ -9,7 +9,7 @@
 #define CAMIO_INIT_ALL_H_
 #include <src/types/types.h>
 
-camio_error_t camio_init_all_transports();
+camio_error_t camio_init_all_devices();
 
 
 

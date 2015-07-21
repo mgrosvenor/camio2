@@ -5,23 +5,23 @@
  *      Author: mgrosvenor
  */
 
-//#include <src/drivers/netmap/netmap_transport.h>
-#include <src/drivers/udp/udp_transport.h>
-#include <src/drivers/tcp/tcp_transport.h>
-#include <src/drivers/delimiter/delim_transport.h>
-#include <src/drivers/fileio/fio_transport.h>
-#include <src/drivers/memfileio/mfio_transport.h>
-#include <src/drivers/stdio/stdio_transport.h>
-#include <src/drivers/bring/bring_transport.h>
+//#include <src/drivers/netmap/netmap_device.h>
+#include <src/drivers/udp/udp_device.h>
+#include <src/drivers/tcp/tcp_device.h>
+#include <src/drivers/delimiter/delim_device.h>
+#include <src/drivers/fileio/fio_device.h>
+#include <src/drivers/memfileio/mfio_device.h>
+#include <src/drivers/stdio/stdio_device.h>
+#include <src/drivers/bring/bring_device.h>
 
 #include "camio_debug.h"
 #include "camio_init_all.h"
 
 // This is a dummy file to be filled in later with a compiler generated one. The aim is to have a configuration file that
 // allows users to specific compiletime and runtime loading of modules.
-// The reason for the strange callback like interface is to make it possible to for dynamic initialization of new transports.
-// Even if a transport doesn't exist in the CamIO library, it can be added at runtime.
-// It also allows transport to be loaded as dynamically linked objects, keeping the CamIO runtime minimal. CamIO is very much
+// The reason for the strange callback like interface is to make it possible to for dynamic initialization of new devices.
+// Even if a device doesn't exist in the CamIO library, it can be added at runtime.
+// It also allows device to be loaded as dynamically linked objects, keeping the CamIO runtime minimal. CamIO is very much
 // trying to emulate an interface similar to the linux kernel, where modules are dynamically loadable, or compiled in.
 
 
@@ -29,10 +29,10 @@
 /**
  * TODO XXX: THIS FUNCTION SHOUD TO BE AUTO GENERATED!
  */
-camio_error_t camio_init_all_transports(){
+camio_error_t camio_init_all_devices(){
 
 
-    DBG("Initializing transports...\n");
+    DBG("Initializing devices...\n");
     //netmap_init();
     udp_init();
     tcp_init();
@@ -43,7 +43,7 @@ camio_error_t camio_init_all_transports(){
     bring_init();
     //add more here
 
-    DBG("Initializing transports...Done\n");
+    DBG("Initializing devices...Done\n");
     return CAMIO_ENOERROR;
 }
 

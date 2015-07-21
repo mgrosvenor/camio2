@@ -15,7 +15,7 @@
 typedef struct buffer_malloc_linear_s buffer_malloc_linear_t;
 
 
-camio_error_t buffer_malloc_linear_new(camio_stream_t* parent, ch_word buffer_size, ch_word bufffer_count,
+camio_error_t buffer_malloc_linear_new(camio_channel_t* parent, ch_word buffer_size, ch_word bufffer_count,
         ch_bool readonly, buffer_malloc_linear_t** lin_buff_o);
 
 

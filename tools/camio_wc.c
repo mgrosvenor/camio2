@@ -69,7 +69,7 @@ int main(int argc, char** argv)
     }
 
     //Use the parameters structure to construct a new connector object
-    camio_connector_t* connector = NULL;
+    camio_controller_t* connector = NULL;
     err = camio_transport_constr(id,&params,params_size,&connector);
     if(err){
         ERR("Could not construct connector\n");

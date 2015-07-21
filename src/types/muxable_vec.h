@@ -11,7 +11,7 @@
 #ifndef MUXABLE_VEC_H_
 #define MUXABLE_VEC_H_
 
-#include <src/types/transport_params_vec.h>
+#include <src/types/device_params_vec.h>
 #include <deps/chaste/data_structs/vector/vector_typed_declare_template.h>
 
 declare_ch_vector(CAMIO_MUXABLE_VEC,camio_muxable_t)

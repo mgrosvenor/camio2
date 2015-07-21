@@ -22,7 +22,7 @@ int main(int argc, char** argv)
 
     printf("Hello CamIO\n");
 
-    camio_connector_t* connector = NULL;
+    camio_controller_t* connector = NULL;
 
     new_camio_transport_str("udp:127.0.0.1?rp=3000?wp=4000",NULL,&connector);
 

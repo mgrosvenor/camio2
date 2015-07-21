@@ -17,7 +17,7 @@
 #include <src/types/types.h>
 
 typedef enum camio_buffer_timestamp_e {
-    CAMIO_BUFFER_TST_NONE = 0,      //No timestamp on this stream
+    CAMIO_BUFFER_TST_NONE = 0,      //No timestamp on this channel
     CAMIO_BUFFER_TST_S_1970,        //Timestamp is seconds since 1970
     CAMIO_BUFFER_TST_US_1970,       //Timestamp is microseconds since 1970
     CAMIO_BUFFER_TST_NS_1970,       //Timestamp is nanoseconds since 1970
@@ -35,7 +35,7 @@ typedef struct camio_buffer_internal_s {
     ch_word __buffer_id;               //Undefined if there is no data
 
     bool __do_auto_release;             //Should release be called automatically for this slot?
-    camio_stream_t* __parent;    //Parent who stream from who owned this slot.
+    camio_channel_t* __parent;    //Parent who channel from who owned this slot.
 
     union {
         struct timespec ts_timespec;
@@ -65,16 +65,17 @@ typedef struct camio_buffer_s {
 
 
     bool valid;          //True if the data is valid (can be set to untrue by read_release)
-    camio_buffer_timestamp_t timestamp_type; //The type of timestamp associated with this stream
+    camio_buffer_timestamp_t timestamp_type; //The type of timestamp associated with this channel
 
     //Some timestamps are inline with the data, some are not, this will point to the timestamp regardless of where it is.
     void* ts;
 
     int64_t data_len;      //Zero if there is no data. Length of data actually in the buffer
-    int64_t orig_len;      //Sometimes there was more data than we have space. If orig_len > data_len, then                            //truncation has happened. This probably only matters for reads
+    int64_t orig_len;      //Sometimes there was more data than we have space. If orig_len > data_len, then
+                           //truncation has happened. This probably only matters for reads
     void* data_start;       //Undefined if there is no data. Data may be offset into the buffer to allow for headers etc.
 
-    camio_buffer_internal_t __internal; //Internal state, do not touch unless you are are stream implementor
+    camio_buffer_internal_t __internal; //Internal state, do not touch unless you are are channel implementor
 
 } camio_buffer_t;
 
@@ -85,7 +86,7 @@ typedef camio_buffer_t camio_wr_buffer_t; //get from a read (rd) buffer to a wri
 
 /**
  * Some macros to make life easier BUFFER_GET_PRIVATE helps us grab the private members out of the public connector_t and
- * CONNECTOR_DECLARE help to make a custom allocator for each stream
+ * CONNECTOR_DECLARE help to make a custom allocator for each channel
  */
 #define BUFFER_GET_PRIVATE(THIS) ( (void*)((THIS) + 1))
 
