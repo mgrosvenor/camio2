@@ -24,7 +24,7 @@
 #include <errno.h>
 
 /**************************************************************************************************************************
- * PER STREAM STATE
+ * PER CHANNEL STATE
  **************************************************************************************************************************/
 typedef struct delim_channel_priv_s {
     camio_channel_t* base; //Base channel that will be "decorated" by this delimiter
@@ -54,7 +54,7 @@ typedef struct delim_channel_priv_s {
  * READ FUNCTIONS
  **************************************************************************************************************************/
 static void delim_read_close(camio_channel_t* this){
-    delim_channel_priv_t* priv = STREAM_GET_PRIVATE(this);
+    delim_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this);
     if(!priv->is_rd_closed){
         free(priv->rd_working_buff.__internal.__mem_start);
         reset_buffer(&priv->rd_working_buff);
@@ -92,7 +92,7 @@ static camio_error_t delim_read_peek( camio_channel_t* this)
 {
     //This is not a public function, can assume that preconditions have been checked.
 //    DBG("Doing read peek\n");
-    delim_channel_priv_t* priv = STREAM_GET_PRIVATE(this);
+    delim_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this);
 
     //If this pointer is non-null, there there is already a result waiting to be consumed
     if(priv->rd_result_buff.data_start){
@@ -219,7 +219,7 @@ static camio_error_t delim_read_ready(camio_muxable_t* this)
     }
 
     //OK now the fun begins
-    delim_channel_priv_t* priv = STREAM_GET_PRIVATE(this->parent.channel);
+    delim_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this->parent.channel);
     if(priv->is_rd_closed){
         ERR("Stream is now closed. There will be no more non null data\n");
         return CAMIO_EREADY;
@@ -265,7 +265,7 @@ static camio_error_t delim_read_request(camio_channel_t* this, camio_rd_req_t* r
         ERR("request length of %lli requested. This value is not currently supported\n", req_vec_len);
         return CAMIO_NOTIMPLEMENTED;
     }
-    delim_channel_priv_t* priv = STREAM_GET_PRIVATE(this);
+    delim_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this);
 
     if(priv->read_registered){
         ERR("New read request registered, but old request is still outstanding. Ignoring request.\n");
@@ -306,7 +306,7 @@ static camio_error_t delim_read_acquire( camio_channel_t* this,  camio_rd_buffer
         ERR("Buffer chain not null. You should release this before getting a new one, otherwise dangling pointers!\n");
         return CAMIO_EINVALID;
     }
-    delim_channel_priv_t* priv = STREAM_GET_PRIVATE(this);
+    delim_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this);
     if(priv->is_rd_closed){
         reset_buffer(&priv->rd_result_buff);
         *buffer_o = &priv->rd_result_buff;
@@ -383,7 +383,7 @@ static camio_error_t delim_read_release(camio_channel_t* this, camio_rd_buffer_t
         return CAMIO_EINVALID;
     }
 
-    delim_channel_priv_t* priv = STREAM_GET_PRIVATE(this);
+    delim_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this);
     if(!priv->read_registered){
         ERR("WFT? Why are you trying to release something if you haven't read anyhting?\n");
         return CAMIO_EINVALID;
@@ -484,7 +484,7 @@ static camio_error_t delim_write_ready(camio_muxable_t* this)
 
 
     //OK now the fun begins
-    delim_channel_priv_t* priv = STREAM_GET_PRIVATE(this->parent.channel);
+    delim_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this->parent.channel);
 
     return camio_write_ready(priv->base);
 
@@ -499,7 +499,7 @@ static camio_error_t delim_write_acquire(camio_channel_t* this, camio_wr_buffer_
         ERR("This null???\n"); //WTF?
         return CAMIO_EINVALID;
     }
-    delim_channel_priv_t* priv = STREAM_GET_PRIVATE(this);
+    delim_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this);
 
     return camio_write_acquire(priv->base,buffer_o);
 }
@@ -512,7 +512,7 @@ static camio_error_t delim_write_request(camio_channel_t* this, camio_wr_req_t* 
         ERR("This is null???\n"); //WTF?
         return CAMIO_EINVALID;
     }
-    delim_channel_priv_t* priv = STREAM_GET_PRIVATE(this);
+    delim_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this);
     return camio_write_request(priv->base,req_vec,req_vec_len);
 }
 
@@ -525,7 +525,7 @@ static camio_error_t delim_write_release(camio_channel_t* this, camio_wr_buffer_
         ERR("This null???\n"); //WTF?
         return CAMIO_EINVALID;
     }
-    delim_channel_priv_t* priv = STREAM_GET_PRIVATE(this);
+    delim_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this);
     return camio_write_release(priv->base,buffer_chain);
 }
 
@@ -546,7 +546,7 @@ static void delim_destroy(camio_channel_t* this)
     }
     delim_read_close(this);
 
-    delim_channel_priv_t* priv = STREAM_GET_PRIVATE(this);
+    delim_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this);
     if(priv->rd_working_buff.__internal.__mem_start){
         free(priv->rd_working_buff.__internal.__mem_start);
     }
@@ -572,7 +572,7 @@ camio_error_t delim_channel_construct(
         ERR("This null???\n"); //WTF?
         return CAMIO_EINVALID;
     }
-    delim_channel_priv_t* priv = STREAM_GET_PRIVATE(this);
+    delim_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this);
 
     priv->delim_fn  = delim_fn;
     priv->base      = base_channel;
@@ -600,4 +600,4 @@ camio_error_t delim_channel_construct(
 }
 
 
-NEW_STREAM_DEFINE(delim,delim_channel_priv_t)
+NEW_CHANNEL_DEFINE(delim,delim_channel_priv_t)

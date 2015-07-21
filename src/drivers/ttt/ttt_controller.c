@@ -60,7 +60,7 @@ static camio_error_t ttt_connect(camio_controller_t* this, camio_channel_t** cha
     }
     DBG("Done connecting, now constructing TTT channel...\n");
 
-    camio_channel_t* channel = NEW_STREAM(ttt);
+    camio_channel_t* channel = NEW_CHANNEL(ttt);
     if(!channel){
         *channel_o = NULL;
         return CAMIO_ENOMEM;

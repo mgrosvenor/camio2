@@ -8,13 +8,13 @@
  *  Description:
  *  <INSERT DESCRIPTION HERE> 
  */
-#ifndef SRC_DRIVERS_MFIO_MFIO_STREAM_H_
-#define SRC_DRIVERS_MFIO_MFIO_STREAM_H_
+#ifndef SRC_DRIVERS_MFIO_MFIO_CHANNEL_H_
+#define SRC_DRIVERS_MFIO_MFIO_CHANNEL_H_
 
 #include <src/devices/channel.h>
 #include <src/devices/controller.h>
 
-NEW_STREAM_DECLARE(mfio);
+NEW_CHANNEL_DECLARE(mfio);
 
 camio_error_t mfio_channel_construct(
     camio_channel_t* this,
@@ -24,4 +24,4 @@ camio_error_t mfio_channel_construct(
     ch_word base_mem_len
 );
 
-#endif /* SRC_DRIVERS_MFIO_MFIO_STREAM_H_ */
+#endif /* SRC_DRIVERS_MFIO_MFIO_CHANNEL_H_ */

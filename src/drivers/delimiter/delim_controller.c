@@ -19,7 +19,7 @@
 
 
 /**************************************************************************************************************************
- * PER STREAM STATE
+ * PER CHANNEL STATE
  **************************************************************************************************************************/
 typedef struct delim_priv_s {
     //Parameters used when a connection happens
@@ -62,7 +62,7 @@ static camio_error_t delim_connect(camio_controller_t* this, camio_channel_t** c
     }
 
     DBG("Making new delimiter channel\n");
-    camio_channel_t* channel = NEW_STREAM(delim);
+    camio_channel_t* channel = NEW_CHANNEL(delim);
     if(!channel){
         ERR("No memory for new delimter\n");
         *channel_o = NULL;

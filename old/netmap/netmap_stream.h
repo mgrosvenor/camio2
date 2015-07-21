@@ -9,15 +9,15 @@
  *  <INSERT DESCRIPTION HERE> 
  */
 
-#ifndef NETMAP_STREAM_H_
-#define NETMAP_STREAM_H_
+#ifndef NETMAP_CHANNEL_H_
+#define NETMAP_CHANNEL_H_
 
 #include "../../devices/channel.h"
 #include "netmap.h"
 
-NEW_STREAM_DECLARE(netmap);
+NEW_CHANNEL_DECLARE(netmap);
 
 camio_error_t netmap_channel_construct(camio_channel_t* this, ch_word netmap_fd, struct netmap_if* net_if, ch_word rings_start,
         ch_word rings_end);
 
-#endif /* NETMAP_STREAM_H_ */
+#endif /* NETMAP_CHANNEL_H_ */

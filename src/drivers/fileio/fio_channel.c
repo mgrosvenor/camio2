@@ -21,7 +21,7 @@
 #include <errno.h>
 
 /**************************************************************************************************************************
- * PER STREAM STATE
+ * PER CHANNEL STATE
  **************************************************************************************************************************/
 //Current (simple) FIO recv only does one buffer at a time, this could change with vectored I/O in the future.
 #define CAMIO_FIO_BUFFER_COUNT (1)
@@ -67,7 +67,7 @@ static camio_error_t fio_read_peek( camio_channel_t* this)
 {
     //This is not a public function, can assume that preconditions have been checked.
     //DBG("Doing read peek\n");
-    fio_channel_priv_t* priv = STREAM_GET_PRIVATE(this);
+    fio_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this);
     camio_error_t err = buffer_malloc_linear_acquire(priv->rd_buff_pool,&priv->rd_buffer);
     if(err){
         DBG("Could not acquire read buffer Have you called release?!\n");
@@ -136,7 +136,7 @@ static camio_error_t fio_read_ready(camio_muxable_t* this)
     }
 
     //OK now the fun begins
-    fio_channel_priv_t* priv = STREAM_GET_PRIVATE(this->parent.channel);
+    fio_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this->parent.channel);
 
     if(!priv->read_registered){ //Even if there is data waiting, nobody want's it, so ignore for now.
         DBG("Nobody wants the data\n");
@@ -175,7 +175,7 @@ static camio_error_t fio_read_request( camio_channel_t* this, camio_rd_req_t* re
         DBG("This null???\n"); //WTF?
         return CAMIO_EINVALID;
     }
-    fio_channel_priv_t* priv = STREAM_GET_PRIVATE(this);
+    fio_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this);
 
     if(req_vec_len != 1){
         DBG("Stream currently only supports read requests of size 1\n"); //TODO this should be coded in the features struct
@@ -214,7 +214,7 @@ static camio_error_t fio_read_acquire( camio_channel_t* this,  camio_rd_buffer_t
         DBG("Buffer chain not null. You should release this before getting a new one, otherwise dangling pointers!\n");
         return CAMIO_EINVALID;
     }
-    fio_channel_priv_t* priv = STREAM_GET_PRIVATE(this);
+    fio_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this);
 
     camio_error_t err = fio_read_ready(&this->rd_muxable);
     if(err == CAMIO_EREADY){ //Whoo hoo! There's data!
@@ -240,7 +240,7 @@ static camio_error_t fio_read_release(camio_channel_t* this, camio_rd_buffer_t**
         DBG("This null???\n"); //WTF?
         return CAMIO_EINVALID;
     }
-    fio_channel_priv_t* priv = STREAM_GET_PRIVATE(this);
+    fio_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this);
 
     if( NULL == buffer){
         DBG("Buffer chain pointer null\n"); //WTF?
@@ -283,7 +283,7 @@ static camio_error_t fio_write_acquire(camio_channel_t* this, camio_wr_buffer_t*
         DBG("This null???\n"); //WTF?
         return CAMIO_EINVALID;
     }
-    fio_channel_priv_t* priv = STREAM_GET_PRIVATE(this);
+    fio_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this);
 
     if( NULL == buffer_o){
         DBG("Buffer chain pointer null\n"); //WTF?
@@ -321,7 +321,7 @@ static camio_error_t fio_write_request(camio_channel_t* this, camio_wr_req_t* re
         return CAMIO_EINVALID;
     }
 
-    fio_channel_priv_t* priv = STREAM_GET_PRIVATE(this);
+    fio_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this);
 
     DBG("Got a write request vector with %lli items\n", req_vec_len);
     if(priv->write_registered){
@@ -342,7 +342,7 @@ static camio_error_t fio_write_request(camio_channel_t* this, camio_wr_req_t* re
 //Try to write to the underlying, channel. This function is private, so no precondition checks necessary
 static camio_error_t fio_write_try(camio_channel_t* this)
 {
-    fio_channel_priv_t* priv = STREAM_GET_PRIVATE(this);
+    fio_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this);
 
     for(int i = priv->write_req_curr; i < priv->write_req_len; i++){
         camio_wr_req_t* req = priv->write_req + i;
@@ -408,7 +408,7 @@ static camio_error_t fio_write_ready(camio_muxable_t* this)
         return CAMIO_EINVALID;
     }
 
-    fio_channel_priv_t* priv = STREAM_GET_PRIVATE(this->parent.channel);
+    fio_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this->parent.channel);
     if(!priv->write_registered){ //No body has asked us to write anything, so we're not ready
         return CAMIO_ENOTREADY;
     }
@@ -443,7 +443,7 @@ static camio_error_t fio_write_release(camio_channel_t* this, camio_wr_buffer_t*
         DBG("This null???\n"); //WTF?
         return CAMIO_EINVALID;
     }
-    fio_channel_priv_t* priv = STREAM_GET_PRIVATE(this);
+    fio_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this);
     (void)priv;
 
     if( NULL == buffer){
@@ -488,7 +488,7 @@ static void fio_destroy(camio_channel_t* this)
         DBG("This null???\n"); //WTF?
         return;
     }
-    fio_channel_priv_t* priv = STREAM_GET_PRIVATE(this);
+    fio_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this);
 
     if(priv->rd_fd > -1){
         close(priv->rd_fd);
@@ -519,7 +519,7 @@ camio_error_t fio_channel_construct(camio_channel_t* this, camio_controller_t* c
         DBG("This null???\n"); //WTF?
         return CAMIO_EINVALID;
     }
-    fio_channel_priv_t* priv = STREAM_GET_PRIVATE(this);
+    fio_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this);
 
     priv->controller     = *controller; //Keep a copy of the controller state
     priv->rd_fd         = rd_fd;
@@ -560,4 +560,4 @@ camio_error_t fio_channel_construct(camio_channel_t* this, camio_controller_t* c
     return CAMIO_ENOERROR;
 }
 
-NEW_STREAM_DEFINE(fio,fio_channel_priv_t)
+NEW_CHANNEL_DEFINE(fio,fio_channel_priv_t)

@@ -8,13 +8,13 @@
  *  Description:
  *  <INSERT DESCRIPTION HERE> 
  */
-#ifndef SRC_DRIVERS_DELIM_DELIM_STREAM_H_
-#define SRC_DRIVERS_DELIM_DELIM_STREAM_H_
+#ifndef SRC_DRIVERS_DELIM_DELIM_CHANNEL_H_
+#define SRC_DRIVERS_DELIM_DELIM_CHANNEL_H_
 
 #include <src/devices/channel.h>
 #include <src/devices/controller.h>
 
-NEW_STREAM_DECLARE(delim);
+NEW_CHANNEL_DECLARE(delim);
 
 camio_error_t delim_channel_construct(
     camio_channel_t* this,
@@ -23,4 +23,4 @@ camio_error_t delim_channel_construct(
     ch_word (*delim_fn)(char* buffer, ch_word len)
 );
 
-#endif /* SRC_DRIVERS_DELIM_DELIM_STREAM_H_ */
+#endif /* SRC_DRIVERS_DELIM_DELIM_CHANNEL_H_ */

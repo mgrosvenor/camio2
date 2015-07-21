@@ -31,73 +31,70 @@
 #include "../camio_debug.h"
 #include "api.h"
 
-
-inline camio_error_t camio_connect( camio_controller_t* this, camio_channel_t** channel_o )
+camio_error_t camio_chan_rd_req( camio_channel_t* this, camio_rd_req_t* req_vec, ch_word vec_len )
 {
-    return this->vtable.connect(this, channel_o);
+    return this->vtable.read_request(this, req_vec, vec_len);
 }
 
 
-inline void camio_controller_destroy(camio_controller_t* this)
-{
-    this->vtable.destroy(this);
-}
-
-inline camio_error_t camio_controller_ready( camio_controller_t* this)
-{
-    return this->muxable.vtable.ready(&this->muxable);
-}
-
-
-inline camio_error_t camio_read_request(camio_channel_t* this, camio_rd_req_t* req_vec, ch_word req_vec_len )
-{
-    return this->vtable.read_request(this, req_vec, req_vec_len);
-}
-
-
-inline camio_error_t camio_read_ready( camio_channel_t* this)
+camio_error_t camio_chan_rd_ready( camio_channel_t* this)
 {
     return this->rd_muxable.vtable.ready(&this->rd_muxable);
 }
 
+camio_error_t camio_chan_rd_res( camio_channel_t* this, camio_rd_req_t** req_o)
 
-inline camio_error_t camio_read_acquire( camio_channel_t* this,  camio_rd_buffer_t** buffer_o)
 {
-    return this->vtable.read_acquire(this, buffer_o);
+    return this->vtable.read_result(this, req_o);
 }
 
 
-inline camio_error_t camio_read_release(camio_channel_t* this, camio_rd_buffer_t** buffer)
+camio_error_t camio_chan_rd_rel(camio_channel_t* this, camio_rd_buffer_t** buffer)
 {
     return this->vtable.read_release(this, buffer);
 }
 
 
-inline camio_error_t camio_write_acquire(camio_channel_t* this, camio_wr_buffer_t** buffer_o)
+camio_error_t camio_chan_wr_buff_req(camio_channel_t* this, camio_wr_req_t* req_vec, ch_word vec_len)
 {
-    return this->vtable.write_acquire(this, buffer_o);
+    return this->vtable.write_buffer_request(this, req_vec, vec_len);
+}
+
+camio_error_t camio_chan_wr_buff_ready(camio_channel_t* this)
+{
+    return this->wr_buff_muxable.vtable.ready(&this->wr_buff_muxable);
 }
 
 
-inline camio_error_t camio_write_request(camio_channel_t* this, camio_wr_req_t* req_vec, ch_word req_vec_len)
+camio_error_t camio_chan_wr_buff_res(camio_channel_t* this, camio_wr_req_t** req_o)
 {
-    return this->vtable.write_request(this, req_vec, req_vec_len);
+    return this->vtable.write_buffer_result(this, req_o);
 }
 
+camio_error_t camio_chan_wr_req(camio_channel_t* this, camio_wr_req_t* req_vec, ch_word vec_len)
+{
+    return this->vtable.write_request(this, req_vec, vec_len);
+}
 
-inline camio_error_t camio_write_ready( camio_channel_t* this)
+camio_error_t camio_write_ready( camio_channel_t* this)
 {
     return this->wr_muxable.vtable.ready(&this->wr_muxable);
 }
 
 
-inline camio_error_t camio_write_release(camio_channel_t* this, camio_wr_buffer_t** buffer)
+camio_error_t camio_chan_wr_res(camio_channel_t* this, camio_wr_req_t** res_o)
 {
-    return this->vtable.write_release(this, buffer);
+    return this->vtable.write_result(this, res_o);
 }
 
 
-inline void camio_channel_destroy(camio_channel_t* this)
+camio_error_t camio_chan_wr_buff_rel(camio_channel_t* this, camio_wr_buffer_t** buffer)
+{
+    return this->vtable.write_buffer_release(this, buffer);
+}
+
+
+void camio_channel_destroy(camio_channel_t* this)
 {
     this->vtable.destroy(this);
 }

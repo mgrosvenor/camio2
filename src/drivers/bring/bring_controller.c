@@ -32,7 +32,7 @@
 #define getpagesize() sysconf(_SC_PAGESIZE)
 
 /**************************************************************************************************************************
- * PER STREAM STATE
+ * PER CHANNEL STATE
  **************************************************************************************************************************/
 typedef struct bring_priv_s {
 
@@ -413,7 +413,7 @@ static camio_error_t bring_connect(camio_controller_t* this, camio_channel_t** c
 
 
     //DBG("Done connecting, now constructing UDP channel...\n");
-    camio_channel_t* channel = NEW_STREAM(bring);
+    camio_channel_t* channel = NEW_CHANNEL(bring);
     if(!channel){
         *channel_o = NULL;
         return CAMIO_ENOMEM;

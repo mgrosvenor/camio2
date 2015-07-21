@@ -16,10 +16,11 @@
 #include <src/types/types.h>
 
 typedef enum {
-    CAMIO_MUX_MODE_NONE    = 0, //Default case. Error.
-    CAMIO_MUX_MODE_READ    = 1, //Selector will fire when muxable is ready to read
-    CAMIO_MUX_MODE_WRITE   = 2, //Selector will fire when muxable is ready to write
-    CAMIO_MUX_MODE_CONNECT = 4, //Selector will fire when muxable is ready to connect
+    CAMIO_MUX_MODE_NONE         = 0, //Default case. Error.
+    CAMIO_MUX_MODE_READ         = 1, //Selector will fire when muxable is ready to read
+    CAMIO_MUX_MODE_WRITE        = 2, //Selector will fire when muxable is ready to write
+    CAMIO_MUX_MODE_WRITE_BUFF   = 4, //Selector will fire when muxable is ready to give a new buffer
+    CAMIO_MUX_MODE_CONNECT      = 8, //Selector will fire when muxable is ready to connect
 } camio_mux_mode_e;
 
 /**

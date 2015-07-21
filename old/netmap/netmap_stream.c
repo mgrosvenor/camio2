@@ -44,7 +44,7 @@ camio_error_t netmap_channel_construct(camio_channel_t* this, ch_word netmap_fd,
 {
     DBG("rings_start=%i,rings_end=%i\n", rings_start, rings_end);
 
-    netmap_channel_priv_t* priv = STREAM_GET_PRIVATE(this);
+    netmap_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this);
     priv->netmap_fd     = netmap_fd;
     priv->net_if        = net_if;
     priv->rings_start   = rings_start;
@@ -134,7 +134,7 @@ camio_error_t netmap_channel_construct(camio_channel_t* this, ch_word netmap_fd,
 
 static void netmap_destroy(camio_channel_t* this)
 {
-    netmap_channel_priv_t* priv = STREAM_GET_PRIVATE(this);
+    netmap_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this);
     if(priv->tx_buffers){
         free(priv->tx_buffers);
         priv->tx_buffers = NULL;
@@ -190,7 +190,7 @@ static void netmap_destroy(camio_channel_t* this)
 static camio_error_t netmap_read_acquire( camio_channel_t* this,  camio_rd_buffer_t** buffer_chain_o,  ch_word* chain_len_o,
         ch_word buffer_offset, ch_word source_offset)
 {
-    netmap_channel_priv_t* priv = STREAM_GET_PRIVATE(this);
+    netmap_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this);
 
     (void)buffer_offset; //Not supported
     (void)source_offset; //Not supported
@@ -238,7 +238,7 @@ static camio_error_t netmap_read_acquire( camio_channel_t* this,  camio_rd_buffe
 
 static camio_error_t netmap_read_release(camio_channel_t* this, camio_rd_buffer_t* buffer_chain)
 {
-    netmap_channel_priv_t* priv = STREAM_GET_PRIVATE(this);
+    netmap_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this);
 
     //Walk to the end of the chain,
     camio_rd_buffer_t* buffer_curr = buffer_chain;
@@ -290,6 +290,6 @@ static camio_error_t netmap_write_release(camio_channel_t* this, camio_wr_buffer
 }
 
 
-NEW_STREAM_DEFINE(netmap,netmap_channel_priv_t)
+NEW_CHANNEL_DEFINE(netmap,netmap_channel_priv_t)
 
 

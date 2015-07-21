@@ -222,7 +222,7 @@ static camio_error_t netmap_connect(camio_controller_t* this, camio_channel_t** 
     }
     struct netmap_if* net_if = NETMAP_IF(netmap_region, req.nr_offset);
 
-    camio_channel_t* channel = NEW_STREAM(netmap);
+    camio_channel_t* channel = NEW_CHANNEL(netmap);
     if(!channel){
         *channel_o = NULL;
         return CAMIO_ENOMEM;

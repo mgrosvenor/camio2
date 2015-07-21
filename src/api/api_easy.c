@@ -58,14 +58,27 @@ camio_error_t camio_channel_new(char* uri, camio_channel_t** channel)
 //
 //   //If not true, we have a problem!
 //   assert(muxable->parent.controller == controller);
+   camio_chan_req_t req = {0};
+   err = camio_ctrl_chan_req(controller,&req,1,0);
+   if(err){
+       DBG("Could not request connection on controller\n");
+       return err;
+   }
 
-   while( (err = camio_connect(controller,channel)) == CAMIO_ETRYAGAIN ){}
+   while( (err = camio_ctrl_chan_ready(controller)) == CAMIO_ETRYAGAIN ){}
    if(err){
        DBG("Could not connect to channel\n");
        return CAMIO_EINVALID; //TODO XXX put a better error here
    }
 
+   camio_chan_req_t* res = NULL;
+   err = camio_ctrl_chan_res(controller,&res);
+   if(err){
+       DBG("Could not get connection response!\n");
+       return err;
+   }
 
+   *channel = res->channel;
    DBG("## Got new channel at address %p\n", channel);
 
    //Clean up our mess

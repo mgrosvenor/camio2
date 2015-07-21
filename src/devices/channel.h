@@ -47,14 +47,16 @@ typedef struct camio_channel_interface_s{
     void (*destroy)(camio_channel_t* this);
 
     //Read operations
-    camio_error_t (*read_request)(camio_channel_t* this, camio_rd_req_t* req_vec, ch_word req_vec_len );
-    camio_error_t (*read_acquire)(camio_channel_t* this, camio_rd_buffer_t** buffer_o);
+    camio_error_t (*read_request)(camio_channel_t* this, camio_rd_req_t* req_vec, ch_word vec_len );
+    camio_error_t (*read_result) (camio_channel_t* this, camio_rd_req_t** res);
     camio_error_t (*read_release)(camio_channel_t* this, camio_wr_buffer_t** buffer_o);
 
     //Write operations
-    camio_error_t (*write_acquire)(camio_channel_t* this, camio_wr_buffer_t** buffer_o);
-    camio_error_t (*write_request)(camio_channel_t* this, camio_wr_req_t* req_vec, ch_word req_vec_len);
-    camio_error_t (*write_release)(camio_channel_t* this, camio_wr_buffer_t** buffer);
+    camio_error_t (*write_buffer_request)(camio_channel_t* this, camio_wr_req_t* req_vec, ch_word vec_len );
+    camio_error_t (*write_buffer_result) (camio_channel_t* this, camio_wr_req_t** res);
+    camio_error_t (*write_request)(camio_channel_t* this, camio_wr_req_t* req_vec, ch_word vec_len );
+    camio_error_t (*write_result) (camio_channel_t* this, camio_wr_req_t** res);
+    camio_error_t (*write_buffer_release)(camio_channel_t* this, camio_wr_buffer_t** buffer_o);
 
 } camio_channel_interface_t;
 
@@ -81,6 +83,7 @@ typedef struct camio_channel_s {
      * Holds the multiplexable structures for adding into a multiplexor
      */
     camio_muxable_t rd_muxable; //For reading
+    camio_muxable_t wr_buff_muxable; //For write buffers
     camio_muxable_t wr_muxable; //For writing
 
 
@@ -97,23 +100,33 @@ typedef struct camio_channel_s {
 
 #define NEW_CHANNEL_DEFINE(NAME, PRIVATE_TYPE) \
     static const camio_channel_interface_t NAME##_channel_interface = {\
-            .read_request   = NAME##_read_request,\
-            .read_acquire   = NAME##_read_acquire,\
-            .read_release   = NAME##_read_release,\
-            .write_acquire  = NAME##_write_acquire,\
-            .write_request  = NAME##_write_request,\
-            .write_release  = NAME##_write_release,\
-            .destroy        = NAME##_destroy,\
+            .read_request           = NAME##_read_request,\
+            .read_result            = NAME##_read_result,\
+            .read_release           = NAME##_read_release,\
+            .write_buffer_request   = NAME##_write_buffer_request,\
+            .write_buffer_result    = NAME##_write_buffer_result,\
+            .write_buffer_release   = NAME##_write_buffer_release,\
+            .write_request          = NAME##_write_request,\
+            .write_result           = NAME##_write_result,\
+            .destroy                = NAME##_destroy,\
     };\
     \
     NEW_CHANNEL_DECLARE(NAME)\
     {\
         camio_channel_t* result = (camio_channel_t*)calloc(1,sizeof(camio_channel_t) + sizeof(PRIVATE_TYPE));\
         if(!result) return NULL;\
-        result->vtable = NAME##_channel_interface;\
+        result->vtable                          = NAME##_channel_interface;\
+        result->rd_muxable.mode                 = CAMIO_MUX_MODE_READ;\
+        result->rd_muxable.parent.channel       = result;\
+        result->rd_muxable.vtable.ready         = NAME##_read_ready;\
+        result->wr_muxable.mode                 = CAMIO_MUX_MODE_WRITE;\
+        result->wr_muxable.parent.channel       = result;\
+        result->wr_muxable.vtable.ready         = NAME##_write_ready;\
+        result->wr_buff_muxable.mode            = CAMIO_MUX_MODE_WRITE_BUFF;\
+        result->wr_buff_muxable.parent.channel  = result;\
+        result->wr_buff_muxable.vtable.ready    = NAME##_write_buffer_ready;\
         return result;\
     }
-
 
 
 

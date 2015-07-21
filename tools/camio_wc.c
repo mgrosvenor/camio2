@@ -88,7 +88,7 @@ int main(int argc, char** argv)
     if(err){ ERR("Could not connect to channel\n"); return CAMIO_EINVALID; /*TODO XXX put a better error here*/ }
 
     //Put the read channel into the mux
-    camio_mux_insert(mux,&io_channel->rd_muxable,READ_STREAM);
+    camio_mux_insert(mux,&io_channel->rd_muxable,READ_CHANNEL);
 
    //Read and write bytes to and from the channel - just do loopback for now
     camio_rd_buffer_t* rd_buffer = NULL;
@@ -112,7 +112,7 @@ int main(int argc, char** argv)
             break;
         }
         switch(which){
-            case READ_STREAM: {//There is new data to be read
+            case READ_CHANNEL: {//There is new data to be read
                 //Acquire a pointer to the new data now that it's ready
                 DBG("Handling read event\n");
                 err = camio_read_acquire(muxable->parent.channel, &rd_buffer);

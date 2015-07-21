@@ -127,7 +127,7 @@ camio_error_t fio_connect(camio_controller_t* this, camio_channel_t** channel_o 
     }
 
     //DBG("Done connecting, now constructing UDP channel...\n");
-    camio_channel_t* channel = NEW_STREAM(fio);
+    camio_channel_t* channel = NEW_CHANNEL(fio);
     if(!channel){
         *channel_o = NULL;
         return CAMIO_ENOMEM;

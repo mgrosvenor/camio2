@@ -28,7 +28,7 @@
 
 
 /**************************************************************************************************************************
- * PER STREAM STATE
+ * PER CHANNEL STATE
  **************************************************************************************************************************/
 typedef struct mfio_priv_s {
 
@@ -117,7 +117,7 @@ static camio_error_t mfio_connect(camio_controller_t* this, camio_channel_t** ch
     }
 
     //DBG("Done connecting, now constructing UDP channel...\n");
-    camio_channel_t* channel = NEW_STREAM(mfio);
+    camio_channel_t* channel = NEW_CHANNEL(mfio);
     if(!channel){
         *channel_o = NULL;
         return CAMIO_ENOMEM;

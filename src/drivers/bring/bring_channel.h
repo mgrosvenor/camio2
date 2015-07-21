@@ -8,14 +8,14 @@
  *  Description:
  *  <INSERT DESCRIPTION HERE> 
  */
-#ifndef SRC_DRIVERS_BRING_BRING_STREAM_H_
-#define SRC_DRIVERS_BRING_BRING_STREAM_H_
+#ifndef SRC_DRIVERS_BRING_BRING_CHANNEL_H_
+#define SRC_DRIVERS_BRING_BRING_CHANNEL_H_
 
 #include <src/devices/channel.h>
 #include <src/devices/controller.h>
 #include <src/types/len_string.h>
 
-NEW_STREAM_DECLARE(bring);
+NEW_CHANNEL_DECLARE(bring);
 
 typedef struct slot_header_s{
     ch_word data_size;
@@ -69,4 +69,4 @@ camio_error_t bring_channel_construct(
     int fd
 );
 
-#endif /* SRC_DRIVERS_BRING_BRING_STREAM_H_ */
+#endif /* SRC_DRIVERS_BRING_BRING_CHANNEL_H_ */

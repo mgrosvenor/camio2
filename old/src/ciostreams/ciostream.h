@@ -1,8 +1,8 @@
 // CamIO 2: ciochannel.h
 // Copyright (C) 2013: Matthew P. Grosvenor (matthew.grosvenor@cl.cam.ac.uk) 
 // Licensed under BSD 3 Clause, please see LICENSE for more details. 
-#ifndef CIOSTREAM_H_
-#define CIOSTREAM_H_
+#ifndef CIOCHANNEL_H_
+#define CIOCHANNEL_H_
 
 #include "../types/types.h"
 #include "../errors/errors.h"
@@ -165,7 +165,7 @@ struct cioconn_s {
  * Returns:
  * - ENOERROR:  All good. Nothing to see here.
  * - EBADURI:   The URI supplied has a syntax error or is poorly formatted
- * - ENOSTREAM: The channel type is unrecognized
+ * - ENOCHANNEL: The channel type is unrecognized
  * - EBADOPT:   The URI options have an error or are unsupported
  * - EBADPROP:  The channel supplied in URI did not match the properties requested.
  */
@@ -179,7 +179,7 @@ int new_cioconn( char* uri , ciostrm_req* properties, struct cioconn_s** cioconn
  * Returns:
  * - ENOERROR:  All good. Nothing to see here.
  * - EBADURI:   The URI supplied has a syntax error or is poorly formatted
- * - ENOSTREAM: The channel type is unrecognized
+ * - ENOCHANNEL: The channel type is unrecognized
  * - EBADOPT:   The URI options have an error or are unsupported
  * - EBADPROP:  The channel supplied in URI did not match the properties requested.
  * - ETRYAGAIN: The channel has nothing new to report at this time. No connection has yet happened.
@@ -187,4 +187,4 @@ int new_cioconn( char* uri , ciostrm_req* properties, struct cioconn_s** cioconn
  */
 int new_ciostrm( char* uri ,  ciostrm_req* properties, ciosel selector, uint64_t timeout_ns, ciostrm** ciochannel_o );
 
-#endif //CIOSTREAM_H_
+#endif //CIOCHANNEL_H_

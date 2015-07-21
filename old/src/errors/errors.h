@@ -17,7 +17,7 @@
 #define CIO_EQFULL               -4LL
 #define CIO_ECOPYOP              -5LL
 #define CIO_EBADURI              -6LL
-#define CIO_ENOSTREAM            -7LL
+#define CIO_ENOCHANNEL            -7LL
 #define CIO_EBADOPT              -8LL
 #define CIO_EBADPROP             -9LL
 #define CIO_EUNSUPSTRAT         -10LL

@@ -227,7 +227,7 @@ camio_error_t camio_chan_wr_buff_ready(camio_channel_t* this);
 /**
  * Try get the results of a write buffer request
  */
-camio_error_t camio_chan_wr_buff_res(camio_channel_t* this, camio_wr_req_t** req_O);
+camio_error_t camio_chan_wr_buff_res(camio_channel_t* this, camio_wr_req_t** req_o);
 
 
 /* Write data described by the , or buffer_chain to the channel called 'this'. Write may or may not block. Use a
@@ -259,7 +259,7 @@ camio_error_t camio_chan_wr_res(camio_channel_t* this, camio_wr_req_t** req_o);
  * - ENOERROR: All good, please continue.
  * - EBADSEQ:  You cannot release this buffer without releasing previous buffers in the sequence too.
  */
-camio_error_t camio_chan_wr_rel(camio_channel_t* this, camio_wr_buffer_t** buffer);
+camio_error_t camio_chan_wr_buff_rel(camio_channel_t* this, camio_wr_buffer_t** buffer);
 
 
 /**

@@ -47,7 +47,7 @@ int new_cioconn( char* uri_str , ciostrm_req* properties, struct cioconn_s** cio
 
     //Could not find the channel name type
     if(!entry->scheme){
-        return CIO_ENOSTREAM;
+        return CIO_ENOCHANNEL;
     }
 
     result = entry->strm_new_cioconn(uri_parsed, cioconn_o, &entry->global_data);

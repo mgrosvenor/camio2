@@ -25,7 +25,7 @@
 #include "bring_device.h"
 
 /**************************************************************************************************************************
- * PER STREAM STATE
+ * PER CHANNEL STATE
  **************************************************************************************************************************/
 #define CAMIO_BRING_BUFFER_SIZE (4 * 1024 * 1024)
 //Current (simple) BRING recv only does one buffer at a time, this could change with vectored I/O in the future.
@@ -83,7 +83,7 @@ static camio_error_t bring_read_peek( camio_channel_t* this)
     DBG("Doing read peek\n");
 
     //This is not a public function, can assume that preconditions have been checked.
-    bring_channel_priv_t* priv = STREAM_GET_PRIVATE(this);
+    bring_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this);
 
     if(priv->rd_buff){ //There is a ready already waiting
         return CAMIO_ENOERROR;
@@ -154,7 +154,7 @@ static camio_error_t bring_read_ready(camio_muxable_t* this)
     }
 
     //OK now the fun begins
-    bring_channel_priv_t* priv = STREAM_GET_PRIVATE(this->parent.channel);
+    bring_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this->parent.channel);
 
     if(!priv->read_registered){ //Even if there is data waiting, nobody want's it, so ignore for now.
         DBG("Nobody wants the data\n");
@@ -193,7 +193,7 @@ static camio_error_t bring_read_request( camio_channel_t* this, camio_rd_req_t* 
         DBG("This null???\n"); //WTF?
         return CAMIO_EINVALID;
     }
-    bring_channel_priv_t* priv = STREAM_GET_PRIVATE(this);
+    bring_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this);
 
     if(req_vec_len != 1){
         DBG("Stream currently only supports read requests of size 1\n"); //TODO this should be coded in the features struct
@@ -216,7 +216,7 @@ static camio_error_t bring_read_request( camio_channel_t* this, camio_rd_req_t* 
 }
 
 
-static camio_error_t bring_read_acquire( camio_channel_t* this,  camio_rd_buffer_t** buffer_o)
+static camio_error_t bring_read_result( camio_channel_t* this, camio_rd_req_t* req_vec )
 {
 
     //Basic sanity checks -- TODO XXX: Should these be made into (compile time optional?) asserts for runtime performance?
@@ -243,7 +243,7 @@ static camio_error_t bring_read_acquire( camio_channel_t* this,  camio_rd_buffer
         return err;
     }
 
-    bring_channel_priv_t* priv = STREAM_GET_PRIVATE(this);
+    bring_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this);
 
     *buffer_o = priv->rd_buff;
     priv->read_registered = false; //Release the read now. This means that read req can be called again
@@ -280,7 +280,7 @@ static camio_error_t bring_read_release(camio_channel_t* this, camio_rd_buffer_t
         return CAMIO_EINVALID;
     }
 
-    bring_channel_priv_t* priv = STREAM_GET_PRIVATE(this);
+    bring_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this);
     camio_rd_buffer_t* bring_buffer = *buffer;
 
     //Check that the buffers are being freed in order
@@ -335,7 +335,7 @@ static camio_error_t try_write_acquire(camio_channel_t* this){
           DBG("This null???\n"); //WTF?
           return CAMIO_EINVALID;
       }
-      bring_channel_priv_t* priv = STREAM_GET_PRIVATE(this);
+      bring_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this);
 
       DBG("Trying to do a write acquire at index=%lli\n", priv->wr_rel_index);
 
@@ -383,7 +383,7 @@ static camio_error_t bring_write_acquire(camio_channel_t* this, camio_wr_buffer_
         return err;
     }
 
-    bring_channel_priv_t* priv = STREAM_GET_PRIVATE(this);
+    bring_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this);
 
     camio_buffer_t* result      = &priv->wr_buffers[priv->wr_rel_index];
     volatile char* slot_mem     = (volatile void*)result->__internal.__mem_start;
@@ -403,7 +403,7 @@ static camio_error_t bring_write_acquire(camio_channel_t* this, camio_wr_buffer_
 //Try to write to the underlying, channel. This function is private, so no precondition checks necessary
 static camio_error_t bring_write_try(camio_channel_t* this)
 {
-    bring_channel_priv_t* priv = STREAM_GET_PRIVATE(this);
+    bring_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this);
 
     for(int i = priv->write_req_curr; i < priv->write_req_len; i++, priv->write_req_curr++){
         camio_wr_req_t* req = priv->write_req + i;
@@ -467,7 +467,7 @@ static camio_error_t bring_write_request(camio_channel_t* this, camio_wr_req_t* 
         return CAMIO_EINVALID;
     }
 
-    bring_channel_priv_t* priv = STREAM_GET_PRIVATE(this);
+    bring_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this);
     if(priv->write_registered){
         ERR("Already registered a write request. Currently this channel only handles one outstanding request at a time\n");
         return CAMIO_EINVALID; //TODO XXX better error code
@@ -504,7 +504,7 @@ static camio_error_t bring_write_ready(camio_muxable_t* this)
         return CAMIO_EINVALID;
     }
 
-    bring_channel_priv_t* priv = STREAM_GET_PRIVATE(this->parent.channel);
+    bring_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this->parent.channel);
     if(!priv->write_registered){ //No body has asked us to write anything, so we're not ready
         return CAMIO_ENOTREADY;
     }
@@ -585,7 +585,7 @@ static camio_error_t bring_write_release(camio_channel_t* this, camio_wr_buffer_
         return CAMIO_ENOERROR; //Buffer has already been released
     }
 
-    bring_channel_priv_t* priv = STREAM_GET_PRIVATE(this);
+    bring_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this);
     //Check that the buffers are being released in order
     if(bring_buffer->__internal.__buffer_id != priv->wr_rel_index){
         ERR("Cannot release this buffer (id=%lli) until buffer with id=%lli is released\n",
@@ -625,7 +625,7 @@ static void bring_destroy(camio_channel_t* this)
         DBG("This null???\n"); //WTF?
         return;
     }
-    bring_channel_priv_t* priv = STREAM_GET_PRIVATE(this);
+    bring_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this);
 
     if(priv->bring_head){
         munlock((void*)priv->bring_head,priv->bring_head->total_mem);
@@ -658,7 +658,7 @@ camio_error_t bring_channel_construct(
         ERR("This null???\n"); //WTF?
         return CAMIO_EINVALID;
     }
-    bring_channel_priv_t* priv = STREAM_GET_PRIVATE(this);
+    bring_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this);
 
     priv->controller  = *controller; //Keep a copy of the controller state
     priv->params     = *params;
@@ -733,4 +733,4 @@ camio_error_t bring_channel_construct(
 }
 
 
-NEW_STREAM_DEFINE(bring,bring_channel_priv_t)
+NEW_CHANNEL_DEFINE(bring,bring_channel_priv_t)

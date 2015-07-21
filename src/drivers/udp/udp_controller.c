@@ -32,7 +32,7 @@
 #include <netdb.h>
 
 /**************************************************************************************************************************
- * PER STREAM STATE
+ * PER CHANNEL STATE
  **************************************************************************************************************************/
 #define CAMIO_UDP_MAX_ADDR_STR 1024
 #define CAMIO_UDP_MAX_PROT_STR 10
@@ -170,7 +170,7 @@ static camio_error_t udp_connect(camio_controller_t* this, camio_channel_t** cha
     }
     //DBG("Done connecting, now constructing UDP channel...\n");
 
-    camio_channel_t* channel = NEW_STREAM(udp);
+    camio_channel_t* channel = NEW_CHANNEL(udp);
     if(!channel){
         *channel_o = NULL;
         return CAMIO_ENOMEM;

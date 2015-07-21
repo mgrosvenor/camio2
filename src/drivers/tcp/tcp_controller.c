@@ -78,7 +78,7 @@ static camio_error_t resolve_bind_connect(char* address, char* prot, ch_bool do_
 
     memset(&hints, 0, sizeof(hints));
     hints.ai_family = PF_UNSPEC;
-    hints.ai_socktype = SOCK_STREAM; //This could be more general in the future if the code is moved out of the TCP channel
+    hints.ai_socktype = SOCK_CHANNEL; //This could be more general in the future if the code is moved out of the TCP channel
     error = getaddrinfo(address, prot, &hints, &res_head);
     if (error) {
         ERR("Getaddrinfo() failed: %s\n", gai_strerror(error));
@@ -241,7 +241,7 @@ static camio_error_t tcp_connect(camio_controller_t* this, camio_channel_t** cha
     }
     DBG("Done connecting, now constructing TCP channel...\n");
 
-    camio_channel_t* channel = NEW_STREAM(tcp);
+    camio_channel_t* channel = NEW_CHANNEL(tcp);
     if(!channel){
         *channel_o = NULL;
         return CAMIO_ENOMEM;
