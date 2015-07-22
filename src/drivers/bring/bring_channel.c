@@ -185,7 +185,7 @@ static camio_error_t bring_read_ready(camio_muxable_t* this)
 
 }
 
-static camio_error_t bring_read_request( camio_channel_t* this, camio_rd_req_t* req_vec, ch_word req_vec_len )
+static camio_error_t bring_read_request(camio_channel_t* this, camio_rd_req_t* req_vec, ch_word vec_len )
 {
     DBG("Doing bring read request...!\n");
     //Basic sanity checks -- TODO XXX: Should these be made into (compile time optional?) asserts for runtime performance?
@@ -195,7 +195,7 @@ static camio_error_t bring_read_request( camio_channel_t* this, camio_rd_req_t* 
     }
     bring_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this);
 
-    if(req_vec_len != 1){
+    if(vec_len != 1){
         DBG("Stream currently only supports read requests of size 1\n"); //TODO this should be coded in the features struct
         return CAMIO_EINVALID;
     }
@@ -207,7 +207,7 @@ static camio_error_t bring_read_request( camio_channel_t* this, camio_rd_req_t* 
 
     //Sanity checks done, do some work now
     priv->read_req          = req_vec;
-    priv->read_req_len      = req_vec_len;
+    priv->read_req_len      = vec_len;
     priv->read_registered   = true;
 
     DBG("Doing bring read request...Done!..Successful\n");
@@ -216,9 +216,8 @@ static camio_error_t bring_read_request( camio_channel_t* this, camio_rd_req_t* 
 }
 
 
-static camio_error_t bring_read_result( camio_channel_t* this, camio_rd_req_t* req_vec )
+static camio_error_t bring_read_result( camio_channel_t* this, camio_rd_req_t** req_vec )
 {
-
     //Basic sanity checks -- TODO XXX: Should these be made into (compile time optional?) asserts for runtime performance?
     if( NULL == this){
         DBG("This null???\n"); //WTF?

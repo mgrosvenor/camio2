@@ -21,6 +21,10 @@
  *  <INSERT DESCRIPTION HERE>
  */
 
+//This switches of the sanity checks in release mode.
+#ifndef NDEBUG
+#define DO_SANITY_CHECKS
+#endif
 
 #include <src/devices/controller.h>
 #include <src/devices/features.h>
@@ -33,24 +37,40 @@
 
 camio_error_t camio_chan_rd_req( camio_channel_t* this, camio_rd_req_t* req_vec, ch_word vec_len )
 {
+    #ifdef DO_SANITY_CHECKS
+        if( NULL == this){ DBG("This is null???\n"); return CAMIO_EINVALID; }
+        if( NULL == req_vec){ DBG("Supplied read request vector is NULL\n"); return CAMIO_EINVALID; }
+        if( 0 == vec_len){ DBG("Supplied read request vector is empty\n"); return CAMIO_EINVALID; }
+    #endif
+
     return this->vtable.read_request(this, req_vec, vec_len);
 }
 
 
 camio_error_t camio_chan_rd_ready( camio_channel_t* this)
 {
+    #ifdef DO_SANITY_CHECKS
+        if( NULL == this){ DBG("This is null???\n");  return CAMIO_EINVALID; }
+    #endif
+
     return this->rd_muxable.vtable.ready(&this->rd_muxable);
 }
 
 camio_error_t camio_chan_rd_res( camio_channel_t* this, camio_rd_req_t** req_o)
-
 {
+    #ifdef DO_SANITY_CHECKS //Only apply these checks in debug mode. Keep the speed when we need it?
+        if( NULL == this){ DBG("This is null???\n"); return CAMIO_EINVALID; }
+        if( NULL == req_o){ DBG("Request result pointer supplied is NULL\n"); return CAMIO_EINVALID; }
+    #endif
+
     return this->vtable.read_result(this, req_o);
 }
 
 
 camio_error_t camio_chan_rd_rel(camio_channel_t* this, camio_rd_buffer_t** buffer)
 {
+
+
     return this->vtable.read_release(this, buffer);
 }
 
