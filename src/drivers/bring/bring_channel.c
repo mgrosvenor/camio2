@@ -82,7 +82,6 @@ static camio_error_t bring_read_peek( camio_channel_t* this)
 {
     DBG("Doing read peek\n");
 
-    //This is not a public function, can assume that preconditions have been checked.
     bring_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this);
 
     if(priv->rd_buff){ //There is a ready already waiting
@@ -142,17 +141,6 @@ static camio_error_t bring_read_peek( camio_channel_t* this)
 
 static camio_error_t bring_read_ready(camio_muxable_t* this)
 {
-    //Basic sanity checks -- TODO XXX: Should these be made into (compile time optional?) asserts for runtime performance?
-    if( NULL == this){
-        DBG("This is null???\n"); //WTF?
-        return CAMIO_EINVALID;
-    }
-
-    if( this->mode != CAMIO_MUX_MODE_READ){
-        DBG("Wrong kind of muxable!\n"); //WTF??
-        return CAMIO_EINVALID;
-    }
-
     //OK now the fun begins
     bring_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this->parent.channel);
 
@@ -188,11 +176,7 @@ static camio_error_t bring_read_ready(camio_muxable_t* this)
 static camio_error_t bring_read_request(camio_channel_t* this, camio_rd_req_t* req_vec, ch_word vec_len )
 {
     DBG("Doing bring read request...!\n");
-    //Basic sanity checks -- TODO XXX: Should these be made into (compile time optional?) asserts for runtime performance?
-    if( NULL == this){
-        DBG("This null???\n"); //WTF?
-        return CAMIO_EINVALID;
-    }
+
     bring_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this);
 
     if(vec_len != 1){
@@ -218,19 +202,7 @@ static camio_error_t bring_read_request(camio_channel_t* this, camio_rd_req_t* r
 
 static camio_error_t bring_read_result( camio_channel_t* this, camio_rd_req_t** req_vec )
 {
-    //Basic sanity checks -- TODO XXX: Should these be made into (compile time optional?) asserts for runtime performance?
-    if( NULL == this){
-        DBG("This null???\n"); //WTF?
-        return CAMIO_EINVALID;
-    }
-    if( NULL == buffer_o){
-        DBG("Buffer chain pointer null\n"); //WTF?
-        return CAMIO_EINVALID;
-    }
-    if( NULL != *buffer_o){
-        DBG("Buffer chain not null. You should release this before getting a new one, otherwise dangling pointers!\n");
-        return CAMIO_EINVALID;
-    }
+
 
     camio_error_t err = bring_read_ready(&this->rd_muxable);
     if(err == CAMIO_ENOTREADY){
@@ -256,28 +228,6 @@ static camio_error_t bring_read_result( camio_channel_t* this, camio_rd_req_t** 
 static camio_error_t bring_read_release(camio_channel_t* this, camio_rd_buffer_t** buffer)
 {
     DBG("Doing read release\n");
-
-    //Basic sanity checks -- TODO XXX: Should these be made into (compile time optional?) asserts for runtime performance?
-    if( NULL == this){
-        ERR("This null???\n"); //WTF?
-        return CAMIO_EINVALID;
-    }
-
-    if( NULL == buffer){
-        ERR("Buffer pointer null\n"); //WTF?
-        return CAMIO_EINVALID;
-    }
-
-    if( NULL == *buffer){
-        ERR("Buffer null\n"); //WTF?
-        return CAMIO_EINVALID;
-    }
-
-    if((*buffer)->__internal.__parent != this){
-        //TODO XXX could add this feature but it would be non-trivial
-        ERR("Cannot release a buffer that does not belong to us!\n");
-        return CAMIO_EINVALID;
-    }
 
     bring_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this);
     camio_rd_buffer_t* bring_buffer = *buffer;
@@ -329,52 +279,37 @@ static camio_error_t bring_read_release(camio_channel_t* this, camio_rd_buffer_t
 static camio_error_t try_write_acquire(camio_channel_t* this){
     DBG("Doing write acquire\n");
 
-    //Basic sanity checks -- TODO XXX: Should these be made into (compile time optional?) asserts for runtime performance?
-      if( NULL == this){
-          DBG("This null???\n"); //WTF?
-          return CAMIO_EINVALID;
-      }
-      bring_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this);
+    bring_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this);
 
-      DBG("Trying to do a write acquire at index=%lli\n", priv->wr_rel_index);
+    DBG("Trying to do a write acquire at index=%lli\n", priv->wr_rel_index);
 
 
-      //Is there a new slot ready for writing?
-      camio_buffer_t* result      = &priv->wr_buffers[priv->wr_rel_index];
-      volatile char* slot_mem     = (volatile void*)result->__internal.__mem_start;
-      const uint64_t slot_mem_sz  = result->__internal.__mem_len;
-      volatile char* hdr_mem      = slot_mem + slot_mem_sz; // - sizeof(bring_slot_header_t);
-      __sync_synchronize();
-      register bring_slot_header_t curr_slot_head = *(volatile bring_slot_header_t*)(hdr_mem);
-      __sync_synchronize();
+    //Is there a new slot ready for writing?
+    camio_buffer_t* result      = &priv->wr_buffers[priv->wr_rel_index];
+    volatile char* slot_mem     = (volatile void*)result->__internal.__mem_start;
+    const uint64_t slot_mem_sz  = result->__internal.__mem_len;
+    volatile char* hdr_mem      = slot_mem + slot_mem_sz; // - sizeof(bring_slot_header_t);
+    __sync_synchronize();
+    register bring_slot_header_t curr_slot_head = *(volatile bring_slot_header_t*)(hdr_mem);
+    __sync_synchronize();
 
-      DBG("seq no   =%lli offset=(%lli)\n", curr_slot_head.seq_no, (char*)hdr_mem - (char*)priv->bring_head);
-      DBG("data size=%lli\n", curr_slot_head.data_size);
+    DBG("seq no   =%lli offset=(%lli)\n", curr_slot_head.seq_no, (char*)hdr_mem - (char*)priv->bring_head);
+    DBG("data size=%lli\n", curr_slot_head.data_size);
 
 
-      if( curr_slot_head.seq_no != 0x00ULL){
-          return CAMIO_ETRYAGAIN;
-      }
+    if( curr_slot_head.seq_no != 0x00ULL){
+        return CAMIO_ETRYAGAIN;
+    }
 
-      //We're all good. A buffer is ready and waiting to to be acquired
-      return CAMIO_ENOERROR;
+    //We're all good. A buffer is ready and waiting to to be acquired
+    return CAMIO_ENOERROR;
 }
 
 
 //This should return a buffer when there is one available.
-static camio_error_t bring_write_acquire(camio_channel_t* this, camio_wr_buffer_t** buffer_o)
+static camio_error_t bring_write_buffer_request(camio_channel_t* this, camio_wr_req_t* req_vec, ch_word vec_len )
 {
     DBG("Doing write acquire\n");
-
-    if( NULL == buffer_o){
-        DBG("Buffer chain pointer null\n"); //WTF?
-        return CAMIO_EINVALID;
-    }
-
-    if( NULL != *buffer_o){
-        DBG("Buffer chain not null\n"); //WTF?
-        return CAMIO_EINVALID;
-    }
 
     camio_error_t err = try_write_acquire(this);
     if( err != CAMIO_ENOERROR){
@@ -397,6 +332,20 @@ static camio_error_t bring_write_acquire(camio_channel_t* this, camio_wr_buffer_
     DBG("Returning new buffer of size %lli at %p, index=%lli\n", (*buffer_o)->data_len, (*buffer_o)->data_start, priv->wr_rel_index);
     return CAMIO_ENOERROR;
 }
+
+static camio_error_t bring_write_buffer_ready(camio_muxable_t* this)
+{
+    DBG("Doing write buffer ready\n");
+    return CAMIO_NOTIMPLEMENTED;
+}
+
+
+camio_error_t bring_write_buffer_result(camio_channel_t* this, camio_wr_req_t** res)
+{
+    DBG("Getting write buffer result\n");
+    return CAMIO_NOTIMPLEMENTED;
+}
+
 
 
 //Try to write to the underlying, channel. This function is private, so no precondition checks necessary
@@ -460,12 +409,6 @@ static camio_error_t bring_write_try(camio_channel_t* this)
 //This should queue up a new request or requests.
 static camio_error_t bring_write_request(camio_channel_t* this, camio_wr_req_t* req_vec, ch_word req_vec_len)
 {
-    //Basic sanity checks -- TODO XXX: Should these be made into (compile time optional?) asserts for runtime performance?
-    if( NULL == this){
-        DBG("This is null???\n"); //WTF?
-        return CAMIO_EINVALID;
-    }
-
     bring_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this);
     if(priv->write_registered){
         ERR("Already registered a write request. Currently this channel only handles one outstanding request at a time\n");
@@ -488,21 +431,9 @@ static camio_error_t bring_write_request(camio_channel_t* this, camio_wr_req_t* 
 
 
 
-
 //Is the underlying channel done writing and ready for more?
 static camio_error_t bring_write_ready(camio_muxable_t* this)
 {
-    //Basic sanity checks -- TODO XXX: Should these be made into (compile time optional?) asserts for runtime performance?
-    if( NULL == this){
-        ERR("This is null???\n"); //WTF?
-        return CAMIO_EINVALID;
-    }
-
-    if( this->mode != CAMIO_MUX_MODE_WRITE){
-        ERR("Wrong kind of muxable!\n"); //WTF??
-        return CAMIO_EINVALID;
-    }
-
     bring_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this->parent.channel);
     if(!priv->write_registered){ //No body has asked us to write anything, so we're not ready
         return CAMIO_ENOTREADY;
@@ -539,7 +470,7 @@ static camio_error_t bring_write_ready(camio_muxable_t* this)
         }
 
         //This is an auto release channel, once you've used the buffer it goes away, you'll need to acquire another
-        camio_error_t err = camio_write_release(this->parent.channel,&req->buffer);
+        camio_error_t err = camio_chan_wr_buff_release(this->parent.channel,&req->buffer);
         if(err){
             return err;
         }
@@ -557,25 +488,16 @@ static camio_error_t bring_write_ready(camio_muxable_t* this)
 }
 
 
-static camio_error_t bring_write_release(camio_channel_t* this, camio_wr_buffer_t** buffer)
+static camio_error_t bring_write_result(camio_muxable_t* this)
+{
+    DBG("Getting write buffer result\n");
+    return CAMIO_NOTIMPLEMENTED;
+}
+
+
+static camio_error_t bring_write_buffer_release(camio_channel_t* this, camio_wr_buffer_t* buffer)
 {
     DBG("Doing write release\n");
-
-    //Basic sanity checks -- TODO XXX: Should these be made into (compile time optional?) asserts for runtime performance?
-    if( NULL == this){
-        DBG("This null???\n"); //WTF?
-        return CAMIO_EINVALID;
-    }
-
-    if( NULL == buffer){
-        DBG("Buffer chain pointer null\n"); //WTF?
-        return CAMIO_EINVALID;
-    }
-
-    if( NULL == *buffer){
-        DBG("Buffer chain null\n"); //WTF?
-        return CAMIO_EINVALID;
-    }
 
     camio_buffer_t* bring_buffer = *buffer;
 
@@ -619,11 +541,7 @@ static camio_error_t bring_write_release(camio_channel_t* this, camio_wr_buffer_
 
 static void bring_destroy(camio_channel_t* this)
 {
-    //Basic sanity checks -- TODO XXX: Should these be made into (compile time optional?) asserts for runtime performance?
-    if( NULL == this){
-        DBG("This null???\n"); //WTF?
-        return;
-    }
+
     bring_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this);
 
     if(priv->bring_head){
@@ -652,11 +570,7 @@ camio_error_t bring_channel_construct(
 {
 
     DBG("Constructing bring channel\n");
-    //Basic sanity checks -- TODO XXX: Should these be made into (compile time optional?) asserts for runtime performance?
-    if( NULL == this){
-        ERR("This null???\n"); //WTF?
-        return CAMIO_EINVALID;
-    }
+
     bring_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this);
 
     priv->controller  = *controller; //Keep a copy of the controller state

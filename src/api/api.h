@@ -194,7 +194,7 @@ camio_error_t camio_chan_rd_res( camio_channel_t* this, camio_rd_req_t** req_o);
  * - EINVALID: Your data got trashed, time to recover!
  * - EBADSEQ:  You cannot release this buffer without releasing previous buffers in the sequence too
  */
-camio_error_t camio_chan_rd_rel(camio_channel_t* this, camio_rd_buffer_t** buffer);
+camio_error_t camio_chan_rd_release(camio_channel_t* this, camio_rd_buffer_t* buffer);
 
 
 /**************************************************************************************************************************
@@ -243,7 +243,7 @@ camio_error_t camio_chan_wr_req(camio_channel_t* this, camio_wr_req_t* req_vec, 
 /**
  * Check if the channel is ready to write.
  */
-camio_error_t camio_write_ready( camio_channel_t* this);
+camio_error_t camio_chan_wr_ready( camio_channel_t* this);
 
 /**
  * Try get the results of a write request
@@ -259,7 +259,7 @@ camio_error_t camio_chan_wr_res(camio_channel_t* this, camio_wr_req_t** req_o);
  * - ENOERROR: All good, please continue.
  * - EBADSEQ:  You cannot release this buffer without releasing previous buffers in the sequence too.
  */
-camio_error_t camio_chan_wr_buff_rel(camio_channel_t* this, camio_wr_buffer_t** buffer);
+camio_error_t camio_chan_wr_buff_release(camio_channel_t* this, camio_wr_buffer_t* buffer);
 
 
 /**
