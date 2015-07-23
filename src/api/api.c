@@ -55,7 +55,7 @@ camio_error_t camio_chan_rd_req( camio_channel_t* this, camio_rd_req_t* req_vec,
     #ifdef DO_SANITY_CHECKS
         CHECK(NULL == this,"This is null???\n")
         CHECK(NULL == req_vec,"Supplied read request vector is NULL\n")
-        CHECK(0 == vec_len,"Supplied read request vector is empty\n")
+        CHECK( 0 >= vec_len,"Supplied read request vector is empty\n")
     #endif
 
     return this->vtable.read_request(this, req_vec, vec_len);
@@ -99,7 +99,8 @@ camio_error_t camio_chan_rd_release(camio_channel_t* this, camio_rd_buffer_t* bu
 camio_error_t camio_chan_wr_buff_req(camio_channel_t* this, camio_wr_req_t* req_vec, ch_word vec_len)
 {
     #ifdef DO_SANITY_CHECKS
-        CHECK(NULL == this,"This is null???\n")
+        CHECK( NULL == this,"This is null???\n")
+        CHECK( 0 >= vec_len,"Supplied read request vector is empty\n")
     #endif
 
     return this->vtable.write_buffer_request(this, req_vec, vec_len);
@@ -131,6 +132,7 @@ camio_error_t camio_chan_wr_req(camio_channel_t* this, camio_wr_req_t* req_vec, 
 {
     #ifdef DO_SANITY_CHECKS
         CHECK( NULL == this,"This is null???\n")
+        CHECK( 0 >= vec_len,"Supplied read request vector is empty\n")
     #endif
 
     return this->vtable.write_request(this, req_vec, vec_len);
