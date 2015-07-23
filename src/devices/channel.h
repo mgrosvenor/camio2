@@ -49,14 +49,14 @@ typedef struct camio_channel_interface_s{
 
     //Read operations
     camio_error_t (*read_request)(camio_channel_t* this, camio_rd_req_t* req_vec, ch_word vec_len );
-    camio_error_t (*read_result) (camio_channel_t* this, camio_rd_req_t** res);
+    camio_error_t (*read_result) (camio_channel_t* this, camio_rd_req_t** res_o);
     camio_error_t (*read_release)(camio_channel_t* this, camio_wr_buffer_t** buffer_o);
 
     //Write operations
     camio_error_t (*write_buffer_request)(camio_channel_t* this, camio_wr_req_t* req_vec, ch_word vec_len );
-    camio_error_t (*write_buffer_result) (camio_channel_t* this, camio_wr_req_t** res);
+    camio_error_t (*write_buffer_result) (camio_channel_t* this, camio_wr_req_t** res_o);
     camio_error_t (*write_request)(camio_channel_t* this, camio_wr_req_t* req_vec, ch_word vec_len );
-    camio_error_t (*write_result) (camio_channel_t* this, camio_wr_req_t** res);
+    camio_error_t (*write_result) (camio_channel_t* this, camio_wr_req_t** res_o);
     camio_error_t (*write_buffer_release)(camio_channel_t* this, camio_wr_buffer_t** buffer_o);
 
 } camio_channel_interface_t;

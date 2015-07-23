@@ -126,7 +126,7 @@ void camio_mux_destroy(camio_mux_t* this);
  * Data Plane Operations - Read
  **************************************************************************************************************************/
 /**
- * This function requests new data from the CamIO Stream called 'this'. Read requests are supplied as a vector of
+ * This function requests new data from the CamIO channel called 'this'. Read requests are supplied as a vector of
  * read_req_t structures. Each structure contains a destination buffer offset hint, a source offset hint and a read size
  * hint. The length of the vector is given by read_vec_len.
  *
@@ -179,7 +179,7 @@ camio_error_t camio_chan_rd_ready( camio_channel_t* this);
  * - ENOBUFFS:  The channel could not allocate more buffers for the read. Free some buffers by releasing an outstanding read
  *              or write transaction.
  */
-camio_error_t camio_chan_rd_res( camio_channel_t* this, camio_rd_req_t** req_o);
+camio_error_t camio_chan_rd_res( camio_channel_t* this, camio_rd_req_t** res_o);
 
 
 /**
@@ -227,7 +227,7 @@ camio_error_t camio_chan_wr_buff_ready(camio_channel_t* this);
 /**
  * Try get the results of a write buffer request
  */
-camio_error_t camio_chan_wr_buff_res(camio_channel_t* this, camio_wr_req_t** req_o);
+camio_error_t camio_chan_wr_buff_res(camio_channel_t* this, camio_wr_req_t** res_o);
 
 
 /* Write data described by the , or buffer_chain to the channel called 'this'. Write may or may not block. Use a
@@ -248,7 +248,7 @@ camio_error_t camio_chan_wr_ready( camio_channel_t* this);
 /**
  * Try get the results of a write request
  */
-camio_error_t camio_chan_wr_res(camio_channel_t* this, camio_wr_req_t** req_o);
+camio_error_t camio_chan_wr_res(camio_channel_t* this, camio_wr_req_t** res_o);
 
 
 
