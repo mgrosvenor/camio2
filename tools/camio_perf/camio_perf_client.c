@@ -77,6 +77,8 @@ static camio_error_t connect_delim(ch_cstr client_channel_uri, camio_controller_
 
 static camio_error_t send_message(camio_muxable_t* muxable)
 {
+    DBG("#### Trying to send message!\n");
+
     camio_error_t err = CAMIO_ENOERROR;
     DBG("Current req_buffer=%p\n", wreq.buffer);
     if(!wreq.buffer){
@@ -167,12 +169,19 @@ static camio_error_t on_new_connect(camio_muxable_t* muxable)
 
     camio_mux_insert(mux,&res->channel->rd_muxable,CONNECTOR_ID + 1);
     camio_mux_insert(mux,&res->channel->wr_muxable,CONNECTOR_ID + 3);
+    camio_mux_insert(mux,&res->channel->wr_buff_muxable,CONNECTOR_ID + 5);
 
-    //We have a successful connection, what about another one?
-    camio_ctrl_chan_req(controller, &chan_req, 1);
 
     //Kick things off by sending the first message
     send_message(&res->channel->wr_muxable);
+
+    //We have a successful connection, what about another one?
+    err = camio_ctrl_chan_req(controller, &chan_req, 1);
+    if(err ){
+        DBG("Unexpected error making controller request\n");
+        return err;
+    }
+
     return CAMIO_ENOERROR;
 
 }
