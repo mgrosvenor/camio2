@@ -123,7 +123,7 @@ static camio_error_t bring_read_request(camio_channel_t* this, camio_rd_req_t* r
         priv->rd_req_queue->size,
         priv->rd_req_queue->count
     );
-    if(unlikely( (err = cbuff_push_back_carray(priv->rd_req_queue, req_vec,vec_len)) )){
+    if(unlikely( (err = cbuff_push_back_carray(priv->rd_req_queue, &req_vec,vec_len)) )){
         ERR("Could not push %lli items on to queue. Error =%lli", vec_len, err);
         if(err == CH_CBUFF_TOOMANY){
             ERR("Request queue is full\n");
@@ -150,12 +150,12 @@ static camio_error_t bring_read_ready(camio_muxable_t* this)
         camio_rd_req_t* req = *req_p;
 
         //Check that the request is a valid one
-        if(unlikely(req->dst_offset_hint != CAMIO_WRITE_REQ_DST_OFFSET_NONE)){
+        if(unlikely(req->dst_offset_hint != CAMIO_READ_REQ_DST_OFFSET_NONE)){
             DBG("Could not enqueue request %i, DST_OFFSET must be NONE\n");
             req->status = CAMIO_EINVALID; //TODO better error code here!
             continue;
         }
-        if(unlikely(req->src_offset_hint != CAMIO_WRITE_REQ_SRC_OFFSET_NONE)){
+        if(unlikely(req->src_offset_hint != CAMIO_READ_REQ_SRC_OFFSET_NONE)){
             DBG("Could not enqueue request %i, SRC_OFFSET must be NONE\n");
             req->status = CAMIO_EINVALID; //TODO better error code here!
             continue;
@@ -294,7 +294,7 @@ static camio_error_t bring_write_buffer_request(camio_channel_t* this, camio_wr_
     );
 
     int err = 0;
-    if( (err = cbuff_push_back_carray(priv->wr_buff_req_queue, req_vec,vec_len)) ){
+    if( (err = cbuff_push_back_carray(priv->wr_buff_req_queue, &req_vec,vec_len)) ){
         ERR("Could not push %lli items on to queue. Error =%lli", vec_len, err);
         if(err == CH_CBUFF_TOOMANY){
             ERR("Request queue is full\n");
@@ -410,7 +410,7 @@ static camio_error_t bring_write_request(camio_channel_t* this, camio_wr_req_t* 
         req->status = 0; //Reset this status. We will use it again later
 
         int err = 0;
-        if( (err = cbuff_push_back(priv->wr_req_queue,req)) ){
+        if( (err = cbuff_push_back(priv->wr_req_queue,&req)) ){
             ERR("Could not push items on to queue even though there is space??. Error =%lli", err);
             return CAMIO_EINVALID; //Exit now, this is unrecoverable
         }

@@ -153,6 +153,12 @@ static camio_error_t on_new_connect(camio_muxable_t* muxable)
         return err;
     }
 
+    if(res->status == CAMIO_EALLREADYCONNECTED){
+        DBG("No more connections on this controller\n", err);
+        camio_mux_remove(mux,muxable);
+        return CAMIO_ENOERROR;
+    }
+
     if(res->status){
         DBG("Could not get channel. Removing broken controller with error=%lli\n", err);
         camio_mux_remove(mux,muxable);
@@ -202,6 +208,7 @@ int camio_perf_clinet(ch_cstr client_channel_uri, ch_word* stop)
     ch_word total_bytes         = 0;
     ch_word intv_bytes          = 0;
 
+    DBG("Chan_req->channel=%p\n", &chan_req);
     camio_ctrl_chan_req(controller, &chan_req, 1);
 
     DBG("Staring main loop\n");

@@ -63,18 +63,13 @@ camio_error_t bring_channel_request( camio_controller_t* this, camio_chan_req_t*
 
     bring_controller_priv_t* priv = CONTROLLER_GET_PRIVATE(this);
 
-    if(priv->is_connected){
-        DBG("Only channel already supplied! Why are you calling this twice?\n");
-        return CAMIO_ETOOMANY; // We're already connected!
-    }
-
     int err = 0;
     DBG("Pushing %lli items into channel request queue of size %lli with %lli items in it\n",
             vec_len,
             priv->chan_req_queue->size,
             priv->chan_req_queue->count
     );
-    if(unlikely( (err = cbuff_push_back_carray(priv->chan_req_queue, req_vec,vec_len)) )){
+    if(unlikely( (err = cbuff_push_back_carray(priv->chan_req_queue, &req_vec,vec_len)) )){
         ERR("Could not push %lli items on to queue. Error =%lli\n", vec_len, err);
         if(err == CH_CBUFF_TOOMANY){
             ERR("Request queue is full\n");
@@ -82,7 +77,6 @@ camio_error_t bring_channel_request( camio_controller_t* this, camio_chan_req_t*
         }
         return CAMIO_EINVALID;
     }
-    DBG("req_queue count=%lli\n", priv->chan_req_queue->count);
 
     DBG("Bring read request done\n");
     return CAMIO_ENOERROR;
@@ -437,32 +431,44 @@ static camio_error_t bring_channel_ready(camio_muxable_t* this)
         return err;
     }
 
+    DBG("Using up a request. Used=%lli\n", priv->chan_req_queue->in_use);
     camio_chan_req_t** req_p = NULL;
     req_p = cbuff_use_front(priv->chan_req_queue);
     if(!req_p){
         ERR("WTF? There should be a request here for us to use!\n");
         return CAMIO_EINVALID;
     }
+    DBG("Used up a request. Used=%lli\n", priv->chan_req_queue->in_use);
+
 
     return err;
 }
 
 static camio_error_t bring_channel_result(camio_controller_t* this, camio_chan_req_t** res_o )
 {
-    DBG("Doing bring connect result\n");
+    DBG("Getting bring connect result\n");
     bring_controller_priv_t* priv = CONTROLLER_GET_PRIVATE(this);
 
     //Is there any data waiting? If not, try to get some
-    if(unlikely(priv->chan_req_queue->_used_index <= 0)){
+    if(unlikely(priv->chan_req_queue->in_use <= 0)){
+        DBG("No requests have been used, are you sure you called ready first?\n");
         camio_error_t err = bring_connect_peek(this);
         if(err){
             DBG("There are no channels available to return. Did you use chan_ready()?\n");
             return err;
         }
     }
-
     camio_chan_req_t** req_p = cbuff_peek_front(priv->chan_req_queue);
     camio_chan_req_t* res = *req_p;
+
+    if(priv->is_connected){
+        DBG("Only channel already supplied! No more channels available\n");
+        res->status = CAMIO_EALLREADYCONNECTED; // We're already connected!
+        *res_o = *req_p;
+        //Error code is in the request, the result is returned successfully even though the result was not a success
+        return CAMIO_ENOERROR;
+    }
+
     res->channel = NEW_CHANNEL(bring);
     if(!res->channel){
         res->status = CAMIO_ENOMEM;
@@ -470,16 +476,15 @@ static camio_error_t bring_channel_result(camio_controller_t* this, camio_chan_r
         return CAMIO_ENOERROR;
     }
 
-
     camio_error_t err = bring_channel_construct(res->channel, this, priv->bring_head, priv->params, priv->bring_fd);
     if(err){
        return err;
     }
-
+    cbuff_unuse_front(priv->chan_req_queue);
     cbuff_pop_front(priv->chan_req_queue);
     *res_o = *req_p;
-
     priv->is_connected = true;
+    DBG("Done returning channel result\n");
     return CAMIO_ENOERROR;
 }
 

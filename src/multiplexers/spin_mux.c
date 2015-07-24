@@ -35,7 +35,7 @@ camio_error_t spin_construct(camio_mux_t* this){
 
 camio_error_t spin_insert(camio_mux_t* this, camio_muxable_t* muxable, ch_word id)
 {
-    DBG("Inserting %p into mux with id=%i\n",muxable,id);
+    //DBG("Inserting %p into mux with id=%i\n",muxable,id);
     mux_spin_priv_t* priv = MUX_GET_PRIVATE(this);
     CH_VECTOR(CAMIO_MUXABLE_VEC)* muxables = priv->muxables;
     muxable->id = id;
@@ -46,7 +46,7 @@ camio_error_t spin_insert(camio_mux_t* this, camio_muxable_t* muxable, ch_word i
 
 camio_error_t spin_remove(camio_mux_t* this, camio_muxable_t* muxable)
 {
-    DBG("Removing %p from mux\n");
+    //DBG("Removing %p from mux\n");
     mux_spin_priv_t* priv = MUX_GET_PRIVATE(this);
     CH_VECTOR(CAMIO_MUXABLE_VEC)* muxables = priv->muxables;
     camio_muxable_t* result = muxables->find(muxables, muxables->first, muxables->end, *muxable);
@@ -65,7 +65,7 @@ camio_error_t spin_select(camio_mux_t* this, /*struct timespec timeout,*/ camio_
 
     mux_spin_priv_t* priv = MUX_GET_PRIVATE(this);
     CH_VECTOR(CAMIO_MUXABLE_VEC)* muxables = priv->muxables;
-    DBG("Selecting over %i items\n", muxables->count);
+    //DBG("Selecting over %i items\n", muxables->count);
 
     while(1){
         usleep(1000*500);

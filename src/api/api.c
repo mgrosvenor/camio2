@@ -229,12 +229,22 @@ void camio_channel_destroy(camio_channel_t* this)
 
 inline camio_error_t camio_mux_insert(camio_mux_t* this, camio_muxable_t* muxable, ch_word id)
 {
+    #ifdef DO_SANITY_CHECKS
+        CHECK( NULL == this,"This is null???\n")
+        CHECK( NULL == muxable, "Muxable is null??\n");
+    #endif
+
     return this->vtable.insert(this,muxable,id);
 }
 
 
 inline camio_error_t camio_mux_remove(camio_mux_t* this, camio_muxable_t* muxable)
 {
+    #ifdef DO_SANITY_CHECKS
+        CHECK( NULL == this,"This is null???\n")
+        CHECK( NULL == muxable, "Muxable is null??\n");
+    #endif
+
     return this->vtable.remove(this,muxable);
 }
 
@@ -243,6 +253,8 @@ inline camio_error_t camio_mux_select(camio_mux_t* this, camio_muxable_t** muxab
 {
     #ifdef DO_SANITY_CHECKS
         CHECK( NULL == this,"This is null???\n")
+        CHECK( NULL == muxable_o, "Muxable_o is null??\n")
+        CHECK( NULL == which_o,"which_o is null???\n")
     #endif
 
     return this->vtable.select(this, /*timeout,*/ muxable_o, which_o);

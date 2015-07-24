@@ -75,6 +75,7 @@ static camio_error_t connect_delim(ch_cstr server_channel_uri, camio_controller_
 }
 
 
+
 static camio_error_t on_new_connect(camio_muxable_t* muxable)
 {
     DBG("Handling got new connect\n");
@@ -82,6 +83,12 @@ static camio_error_t on_new_connect(camio_muxable_t* muxable)
     camio_error_t err = camio_ctrl_chan_res(muxable->parent.controller,&res);
     if(err){
         return err;
+    }
+
+    if(res->status == CAMIO_EALLREADYCONNECTED){
+        DBG("No more connections on this controller\n", err);
+        camio_mux_remove(mux,muxable);
+        return CAMIO_ENOERROR;
     }
 
     if(res->status){
@@ -93,18 +100,23 @@ static camio_error_t on_new_connect(camio_muxable_t* muxable)
     camio_mux_insert(mux,&res->channel->rd_muxable,CONNECTOR_ID + 1);
     camio_mux_insert(mux,&res->channel->wr_muxable,CONNECTOR_ID + 3);
 
-    //We have a successful connection, what about another one?
-    camio_ctrl_chan_req(controller, &chan_req, 1);
-
     //Kick things off by asking for data
     rreq.dst_offset_hint = CAMIO_READ_REQ_DST_OFFSET_NONE;
     rreq.src_offset_hint = CAMIO_READ_REQ_SRC_OFFSET_NONE;
     rreq.read_size_hint  = CAMIO_READ_REQ_SIZE_ANY;
     err = camio_chan_rd_req(chan_req.channel,&rreq,1);
     if(err != CAMIO_ENOERROR){
-        ERR("Could not issue read_request. Got errr %i\n", err);
+        ERR("Could not issue read_request. Got err %lli\n", err);
         return CAMIO_EINVALID;
     }
+
+    //We have a successful connection, what about another one?
+    err = camio_ctrl_chan_req(controller, &chan_req, 1);
+    if(err){
+        ERR("Could not issue channel request. Got err %lli\n", err);
+        return err;
+    }
+
     return CAMIO_ENOERROR;
 
 }
@@ -115,11 +127,9 @@ int camio_perf_server(ch_cstr client_channel_uri, ch_word* stop)
 {
     DBG("Staring CamIO-perf Server\n");
     //Create a new multiplexer for channels to go into
-    camio_mux_t* mux = NULL;
     camio_error_t err = camio_mux_new(CAMIO_MUX_HINT_PERFORMANCE, &mux);
 
     //Construct a delimiter
-    camio_controller_t* controller = NULL;
     err = connect_delim(client_channel_uri, &controller);
     if(err){
         DBG("Could not create delimiter!\n");
@@ -147,6 +157,8 @@ int camio_perf_server(ch_cstr client_channel_uri, ch_word* stop)
     ch_word max_latency         = INT64_MIN;
     ch_word total_latency       = 0;
 
+
+    camio_ctrl_chan_req(controller, &chan_req, 1);
 
     DBG("Staring main loop\n");
     camio_muxable_t* muxable     = NULL;
@@ -196,12 +208,14 @@ int camio_perf_server(ch_cstr client_channel_uri, ch_word* stop)
             }
             case CAMIO_MUX_MODE_READ:{
                 DBG("Handling read ready()\n");
-                camio_rd_req_t* res;
+                camio_rd_req_t* res = NULL;
+                DBG("res=%p\n");
                 err = camio_chan_rd_res(muxable->parent.channel, &res );
                 if(err != CAMIO_ENOERROR){
                     ERR("Could not acquire buffer. Got errr %i\n", err);
                     return CAMIO_EINVALID;
                 }
+                DBG("res=%p\n");
                 if(res->status != CAMIO_ENOERROR){
                     DBG("Reading had an error %lli\n", res->status);
                     continue;
