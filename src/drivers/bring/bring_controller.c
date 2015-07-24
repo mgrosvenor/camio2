@@ -426,22 +426,7 @@ static camio_error_t bring_channel_ready(camio_muxable_t* this)
         return CAMIO_ETRYAGAIN;
     }
 
-    camio_error_t err = bring_connect_peek(this->parent.controller);
-    if(err){
-        return err;
-    }
-
-    DBG("Using up a request. Used=%lli\n", priv->chan_req_queue->in_use);
-    camio_chan_req_t** req_p = NULL;
-    req_p = cbuff_use_front(priv->chan_req_queue);
-    if(!req_p){
-        ERR("WTF? There should be a request here for us to use!\n");
-        return CAMIO_EINVALID;
-    }
-    DBG("Used up a request. Used=%lli\n", priv->chan_req_queue->in_use);
-
-
-    return err;
+    return bring_connect_peek(this->parent.controller);
 }
 
 static camio_error_t bring_channel_result(camio_controller_t* this, camio_chan_req_t** res_o )
@@ -450,8 +435,8 @@ static camio_error_t bring_channel_result(camio_controller_t* this, camio_chan_r
     bring_controller_priv_t* priv = CONTROLLER_GET_PRIVATE(this);
 
     //Is there any data waiting? If not, try to get some
-    if(unlikely(priv->chan_req_queue->in_use <= 0)){
-        DBG("No requests have been used, are you sure you called ready first?\n");
+    if(unlikely(priv->chan_req_queue->count <= 0)){
+        DBG("No requests have been added, are you sure you called request first?\n");
         camio_error_t err = bring_connect_peek(this);
         if(err){
             DBG("There are no channels available to return. Did you use chan_ready()?\n");
@@ -480,7 +465,6 @@ static camio_error_t bring_channel_result(camio_controller_t* this, camio_chan_r
     if(err){
        return err;
     }
-    cbuff_unuse_front(priv->chan_req_queue);
     cbuff_pop_front(priv->chan_req_queue);
     *res_o = *req_p;
     priv->is_connected = true;
