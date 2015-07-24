@@ -40,10 +40,10 @@ SRC=src/camio.c
 #    --LINKFLAGS="$LINKFLAGS"\
 #    $TESTS
  
-cake tools/camio_cat.c \
-    --append-CFLAGS="$INCLUDES $CFLAGS"\
-    --append-LINKFLAGS="$LINKFLAGS"\
-    $@
+#cake tools/camio_cat.c \
+#   --append-CFLAGS="$INCLUDES $CFLAGS"\
+#   --append-LINKFLAGS="$LINKFLAGS"\
+#    $@
 
 cake tools/camio_perf/camio_perf.c \
     --append-CFLAGS="$INCLUDES $CFLAGS"\

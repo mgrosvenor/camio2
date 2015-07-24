@@ -59,7 +59,7 @@ camio_error_t camio_channel_new(char* uri, camio_channel_t** channel)
 //   //If not true, we have a problem!
 //   assert(muxable->parent.controller == controller);
    camio_chan_req_t req = {0};
-   err = camio_ctrl_chan_req(controller,&req,1,0);
+   err = camio_ctrl_chan_req(controller,&req,1);
    if(err){
        DBG("Could not request connection on controller\n");
        return err;

@@ -9,8 +9,8 @@
  *  <INSERT DESCRIPTION HERE> 
  */
 
-#ifndef CONNECTOR_H_
-#define CONNECTOR_H_
+#ifndef CONTROLLER_H_
+#define CONTROLLER_H_
 
 #include <src/devices/features.h>
 #include <stdlib.h>
@@ -31,12 +31,13 @@ typedef camio_error_t (*camio_conn_construct_f)(camio_controller_t* controller_o
 
 
 /**
- * Every CamIO channel must implement this interface, see function prototypes in api.h
+ * Every CamIO channel must implement this interface, see function prototypes in api.h for more details
  */
-
 typedef struct camio_controller_interface_s{
     camio_conn_construct_f construct;
-    camio_error_t (*connect)( camio_controller_t* this, camio_channel_t** channel_o );
+    camio_error_t (*channel_request)( camio_controller_t* this, camio_chan_req_t* req_vec, ch_word vec_len);
+    camio_error_t (*channel_ready)( camio_controller_t* this );
+    camio_error_t (*channel_result)( camio_controller_t* this, camio_chan_req_t** res_o );
     void (*destroy)(camio_controller_t* this);
 } camio_controller_interface_t;
 
@@ -70,32 +71,38 @@ typedef struct camio_controller_s {
 
 
 /**
- * Some macros to make life easier CONNECTOR_GET_PRIVATE helps us grab the private members out of the public controller_t and
- * CONNECTOR_DECLARE help to make a custom allocator for each channel
+ * Some macros to make life easier CONTROLLER_GET_PRIVATE helps us grab the private members out of the public controller_t and
+ * CONTROLLER_DECLARE help to make a custom allocator for each channel
  */
-#define CONNECTOR_GET_PRIVATE(THIS) ( (void*)(THIS + 1))
+#define CONTROLLER_GET_PRIVATE(THIS) ( (void*)(THIS + 1))
 
-#define NEW_CONNECTOR(name)\
+#define NEW_CONTROLLER(name)\
         new_##name##_controller()
 
-#define NEW_CONNECTOR_DECLARE(NAME)\
+#define NEW_CONTROLLER_DECLARE(NAME)\
         camio_controller_t* new_##NAME##_controller()
 
-#define NEW_CONNECTOR_DEFINE(NAME, PRIVATE_TYPE) \
+#define NEW_CONTROLLER_DEFINE(NAME, PRIVATE_TYPE) \
     static const camio_controller_interface_t NAME##_controller_interface = {\
-            .construct = NAME##_construct,\
-            .connect   = NAME##_connect,\
-            .destroy   = NAME##_destroy,\
+            .construct         = NAME##_construct,\
+            .channel_request   = NAME##_channel_request,\
+            .channel_result    = NAME##_channel_result,\
+            .destroy           = NAME##_destroy,\
     };\
     \
-    NEW_CONNECTOR_DECLARE(NAME)\
+    NEW_CONTROLLER_DECLARE(NAME)\
     {\
         camio_controller_t* result = (camio_controller_t*)calloc(1,sizeof(camio_controller_t) + sizeof(PRIVATE_TYPE));\
         if(!result) return NULL;\
-        result->vtable = NAME##_controller_interface;\
+        if(!result) return ((void *)0);\
+        result->vtable                      = bring_controller_interface;\
+        result->muxable.mode                = CAMIO_MUX_MODE_CONNECT;\
+        result->muxable.parent.controller   = result;\
+        result->muxable.vtable.ready        = bring_channel_ready;\
+        result->muxable.fd                  = -1;\
         return result;\
     }
 
 
 
-#endif /* CONNECTOR_H_ */
+#endif /* CONTROLLER_H_ */

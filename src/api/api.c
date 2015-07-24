@@ -49,6 +49,49 @@
     }
 
 
+camio_error_t camio_ctrl_chan_req( camio_controller_t* this, camio_chan_req_t* req_vec, ch_word vec_len)
+{
+    #ifdef DO_SANITY_CHECKS
+        CHECK(NULL == this,"This is null???\n")
+        CHECK(NULL == req_vec,"Supplied read request vector is NULL\n")
+        CHECK( 0 >= vec_len,"Supplied read request vector is empty\n")
+    #endif
+
+    return this->vtable.channel_request(this, req_vec, vec_len);
+}
+
+
+camio_error_t camio_ctrl_chan_ready( camio_controller_t* this )
+{
+    #ifdef DO_SANITY_CHECKS
+        CHECK( NULL == this,"This is null???\n")
+        CHECK( this->muxable.mode != CAMIO_MUX_MODE_CONNECT, "Wrong kind of muxable mode! Expected CONNECT\n")
+    #endif
+
+    return this->muxable.vtable.ready(&this->muxable);
+}
+
+
+camio_error_t camio_ctrl_chan_res( camio_controller_t* this, camio_chan_req_t** res_o )
+{
+    #ifdef DO_SANITY_CHECKS //Only apply these checks in debug mode. Keep the speed when we need it?
+        CHECK( NULL == this,"This is null???\n")
+        CHECK( NULL == res_o,"Request result pointer supplied is NULL\n")
+    #endif
+
+    return this->vtable.channel_result(this, res_o);
+}
+
+
+void camio_controller_destroy(camio_controller_t* this)
+{
+    #ifdef DO_SANITY_CHECKS
+        CHECK_NR( NULL == this,"This is null???\n")
+    #endif
+
+    this->vtable.destroy(this);
+}
+
 
 camio_error_t camio_chan_rd_req( camio_channel_t* this, camio_rd_req_t* req_vec, ch_word vec_len )
 {
@@ -71,6 +114,7 @@ camio_error_t camio_chan_rd_ready( camio_channel_t* this)
 
     return this->rd_muxable.vtable.ready(&this->rd_muxable);
 }
+
 
 camio_error_t camio_chan_rd_res( camio_channel_t* this, camio_rd_req_t** res_o)
 {

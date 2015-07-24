@@ -38,10 +38,8 @@ typedef struct bring_channel_priv_s {
     volatile bring_header_t* bring_head;
     ch_bool connected;              //Is the channel currently running? Or has close been called?
 
-    ch_cbuff_t* wr_buff_req_queue;
-    ch_cbuff_t* wr_req_queue;
 
-    //The current read buffer
+    //Read side variables
     ch_cbuff_t* rd_req_queue;       //queue for inbound read requests
     volatile char* rd_mem;          //Underlying memory to support shared mem transport
     camio_buffer_t* rd_buffers;     //All buffers for the read side, basically pointers to the shared mem region
@@ -50,6 +48,9 @@ typedef struct bring_channel_priv_s {
     ch_word rd_acq_index;           //Current index for acquiring new read buffers
     ch_word rd_rel_index;           //Current index for releasing new read buffers
 
+    //Write side variables
+    ch_cbuff_t* wr_buff_req_queue;  //queue for inbound write buffer requests
+    ch_cbuff_t* wr_req_queue;       //queue for inbound write requests
     volatile char* wr_mem;          //Underlying memory for the shared memory transport
     ch_bool wr_ready;               //Is the channel ready for writing (for edge triggered multiplexers)
     camio_buffer_t* wr_buffers;     //All buffers for the write side;
@@ -115,18 +116,6 @@ static camio_error_t bring_read_request(camio_channel_t* this, camio_rd_req_t* r
     DBG("Doing bring read request...!\n");
 
     bring_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this);
-
-    //Make sure that the request vector items match the channel properties
-    for(ch_word i = 0; i < vec_len; i++){
-        if(unlikely(req_vec[i].dst_offset_hint != CAMIO_READ_REQ_DST_OFFSET_NONE)){
-            DBG("Could not enqueue request %i, DST_OFFSET must be NONE\n");
-            return CAMIO_EINVALID;
-        }
-        if(unlikely(req_vec[i].src_offset_hint != CAMIO_READ_REQ_SRC_OFFSET_NONE)){
-            DBG("Could not enqueue request %i, SRC_OFFSET must be NONE\n");
-            return CAMIO_EINVALID;
-        }
-    }
 
     int err = 0;
     DBG("Pushing %lli items into read request queue of size %lli with %lli items in it\n",
@@ -688,16 +677,6 @@ camio_error_t bring_channel_construct(
     priv->rd_sync_counter   = 1; //This is where we expect the first counter
     priv->wr_sync_counter   = 1;
 
-
-    this->rd_muxable.mode              = CAMIO_MUX_MODE_READ;
-    this->rd_muxable.parent.channel     = this;
-    this->rd_muxable.vtable.ready      = bring_read_ready;
-    this->rd_muxable.fd                = fd;
-
-    this->wr_muxable.mode              = CAMIO_MUX_MODE_WRITE;
-    this->wr_muxable.parent.channel     = this;
-    this->wr_muxable.vtable.ready      = bring_write_ready;
-    this->wr_muxable.fd                = fd;
 
     //TODO: Should wire in this parameter from the outside, 1024 will do for the moment.
     priv->rd_req_queue      = ch_cbuff_new(1024,sizeof(void*));

@@ -24,6 +24,7 @@
 #include <src/camio_debug.h>
 
 #include <deps/chaste/utils/util.h>
+#include <deps/chaste/data_structs/circular_buffer/circular_buffer.h>
 
 #include "bring_device.h"
 #include "bring_controller.h"
@@ -32,7 +33,7 @@
 #define getpagesize() sysconf(_SC_PAGESIZE)
 
 /**************************************************************************************************************************
- * PER CHANNEL STATE
+ * PER CONTROLLER STATE
  **************************************************************************************************************************/
 typedef struct bring_priv_s {
 
@@ -40,6 +41,8 @@ typedef struct bring_priv_s {
 
     bool is_connected;          //Has connect be called?
     int bring_fd;               //File descriptor for the backing buffer
+
+    ch_cbuff_t* chan_req_queue; //Queue for channel requests
 
     //Actual data structure
     volatile bring_header_t* bring_head;
@@ -53,11 +56,43 @@ typedef struct bring_priv_s {
 /**************************************************************************************************************************
  * Connect functions
  **************************************************************************************************************************/
+
+camio_error_t bring_channel_request( camio_controller_t* this, camio_chan_req_t* req_vec, ch_word vec_len)
+{
+    DBG("Doing bring read request...!\n");
+
+    bring_controller_priv_t* priv = CONTROLLER_GET_PRIVATE(this);
+
+    if(priv->is_connected){
+        DBG("Only channel already supplied! Why are you calling this twice?\n");
+        return CAMIO_ETOOMANY; // We're already connected!
+    }
+
+    int err = 0;
+    DBG("Pushing %lli items into channel request queue of size %lli with %lli items in it\n",
+            vec_len,
+            priv->chan_req_queue->size,
+            priv->chan_req_queue->count
+    );
+    if(unlikely( (err = cbuff_push_back_carray(priv->chan_req_queue, req_vec,vec_len)) )){
+        ERR("Could not push %lli items on to queue. Error =%lli\n", vec_len, err);
+        if(err == CH_CBUFF_TOOMANY){
+            ERR("Request queue is full\n");
+            return CAMIO_ETOOMANY;
+        }
+        return CAMIO_EINVALID;
+    }
+
+    DBG("Bring read request done\n");
+    return CAMIO_ENOERROR;
+}
+
+
 static camio_error_t bring_connect_peek_server(camio_controller_t* this)
 {
 
     camio_error_t result = CAMIO_ENOERROR;
-    bring_controller_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
+    bring_controller_priv_t* priv = CONTROLLER_GET_PRIVATE(this);
     DBG("Doing connect peek server on %s\n", priv->bring_filen);
 
     if(priv->bring_fd > -1 ){ //Ready to go! Call connect!
@@ -230,7 +265,7 @@ static camio_error_t bring_connect_peek_client(camio_controller_t* this)
 {
 
     camio_error_t result = CAMIO_ENOERROR;
-    bring_controller_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
+    bring_controller_priv_t* priv = CONTROLLER_GET_PRIVATE(this);
     DBG("Doing connect peek client on %s\n", priv->bring_filen);
 
     if(priv->bring_fd > -1 ){ //Ready to go! Call connect!
@@ -358,7 +393,7 @@ static camio_error_t bring_connect_peek(camio_controller_t* this)
 {
     DBG("Doing connect peek\n");
     camio_error_t result = CAMIO_ENOERROR;
-    bring_controller_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
+    bring_controller_priv_t* priv = CONTROLLER_GET_PRIVATE(this);
 
     if(priv->params->server){
         result = bring_connect_peek_server(this);
@@ -383,47 +418,64 @@ static camio_error_t bring_connect_peek(camio_controller_t* this)
 
 }
 
-static camio_error_t bring_controller_ready(camio_muxable_t* this)
+
+static camio_error_t bring_channel_ready(camio_muxable_t* this)
 {
-    camio_error_t err = bring_connect_peek(this->parent.controller);
-    if(err == CAMIO_ETRYAGAIN){
-        return CAMIO_ENOTREADY;
+
+    bring_controller_priv_t* priv = CONTROLLER_GET_PRIVATE(this->parent.channel);
+    DBG("Doing read ready\n");
+
+    if(priv->chan_req_queue->count == 0){
+        DBG("No channel requests yet received\n");
+        return CAMIO_ETRYAGAIN;
     }
 
-    if(err != CAMIO_ENOERROR){
+    camio_error_t err = bring_connect_peek(this->parent.controller);
+    if(err){
         return err;
     }
 
-    return CAMIO_EREADY;
+    camio_chan_req_t** req_p = NULL;
+    req_p = cbuff_use_front(priv->chan_req_queue);
+    if(!req_p){
+        ERR("WTF? There should be a request here for us to use!\n");
+        return CAMIO_EINVALID;
+    }
+
+    return err;
 }
 
-static camio_error_t bring_connect(camio_controller_t* this, camio_channel_t** channel_o )
+static camio_error_t bring_channel_result(camio_controller_t* this, camio_chan_req_t** res_o )
 {
-    DBG("Doing bring connect\n");
-    bring_controller_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
-    camio_error_t err = bring_connect_peek(this);
-    if(err != CAMIO_ENOERROR){
-        return err;
+    DBG("Doing bring connect result\n");
+    bring_controller_priv_t* priv = CONTROLLER_GET_PRIVATE(this);
+
+    //Is there any data waiting? If not, try to get some
+    if(unlikely(priv->chan_req_queue->_used_index <= 0)){
+        camio_error_t err = bring_connect_peek(this);
+        if(err){
+            DBG("There are no channels available to return. Did you use chan_ready()?\n");
+            return err;
+        }
     }
 
-    if(priv->is_connected){
-        DBG("Already connected! Why are you calling this twice?\n");
-        return CAMIO_EALLREADYCONNECTED; // We're already connected!
+    camio_chan_req_t** req_p = cbuff_peek_front(priv->chan_req_queue);
+    camio_chan_req_t* res = *req_p;
+    res->channel = NEW_CHANNEL(bring);
+    if(!res->channel){
+        res->status = CAMIO_ENOMEM;
+        //Error code is in the request, the result is returned successfully even though the result was not a success
+        return CAMIO_ENOERROR;
     }
 
 
-    //DBG("Done connecting, now constructing UDP channel...\n");
-    camio_channel_t* channel = NEW_CHANNEL(bring);
-    if(!channel){
-        *channel_o = NULL;
-        return CAMIO_ENOMEM;
-    }
-    *channel_o = channel;
-
-    err = bring_channel_construct(channel, this, priv->bring_head, priv->params, priv->bring_fd);
+    camio_error_t err = bring_channel_construct(res->channel, this, priv->bring_head, priv->params, priv->bring_fd);
     if(err){
        return err;
     }
+
+    cbuff_pop_front(priv->chan_req_queue);
+    *res_o = *req_p;
 
     priv->is_connected = true;
     return CAMIO_ENOERROR;
@@ -438,7 +490,7 @@ static camio_error_t bring_connect(camio_controller_t* this, camio_channel_t** c
 static camio_error_t bring_construct(camio_controller_t* this, void** params, ch_word params_size)
 {
 
-    bring_controller_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
+    bring_controller_priv_t* priv = CONTROLLER_GET_PRIVATE(this);
     //Basic sanity check that the params is the right one.
     if(params_size != sizeof(bring_params_t)){
         ERR("Bad parameters structure passed\n");
@@ -466,16 +518,14 @@ static camio_error_t bring_construct(camio_controller_t* this, void** params, ch
         return CAMIO_EINVALID;
     }
 
+    priv->chan_req_queue = ch_cbuff_new(1,sizeof(void*)); //Only 1 request slot, since we can (currently) only connect once
+
     priv->bring_fd = -1;
 
     priv->bring_filen = (char*)calloc(1,priv->params->hierarchical.str_len + 1);
     strncpy(priv->bring_filen,priv->params->hierarchical.str, priv->params->hierarchical.str_len);
 
     //Populate the rest of the muxable structure
-    this->muxable.mode              = CAMIO_MUX_MODE_CONNECT;
-    this->muxable.parent.controller  = this;
-    this->muxable.vtable.ready      = bring_controller_ready;
-    this->muxable.fd                = -1;
 
     return CAMIO_ENOERROR;
 }
@@ -484,7 +534,7 @@ static camio_error_t bring_construct(camio_controller_t* this, void** params, ch
 static void bring_destroy(camio_controller_t* this)
 {
     DBG("Destroying bring controller\n");
-    bring_controller_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
+    bring_controller_priv_t* priv = CONTROLLER_GET_PRIVATE(this);
 
     if(priv->bring_filen)      { free(priv->bring_filen);       }
 
@@ -494,4 +544,5 @@ static void bring_destroy(camio_controller_t* this)
     DBG("Freed controller structure\n");
 }
 
-NEW_CONNECTOR_DEFINE(bring, bring_controller_priv_t)
+
+NEW_CONTROLLER_DEFINE(bring, bring_controller_priv_t)

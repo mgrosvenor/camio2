@@ -15,59 +15,101 @@
 
 #include <src/api/api_easy.h>
 #include <src/camio_debug.h>
-#include <src/drivers/delimiter/delim_device.h>
+//#include <src/drivers/delimiter/delim_device.h>
 #include "camio_perf_packet.h"
 
 #include "options.h"
 extern struct options_t options;
+static camio_mux_t* mux               = NULL;
+static ch_word time_now_ns            = 0;
+static camio_rd_req_t rreq            = {0};
+static camio_controller_t* controller = NULL;
+static camio_chan_req_t chan_req      = { 0 };
 
 #include "camio_perf_server.h"
 
 #define CONNECTOR_ID 0
-static ch_word delimit(char* buffer, ch_word len)
-{
-    DBG("Deliminting %p len=%lli\n", buffer, len);
-    if((size_t)len < sizeof(camio_perf_packet_head_t)){
-        return -1;
-    }
+//static ch_word delimit(char* buffer, ch_word len)
+//{
+//    DBG("Deliminting %p len=%lli\n", buffer, len);
+//    if((size_t)len < sizeof(camio_perf_packet_head_t)){
+//        return -1;
+//    }
+//
+//    camio_perf_packet_head_t* head = (camio_perf_packet_head_t*)buffer;
+//    if(len < head->size){
+//        return -1;
+//    }
+//
+//    DBG("delimt packet size=%lli\n", head->size);
+//    return head->size;
+//}
 
-    camio_perf_packet_head_t* head = (camio_perf_packet_head_t*)buffer;
-    if(len < head->size){
-        return -1;
-    }
+//delim_params_t delim_params;
+static camio_error_t connect_delim(ch_cstr server_channel_uri, camio_controller_t** controller) {
+//
+//    //Find the ID of the delim channel
+//    ch_word id;
+//    camio_error_t err = camio_device_get_id("delim", &id);
+//
+//    //Fill in the delim channel paramters structure
+//    delim_params.base_uri = client_channel_uri;
+//    delim_params.delim_fn = delimit;
+//
+//    DBG("delimter=%p\n", delimit);
+//    ch_word params_size = sizeof(delim_params_t);
+//    void* params = &delim_params;
+//
+//    //Use the parameters structure to construct a new controller object
+//    err = camio_device_constr(id, &params, params_size, controller);
+//    if (err) {
+//        DBG("Could not construct controller\n");
+//        return err; //TODO XXX put a better error here
+//    }
+//
+//    //And we're done!
+//    DBG("Got controller\n");
 
-    DBG("delimt packet size=%lli\n", head->size);
-    return head->size;
-}
-
-delim_params_t delim_params;
-static camio_error_t connect_delim(ch_cstr client_channel_uri, camio_controller_t** controller) {
-
-    //Find the ID of the delim channel
-    ch_word id;
-    camio_error_t err = camio_device_get_id("delim", &id);
-
-    //Fill in the delim channel paramters structure
-    delim_params.base_uri = client_channel_uri;
-    delim_params.delim_fn = delimit;
-
-    DBG("delimter=%p\n", delimit);
-    ch_word params_size = sizeof(delim_params_t);
-    void* params = &delim_params;
-
-    //Use the parameters structure to construct a new controller object
-    err = camio_device_constr(id, &params, params_size, controller);
-    if (err) {
-        DBG("Could not construct controller\n");
-        return err; //TODO XXX put a better error here
-    }
-
-    //And we're done!
-    DBG("Got controller\n");
+    camio_controller_new(server_channel_uri,controller);
     return CAMIO_ENOERROR;
 }
 
-static camio_rd_req_t rreq;
+
+static camio_error_t on_new_connect(camio_muxable_t* muxable)
+{
+    DBG("Handling got new connect\n");
+    camio_chan_req_t* res;
+    camio_error_t err = camio_ctrl_chan_res(muxable->parent.controller,&res);
+    if(err){
+        return err;
+    }
+
+    if(res->status){
+        DBG("Could not get channel. Removing broken controller with error=%lli\n", err);
+        camio_mux_remove(mux,muxable);
+        return res->status;
+    }
+
+    camio_mux_insert(mux,&res->channel->rd_muxable,CONNECTOR_ID + 1);
+    camio_mux_insert(mux,&res->channel->wr_muxable,CONNECTOR_ID + 3);
+
+    //We have a successful connection, what about another one?
+    camio_ctrl_chan_req(controller, &chan_req, 1);
+
+    //Kick things off by asking for data
+    rreq.dst_offset_hint = CAMIO_READ_REQ_DST_OFFSET_NONE;
+    rreq.src_offset_hint = CAMIO_READ_REQ_SRC_OFFSET_NONE;
+    rreq.read_size_hint  = CAMIO_READ_REQ_SIZE_ANY;
+    err = camio_chan_rd_req(chan_req.channel,&rreq,1);
+    if(err != CAMIO_ENOERROR){
+        ERR("Could not issue read_request. Got errr %i\n", err);
+        return CAMIO_EINVALID;
+    }
+    return CAMIO_ENOERROR;
+
+}
+
+
 
 int camio_perf_server(ch_cstr client_channel_uri, ch_word* stop)
 {
@@ -96,7 +138,6 @@ int camio_perf_server(ch_cstr client_channel_uri, ch_word* stop)
 
     ch_word time_start_ns       = now.tv_sec * 1000 * 1000 * 1000 + now.tv_usec * 1000;
     ch_word time_int_start_ns   = time_start_ns;
-    ch_word time_now_ns         = 0;
     ch_word time_interval_ns    = 1000 * 1000 * 1000;
     ch_word total_bytes         = 0;
     ch_word intv_bytes          = 0;
@@ -149,42 +190,24 @@ int camio_perf_server(ch_cstr client_channel_uri, ch_word* stop)
         switch(muxable->mode){
             //This is a controller that's just fired
             case CAMIO_MUX_MODE_CONNECT:{
-                DBG("Handling connect ready()\n");
-                camio_channel_t* tmp_channel = NULL;
-                err = camio_connect(muxable->parent.controller,&tmp_channel);
-
-                if(err == CAMIO_EALLREADYCONNECTED){ //No more connections possible
-                    DBG("Removing expired controller\n");
-                    camio_mux_remove(mux,muxable);
-                    continue;
-                }
-                if(err != CAMIO_ENOERROR){
-                    ERR("Could not get channel. Got errr %i\n", err);
-                    return CAMIO_EINVALID;
-                }
-
-                camio_mux_insert(mux,&tmp_channel->rd_muxable,CONNECTOR_ID + 1);
-                camio_mux_insert(mux,&tmp_channel->wr_muxable,CONNECTOR_ID + 3);
-
-                //Kick things off by asking for data
-                rreq.dst_offset_hint = CAMIO_READ_REQ_DST_OFFSET_NONE;
-                rreq.src_offset_hint = CAMIO_READ_REQ_SRC_OFFSET_NONE;
-                rreq.read_size_hint  = CAMIO_READ_REQ_SIZE_ANY;
-                err = camio_read_request(tmp_channel,&rreq,1);
-                if(err != CAMIO_ENOERROR){
-                    ERR("Could not issue read_request. Got errr %i\n", err);
-                    return CAMIO_EINVALID;
-                }
-
+                err = on_new_connect(muxable);
+                if(err){ return err; } //Cannot recover from connection error!
                 break;
             }
             case CAMIO_MUX_MODE_READ:{
                 DBG("Handling read ready()\n");
-                err = camio_read_acquire(muxable->parent.channel, &rd_buffer);
+                camio_rd_req_t* res;
+                err = camio_chan_rd_res(muxable->parent.channel, &res );
                 if(err != CAMIO_ENOERROR){
                     ERR("Could not acquire buffer. Got errr %i\n", err);
                     return CAMIO_EINVALID;
                 }
+                if(res->status != CAMIO_ENOERROR){
+                    DBG("Reading had an error %lli\n", res->status);
+                    continue;
+                }
+
+                rd_buffer = res->buffer;
 
                 DBG("Got %lli bytes\n", rd_buffer->data_len);
                 if(rd_buffer->data_len <= 0){
@@ -209,12 +232,17 @@ int camio_perf_server(ch_cstr client_channel_uri, ch_word* stop)
 
                 //printf("ts=%lli, len=%lli, seq=%lli, \n", head->time_stamp, head->size, head->seq_number );
 
-                camio_read_release(muxable->parent.channel, &rd_buffer);
+                err = camio_chan_rd_release(muxable->parent.channel, rd_buffer);
+                if(err){
+                    DBG("WTF? Error releasing buffer??\n");
+                    return err;//Don't know how to recover from this!
+                }
+                rd_buffer = NULL;
 
                 rreq.dst_offset_hint = CAMIO_READ_REQ_DST_OFFSET_NONE;
                 rreq.src_offset_hint = CAMIO_READ_REQ_SRC_OFFSET_NONE;
                 rreq.read_size_hint  = CAMIO_READ_REQ_SIZE_ANY;
-                err = camio_read_request(muxable->parent.channel,&rreq,1);
+                err = camio_chan_rd_req(muxable->parent.channel,&rreq,1);
                 if(err != CAMIO_ENOERROR){
                     ERR("Could not issue read_request. Got errr %i\n", err);
                     return CAMIO_EINVALID;

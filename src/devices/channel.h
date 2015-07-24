@@ -120,12 +120,15 @@ typedef struct camio_channel_s {
         result->rd_muxable.mode                 = CAMIO_MUX_MODE_READ;\
         result->rd_muxable.parent.channel       = result;\
         result->rd_muxable.vtable.ready         = NAME##_read_ready;\
+        result->rd_muxable.fd                   = -1;\
         result->wr_muxable.mode                 = CAMIO_MUX_MODE_WRITE;\
         result->wr_muxable.parent.channel       = result;\
         result->wr_muxable.vtable.ready         = NAME##_write_ready;\
+        result->wr_muxable.fd                   = -1;\
         result->wr_buff_muxable.mode            = CAMIO_MUX_MODE_WRITE_BUFF;\
         result->wr_buff_muxable.parent.channel  = result;\
         result->wr_buff_muxable.vtable.ready    = NAME##_write_buffer_ready;\
+        result->wr_buff_muxable.fd              = -1;\
         return result;\
     }
 

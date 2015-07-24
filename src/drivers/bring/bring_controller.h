@@ -11,8 +11,8 @@
 #ifndef SRC_DRIVERS_BRING_BRING_CONNECTOR_H_
 #define SRC_DRIVERS_BRING_BRING_CONNECTOR_H_
 
-#include "../../devices/controller.h"
+#include <src/devices/controller.h>
 
-NEW_CONNECTOR_DECLARE(bring);
+NEW_CONTROLLER_DECLARE(bring);
 
 #endif /* SRC_DRIVERS_BRING_BRING_CONNECTOR_H_ */

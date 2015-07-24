@@ -37,7 +37,7 @@
  *  CAMIO_ETOOMANY - the request slots have run-out
  *  CAMIO_ENOMORE  - the device has run out of communication channels, no more requests will succeed.
  */
-camio_error_t camio_ctrl_chan_req( camio_controller_t* this, camio_chan_req_t* req_vec, ch_word vec_len, ch_word flags );
+camio_error_t camio_ctrl_chan_req( camio_controller_t* this, camio_chan_req_t* req_vec, ch_word vec_len);
 
 
 /**
@@ -65,7 +65,7 @@ camio_error_t camio_ctrl_chan_res( camio_controller_t* this, camio_chan_req_t** 
 /**
  * Configure properties of the device
  */
-camio_error_t camio_ctrl_config( camio_controller_t* this, void* params, size_t param_size);
+//camio_error_t camio_ctrl_config( camio_controller_t* this, void* params, size_t param_size);
 
 
 /**

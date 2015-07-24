@@ -27,7 +27,7 @@ static const char* const scheme = "bring";
 
 static camio_error_t construct(void** params, ch_word params_size, camio_controller_t** controller_o)
 {
-    camio_controller_t* conn = NEW_CONNECTOR(bring);
+    camio_controller_t* conn = NEW_CONTROLLER(bring);
     if(!conn){
         *controller_o = NULL;
         return CAMIO_ENOMEM;
