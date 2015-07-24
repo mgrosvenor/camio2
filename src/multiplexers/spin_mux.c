@@ -72,7 +72,7 @@ camio_error_t spin_select(camio_mux_t* this, /*struct timespec timeout,*/ camio_
         //priv->idx %= muxables->count; //Adjust for overflow
         camio_muxable_t* muxable = muxables->off(muxables,priv->idx);
         camio_error_t err = muxable->vtable.ready(muxable);
-        if(err == CAMIO_EREADY){
+        if(err == CAMIO_ENOERROR){
             DBG("Found ready item at index %i\n", priv->idx);
             priv->idx = priv->idx >= muxables->count - 1 ? 0 : priv->idx + 1;//Make sure we look at the next device first
             *muxable_o = muxable;
@@ -80,7 +80,7 @@ camio_error_t spin_select(camio_mux_t* this, /*struct timespec timeout,*/ camio_
             return CAMIO_ENOERROR;
         }
 
-        if(err != CAMIO_ENOTREADY){
+        if(err != CAMIO_ETRYAGAIN){
             DBG("Muxable had an unexpected error = %i\n", err);
             *muxable_o = muxable;
             *which_o = muxable->id;

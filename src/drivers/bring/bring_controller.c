@@ -59,7 +59,7 @@ typedef struct bring_priv_s {
 
 camio_error_t bring_channel_request( camio_controller_t* this, camio_chan_req_t* req_vec, ch_word vec_len)
 {
-    DBG("Doing bring read request...!\n");
+    DBG("Doing bring channel request...!\n");
 
     bring_controller_priv_t* priv = CONTROLLER_GET_PRIVATE(this);
 
@@ -82,6 +82,7 @@ camio_error_t bring_channel_request( camio_controller_t* this, camio_chan_req_t*
         }
         return CAMIO_EINVALID;
     }
+    DBG("req_queue count=%lli\n", priv->chan_req_queue->count);
 
     DBG("Bring read request done\n");
     return CAMIO_ENOERROR;
@@ -422,9 +423,10 @@ static camio_error_t bring_connect_peek(camio_controller_t* this)
 static camio_error_t bring_channel_ready(camio_muxable_t* this)
 {
 
-    bring_controller_priv_t* priv = CONTROLLER_GET_PRIVATE(this->parent.channel);
-    DBG("Doing read ready\n");
+    bring_controller_priv_t* priv = CONTROLLER_GET_PRIVATE(this->parent.controller);
+    DBG("Doing channel ready\n");
 
+    DBG("req_queue count=%lli\n", priv->chan_req_queue->count);
     if(priv->chan_req_queue->count == 0){
         DBG("No channel requests yet received\n");
         return CAMIO_ETRYAGAIN;
