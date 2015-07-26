@@ -83,7 +83,7 @@ static camio_error_t send_message(camio_muxable_t* muxable)
     DBG("Current req_buffer=%p\n", wreq.buffer);
     if(!wreq.buffer){
         //Get and init a buffer for writing stuff to. Hang on to it if possible
-        DBG("No write buffer, grabbing a new one parent=%p, buffer=%p\n", muxable->parent.channel, &wreq.buffer);
+        DBG("No write buffer, grabbing a new one\n");
         return camio_chan_wr_buff_req( muxable->parent.channel, &wreq, 1);
     }
 
@@ -270,6 +270,14 @@ int camio_perf_clinet(ch_cstr client_channel_uri, ch_word* stop)
                 DBG("Handling write ready()\n");
                 DBG("Sent %lli bytes\n", inflight_bytes);
                 intv_bytes += inflight_bytes;
+                camio_wr_req_t* res;
+                err = camio_chan_wr_res(muxable->parent.channel,&res);
+                if(err){
+                    DBG("Getting write result had an error %lli\n", err);
+                }
+                else{
+                    DBG("Write result status=%lli\n", res->status);
+                }
                 send_message(muxable);
                 break;
             }

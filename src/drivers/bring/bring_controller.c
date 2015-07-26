@@ -418,9 +418,9 @@ static camio_error_t bring_channel_ready(camio_muxable_t* this)
 {
 
     bring_controller_priv_t* priv = CONTROLLER_GET_PRIVATE(this->parent.controller);
-    DBG("Doing channel ready\n");
+    //DBG("Doing channel ready\n");
 
-    DBG("req_queue count=%lli\n", priv->chan_req_queue->count);
+    //DBG("req_queue count=%lli\n", priv->chan_req_queue->count);
     if(priv->chan_req_queue->count == 0){
         DBG("No channel requests yet received\n");
         return CAMIO_ETRYAGAIN;

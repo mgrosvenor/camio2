@@ -68,7 +68,7 @@ camio_error_t spin_select(camio_mux_t* this, /*struct timespec timeout,*/ camio_
     //DBG("Selecting over %i items\n", muxables->count);
 
     while(1){
-        usleep(1000*500);
+        //usleep(1);
         //priv->idx %= muxables->count; //Adjust for overflow
         camio_muxable_t* muxable = muxables->off(muxables,priv->idx);
         camio_error_t err = muxable->vtable.ready(muxable);
@@ -88,6 +88,7 @@ camio_error_t spin_select(camio_mux_t* this, /*struct timespec timeout,*/ camio_
         }
 
         priv->idx = priv->idx >= muxables->count - 1 ? 0 : priv->idx + 1;
+        __asm__ __volatile__("pause;");
 
     }
 

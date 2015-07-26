@@ -210,13 +210,11 @@ int camio_perf_server(ch_cstr client_channel_uri, ch_word* stop)
             case CAMIO_MUX_MODE_READ:{
                 DBG("Handling read ready()\n");
                 camio_rd_req_t* res = NULL;
-                DBG("res=%p\n");
                 err = camio_chan_rd_res(muxable->parent.channel, &res );
                 if(err != CAMIO_ENOERROR){
                     ERR("Could not acquire buffer. Got errr %i\n", err);
                     return CAMIO_EINVALID;
                 }
-                DBG("res=%p\n");
                 if(res->status != CAMIO_ENOERROR){
                     DBG("Reading had an error %lli\n", res->status);
                     continue;
@@ -226,7 +224,7 @@ int camio_perf_server(ch_cstr client_channel_uri, ch_word* stop)
 
                 DBG("Got %lli bytes\n", rd_buffer->data_len);
                 if(rd_buffer->data_len <= 0){
-                    DBG("Stream has ended, removing\n");
+                    ERR("Stream has ended, removing\n");
                     camio_mux_remove(mux, muxable);
                 }
 
@@ -238,6 +236,8 @@ int camio_perf_server(ch_cstr client_channel_uri, ch_word* stop)
                 }
                 else{
                     found_count++;
+                    gettimeofday(&now, NULL);
+                    time_now_ns = now.tv_sec * 1000 * 1000 * 1000 + now.tv_usec * 1000;
                     const ch_word latency = time_now_ns - head->time_stamp;
                     min_latency = MIN(min_latency, latency);
                     max_latency = MAX(max_latency, latency);
