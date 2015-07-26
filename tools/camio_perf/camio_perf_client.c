@@ -167,9 +167,9 @@ static camio_error_t on_new_connect(camio_muxable_t* muxable)
         return res->status;
     }
 
-    //camio_mux_insert(mux,&res->channel->rd_muxable,CONNECTOR_ID + 1);
-    camio_mux_insert(mux,&res->channel->wr_muxable,CONNECTOR_ID + 3);
-    camio_mux_insert(mux,&res->channel->wr_buff_muxable,CONNECTOR_ID + 5);
+    camio_mux_insert(mux,&res->channel->rd_muxable,CONNECTOR_ID + 1);
+    //camio_mux_insert(mux,&res->channel->wr_muxable,CONNECTOR_ID + 3);
+    //camio_mux_insert(mux,&res->channel->wr_buff_muxable,CONNECTOR_ID + 5);
 
 
     //Kick things off by sending the first message
