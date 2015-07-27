@@ -35,7 +35,7 @@ typedef camio_error_t (*camio_conn_construct_f)(camio_controller_t* controller_o
  */
 typedef struct camio_controller_interface_s{
     camio_conn_construct_f construct;
-    camio_error_t (*channel_request)( camio_controller_t* this, camio_chan_req_t* req_vec, ch_word vec_len);
+    camio_error_t (*channel_request)( camio_controller_t* this, camio_chan_req_t* req_vec, ch_word* vec_len_io);
     camio_error_t (*channel_ready)( camio_controller_t* this );
     camio_error_t (*channel_result)( camio_controller_t* this, camio_chan_req_t** res_o );
     void (*destroy)(camio_controller_t* this);

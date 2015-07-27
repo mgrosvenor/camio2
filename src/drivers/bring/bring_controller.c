@@ -57,28 +57,20 @@ typedef struct bring_priv_s {
  * Connect functions
  **************************************************************************************************************************/
 
-camio_error_t bring_channel_request( camio_controller_t* this, camio_chan_req_t* req_vec, ch_word vec_len)
+camio_error_t bring_channel_request( camio_controller_t* this, camio_chan_req_t* req_vec, ch_word* vec_len_io)
 {
-    DBG("Doing bring channel request...!\n");
+    //DBG("Doing bring channel request...!\n");
 
     bring_controller_priv_t* priv = CONTROLLER_GET_PRIVATE(this);
 
-    int err = 0;
-    DBG("Pushing %lli items into channel request queue of size %lli with %lli items in it\n",
-            vec_len,
-            priv->chan_req_queue->size,
-            priv->chan_req_queue->count
-    );
-    if(unlikely( (err = cbuff_push_back_carray(priv->chan_req_queue, &req_vec,vec_len)) )){
-        ERR("Could not push %lli items on to queue. Error =%lli\n", vec_len, err);
-        if(err == CH_CBUFF_TOOMANY){
-            ERR("Request queue is full\n");
-            return CAMIO_ETOOMANY;
-        }
+    ch_word items = cbuff_push_back_carray(priv->chan_req_queue, &req_vec,*vec_len_io);
+    if(unlikely( items < 0)){
+        ERR("Could not push items on to queue. Error code is", items);
         return CAMIO_EINVALID;
     }
+    *vec_len_io = items;
 
-    DBG("Bring read request done\n");
+    //DBG("Bring channel request added!\n");
     return CAMIO_ENOERROR;
 }
 
@@ -88,7 +80,7 @@ static camio_error_t bring_connect_peek_server(camio_controller_t* this)
 
     camio_error_t result = CAMIO_ENOERROR;
     bring_controller_priv_t* priv = CONTROLLER_GET_PRIVATE(this);
-    DBG("Doing connect peek server on %s\n", priv->bring_filen);
+    //DBG("Doing connect peek server on %s\n", priv->bring_filen);
 
     if(priv->bring_fd > -1 ){ //Ready to go! Call connect!
         return CAMIO_ENOERROR;
@@ -261,7 +253,7 @@ static camio_error_t bring_connect_peek_client(camio_controller_t* this)
 
     camio_error_t result = CAMIO_ENOERROR;
     bring_controller_priv_t* priv = CONTROLLER_GET_PRIVATE(this);
-    DBG("Doing connect peek client on %s\n", priv->bring_filen);
+    //DBG("Doing connect peek client on %s\n", priv->bring_filen);
 
     if(priv->bring_fd > -1 ){ //Ready to go! Call connect!
         return CAMIO_ENOERROR;
@@ -270,7 +262,7 @@ static camio_error_t bring_connect_peek_client(camio_controller_t* this)
     //Now there is a bring file and it should have a header in it
     int bring_fd = open(priv->bring_filen, O_RDWR);
     if(bring_fd < 0){
-        ERR("Could not open named shared memory file \"%s\". Error=%s\n", priv->bring_filen, strerror(errno));
+        //ERR("Could not open named shared memory file \"%s\". Error=%s\n", priv->bring_filen, strerror(errno));
         result = CAMIO_ETRYAGAIN;
         goto error_no_cleanup;
     }
@@ -279,12 +271,12 @@ static camio_error_t bring_connect_peek_client(camio_controller_t* this)
     bring_header_t header_tmp = {0};
     size_t bytes = read(bring_fd,&header_tmp.magic,sizeof(ch_word));
     if(bytes < sizeof(ch_word)){
-        ERR("Could not read header magic. Not enough bytes, expected %lli but got %lli\n", sizeof(header_tmp.magic), bytes);
+        //ERR("Could not read header magic. Not enough bytes, expected %lli but got %lli\n", sizeof(header_tmp.magic), bytes);
         result = CAMIO_ETRYAGAIN;
         goto error_close_file;
     }
     if(header_tmp.magic != BRING_MAGIC_SERVER){
-        ERR("Bad magic! Expected 0x%016X but got 0x%016X\n", BRING_MAGIC_SERVER, header_tmp.magic);
+        //ERR("Bad magic! Expected 0x%016X but got 0x%016X\n", BRING_MAGIC_SERVER, header_tmp.magic);
         result = CAMIO_ETRYAGAIN;
         goto error_close_file;
     }
@@ -386,7 +378,7 @@ error_no_cleanup:
 //Try to see if connecting is possible.
 static camio_error_t bring_connect_peek(camio_controller_t* this)
 {
-    DBG("Doing connect peek\n");
+    //DBG("Doing connect peek\n");
     camio_error_t result = CAMIO_ENOERROR;
     bring_controller_priv_t* priv = CONTROLLER_GET_PRIVATE(this);
 

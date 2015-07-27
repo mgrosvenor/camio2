@@ -85,7 +85,8 @@ static camio_error_t send_message(camio_muxable_t* muxable)
     if(!wreq.buffer){
         //Get and init a buffer for writing stuff to. Hang on to it if possible
         DBG("No write buffer, grabbing a new one\n");
-        return camio_chan_wr_buff_req( muxable->parent.channel, &wreq, 1);
+        ch_word vec_len = 1;
+        return camio_chan_wr_buff_req( muxable->parent.channel, &wreq, &vec_len);
     }
 
     const ch_word req_bytes     = MAX((size_t)options.len, sizeof(camio_perf_packet_head_t));
@@ -109,7 +110,8 @@ static camio_error_t send_message(camio_muxable_t* muxable)
             wreq.buffer->data_start
     );
 
-    err = camio_chan_wr_req(muxable->parent.channel,&wreq,1 );
+    ch_word vec_len = 1;
+    err = camio_chan_wr_req(muxable->parent.channel,&wreq,&vec_len);
     if(err != CAMIO_ENOERROR && err != CAMIO_ETRYAGAIN){
         ERR("Unexpected write error %lli\n", err);
         return err;
@@ -137,7 +139,7 @@ static void on_new_buff(camio_muxable_t* muxable)
     const ch_word req_bytes     = MAX((size_t)options.len, sizeof(camio_perf_packet_head_t));
     const ch_word bytes_to_send = MIN(req_bytes,res->buffer->data_len);
 
-    //Put data in the packet from the temporary packet
+    //Put data in the packet from the temporary packetb
     memcpy(res->buffer->data_start, packet_data, bytes_to_send);
 
     //Now that we have a buffer, try to send
@@ -167,15 +169,17 @@ static camio_error_t on_new_connect(camio_muxable_t* muxable)
     }
 
     camio_mux_insert(mux,&res->channel->rd_muxable,CONNECTOR_ID + 1);
+    camio_mux_insert(mux,&res->channel->rd_buff_muxable,CONNECTOR_ID + 2);
     camio_mux_insert(mux,&res->channel->wr_muxable,CONNECTOR_ID + 3);
-    camio_mux_insert(mux,&res->channel->wr_buff_muxable,CONNECTOR_ID + 5);
+    camio_mux_insert(mux,&res->channel->wr_buff_muxable,CONNECTOR_ID + 4);
 
 
     //Kick things off by sending the first message
     send_message(&res->channel->wr_muxable);
 
     //We have a successful connection, what about another one?
-    err = camio_ctrl_chan_req(controller, &chan_req, 1);
+    ch_word vec_len = 1;
+    err = camio_ctrl_chan_req(controller, &chan_req, &vec_len);
     if(err ){
         DBG("Unexpected error making controller request\n");
         return err;
@@ -217,7 +221,8 @@ int camio_perf_clinet(ch_cstr client_channel_uri, ch_word* stop)
     ch_word intv_bytes          = 0;
 
     DBG("Chan_req->channel=%p\n", &chan_req);
-    camio_ctrl_chan_req(controller, &chan_req, 1);
+    ch_word vec_len = 1;
+    camio_ctrl_chan_req(controller, &chan_req, &vec_len);
 
     DBG("Staring main loop\n");
     camio_muxable_t* muxable     = NULL;
@@ -231,7 +236,7 @@ int camio_perf_clinet(ch_cstr client_channel_uri, ch_word* stop)
         return CAMIO_ENOMEM;
     }
     for(int i = 0; i < options.len; i++){
-        packet_data [i] = i % 27 + 'A';
+        packet_data [i] = i % 26 + 'A';
     }
 
 
@@ -273,6 +278,10 @@ int camio_perf_clinet(ch_cstr client_channel_uri, ch_word* stop)
                 ERR("Handling read ready() -- I didn't expect this...\n");
                 break;
             }
+            case CAMIO_MUX_MODE_READ_BUFF:{
+                ERR("Handling read buffer ready() -- I didn't expect this...\n");
+                break;
+            }
             case CAMIO_MUX_MODE_WRITE_BUFF:{
                 on_new_buff(muxable);
                 break;
@@ -295,6 +304,7 @@ int camio_perf_clinet(ch_cstr client_channel_uri, ch_word* stop)
             case CAMIO_MUX_MODE_NONE:{
                 ERR("Um? What?? This shouldn't happen!\n");
             }
+            //There is no default case, this is intentional so that the compiler will catch us if we add a new enum
         }
     }
 

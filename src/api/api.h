@@ -31,13 +31,14 @@
  *  CamIO Control, Channel Request
  *  Tell the controller that we would like to obtain a communication channel on this device. Some devices will support many
  *  channels. Some devices will support only one. The request is issued as a vector of request structures, with length
- *  vec_len. The device may have a limited number of request slots.
+ *  vec_len_io. The device may have a limited number of request slots. The number of requests accepted into the queue is
+ *  returned in vec_len_io.
  *  Return values:
  *  CAMIO_ENOERROR - the request was accepted into the queue
  *  CAMIO_ETOOMANY - the request slots have run-out
  *  CAMIO_ENOMORE  - the device has run out of communication channels, no more requests will succeed.
  */
-camio_error_t camio_ctrl_chan_req( camio_controller_t* this, camio_chan_req_t* req_vec, ch_word vec_len);
+camio_error_t camio_ctrl_chan_req( camio_controller_t* this, camio_chan_req_t* req_vec, ch_word* vec_len_io);
 
 
 /**
@@ -125,6 +126,36 @@ void camio_mux_destroy(camio_mux_t* this);
 /**************************************************************************************************************************
  * Data Plane Operations - Read
  **************************************************************************************************************************/
+
+/**
+ * Try to acquire a buffer for read data into.
+ */
+camio_error_t camio_chan_rd_buff_req(camio_channel_t* this, camio_rd_req_t* req_vec,  ch_word* vec_len_io );
+
+/**
+ * Try to acquire a buffer for read data into.
+ */
+camio_error_t camio_chan_rd_buff_ready(camio_channel_t* this);
+
+/**
+ * Try get the results of a read buffer request
+ */
+camio_error_t camio_chan_rd_buff_res(camio_channel_t* this, camio_rd_req_t** res_o);
+
+/**
+ * Relinquish resources associated with the given read buffer. Streams with the async_arrv feature enabled support
+ * asynchronous update modes. Read_release will check to see if the data in these buffer is still valid. If it is not valid,
+ * it may have been trashed while you were working on it, so any results are invalid! If you are concerned about correctness,
+ * you should a) not use a channel that has async_arrv b) ensure that your software can âroll backâ when a corruption is
+ * detected c) copy data and check for validity before proceeding. Some channels have sequencing requirements for buffer
+ * chains. If you try to release an invalid sequence, an EBADSEQ error may be raised.
+ * Return values:
+ * - ENOERROR: All good, please continue
+ * - EINVALID: Your data got trashed, time to recover!
+ * - EBADSEQ:  You cannot release this buffer without releasing previous buffers in the sequence too
+ */
+camio_error_t camio_chan_rd_buff_release(camio_channel_t* this, camio_rd_buffer_t* buffer);
+
 /**
  * This function requests new data from the CamIO channel called 'this'. Read requests are supplied as a vector of
  * read_req_t structures. Each structure contains a destination buffer offset hint, a source offset hint and a read size
@@ -156,7 +187,7 @@ void camio_mux_destroy(camio_mux_t* this);
  * TODO XXX: Another way to build this interface would be to register the buffer pointer here as well. I feel that it is less
  * elegant as the meaning of the API is now obscured, but it could be faster. Hmmm.. Defer to a later decision point
  */
-camio_error_t camio_chan_rd_req( camio_channel_t* this, camio_rd_req_t* req_vec, ch_word vec_len );
+camio_error_t camio_chan_rd_req( camio_channel_t* this, camio_rd_req_t* req_vec, ch_word* vec_len_io );
 
 
 /**
@@ -182,19 +213,7 @@ camio_error_t camio_chan_rd_ready( camio_channel_t* this);
 camio_error_t camio_chan_rd_res( camio_channel_t* this, camio_rd_req_t** res_o);
 
 
-/**
- * Relinquish resources associated with the given read buffer. Streams with the async_arrv feature enabled support
- * asynchronous update modes. Read_release will check to see if the data in these buffer is still valid. If it is not valid,
- * it may have been trashed while you were working on it, so any results are invalid! If you are concerned about correctness,
- * you should a) not use a channel that has async_arrv b) ensure that your software can âroll backâ when a corruption is
- * detected c) copy data and check for validity before proceeding. Some channels have sequencing requirements for buffer
- * chains. If you try to release an invalid sequence, an EBADSEQ error may be raised.
- * Return values:
- * - ENOERROR: All good, please continue
- * - EINVALID: Your data got trashed, time to recover!
- * - EBADSEQ:  You cannot release this buffer without releasing previous buffers in the sequence too
- */
-camio_error_t camio_chan_rd_release(camio_channel_t* this, camio_rd_buffer_t* buffer);
+
 
 
 /**************************************************************************************************************************
@@ -210,7 +229,7 @@ camio_error_t camio_chan_rd_release(camio_channel_t* this, camio_rd_buffer_t* bu
  *  - ENOSLOTS: The channel could not allocate more slots for the read. Free some slots by releasing a read or write
  *              transaction.
  */
-camio_error_t camio_chan_wr_buff_req(camio_channel_t* this, camio_wr_req_t* req_vec, ch_word vec_len);
+camio_error_t camio_chan_wr_buff_req(camio_channel_t* this, camio_wr_req_t* req_vec,  ch_word* vec_len_io );
 
 /**
  * Try to acquire a buffer for writing data into. You can hang on to this buffers as long as the channel permits, but beware,
@@ -238,7 +257,7 @@ camio_error_t camio_chan_wr_buff_res(camio_channel_t* this, camio_wr_req_t** res
  * - ENOERROR: Completed successfully.
  * - TODO XXX: Add more here
  */
-camio_error_t camio_chan_wr_req(camio_channel_t* this, camio_wr_req_t* req_vec, ch_word vec_len);
+camio_error_t camio_chan_wr_req(camio_channel_t* this, camio_wr_req_t* req_vec,  ch_word* vec_len_io );
 
 /**
  * Check if the channel is ready to write.

@@ -98,21 +98,23 @@ static camio_error_t on_new_connect(camio_muxable_t* muxable)
     }
 
     camio_mux_insert(mux,&res->channel->rd_muxable,CONNECTOR_ID + 1);
+    camio_mux_insert(mux,&res->channel->rd_buff_muxable,CONNECTOR_ID + 2);
     camio_mux_insert(mux,&res->channel->wr_muxable,CONNECTOR_ID + 3);
-    camio_mux_insert(mux,&res->channel->wr_buff_muxable,CONNECTOR_ID + 5);
+    camio_mux_insert(mux,&res->channel->wr_buff_muxable,CONNECTOR_ID + 4);
 
     //Kick things off by asking for data
     rreq.dst_offset_hint = CAMIO_READ_REQ_DST_OFFSET_NONE;
     rreq.src_offset_hint = CAMIO_READ_REQ_SRC_OFFSET_NONE;
     rreq.read_size_hint  = CAMIO_READ_REQ_SIZE_ANY;
-    err = camio_chan_rd_req(chan_req.channel,&rreq,1);
+    ch_word vec_len = 1;
+    err = camio_chan_rd_buff_req(chan_req.channel,&rreq,&vec_len);
     if(err != CAMIO_ENOERROR){
-        ERR("Could not issue read_request. Got err %lli\n", err);
+        ERR("Could not issue read buffer request. Got err %lli\n", err);
         return CAMIO_EINVALID;
     }
 
     //We have a successful connection, what about another one?
-    err = camio_ctrl_chan_req(controller, &chan_req, 1);
+    err = camio_ctrl_chan_req(controller, &chan_req, &vec_len);
     if(err){
         ERR("Could not issue channel request. Got err %lli\n", err);
         return err;
@@ -158,8 +160,8 @@ int camio_perf_server(ch_cstr client_channel_uri, ch_word* stop)
     ch_word max_latency         = INT64_MIN;
     ch_word total_latency       = 0;
 
-
-    camio_ctrl_chan_req(controller, &chan_req, 1);
+    ch_word vec_len = 1;
+    camio_ctrl_chan_req(controller, &chan_req, &vec_len);
 
     DBG("Staring main loop\n");
     camio_muxable_t* muxable     = NULL;
@@ -207,6 +209,24 @@ int camio_perf_server(ch_cstr client_channel_uri, ch_word* stop)
                 if(err){ return err; } //Cannot recover from connection error!
                 break;
             }
+            case CAMIO_MUX_MODE_READ_BUFF:{
+                DBG("Handling read buff ready()\n");
+
+                camio_rd_req_t* res = NULL;
+                err = camio_chan_rd_buff_res(muxable->parent.channel, &res );
+                if(err){
+                    ERR("Getting read buffer=%lli\n", err);
+                    return err;
+                }
+
+                ch_word vec_len = 1;
+                err = camio_chan_rd_req(chan_req.channel,&rreq,&vec_len);
+                if(err){
+                    ERR("Sending read request=%lli\n", err);
+                    return err;
+                }
+                break;
+            }
             case CAMIO_MUX_MODE_READ:{
                 DBG("Handling read ready()\n");
                 camio_rd_req_t* res = NULL;
@@ -247,7 +267,7 @@ int camio_perf_server(ch_cstr client_channel_uri, ch_word* stop)
 
                 //printf("ts=%lli, len=%lli, seq=%lli, \n", head->time_stamp, head->size, head->seq_number );
 
-                err = camio_chan_rd_release(muxable->parent.channel, rd_buffer);
+                err = camio_chan_rd_buff_release(muxable->parent.channel, rd_buffer);
                 if(err){
                     DBG("WTF? Error releasing buffer??\n");
                     return err;//Don't know how to recover from this!
@@ -257,9 +277,10 @@ int camio_perf_server(ch_cstr client_channel_uri, ch_word* stop)
                 rreq.dst_offset_hint = CAMIO_READ_REQ_DST_OFFSET_NONE;
                 rreq.src_offset_hint = CAMIO_READ_REQ_SRC_OFFSET_NONE;
                 rreq.read_size_hint  = CAMIO_READ_REQ_SIZE_ANY;
-                err = camio_chan_rd_req(muxable->parent.channel,&rreq,1);
+                ch_word vec_len = 1;
+                err = camio_chan_rd_buff_req(chan_req.channel,&rreq,&vec_len);
                 if(err != CAMIO_ENOERROR){
-                    ERR("Could not issue read_request. Got errr %i\n", err);
+                    ERR("Could not issue read buffer request. Got err %lli\n", err);
                     return CAMIO_EINVALID;
                 }
 
@@ -269,9 +290,15 @@ int camio_perf_server(ch_cstr client_channel_uri, ch_word* stop)
                 ERR("Handling write ready() -- I didn't expect this...\n");
                 break;
             }
-            default:{
-                ERR("Um? What\n");
+            case CAMIO_MUX_MODE_WRITE_BUFF:{
+                ERR("Um? What?? This shouldn't happen!\n");
+                break;
             }
+            case CAMIO_MUX_MODE_NONE:{
+                ERR("Um? What?? This shouldn't happen!\n");
+                break;
+            }
+            //There is no default case, this is intentional so that the compiler will catch us if we add a new enum
         }
 
     }
