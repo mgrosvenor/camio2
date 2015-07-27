@@ -29,6 +29,7 @@ static ch_word inflight_bytes         = 0;
 static camio_wr_req_t wreq            = {0};
 static camio_controller_t* controller = NULL;
 static camio_chan_req_t chan_req      = { 0 };
+static char* packet_data              = NULL;
 
 //static ch_word delimit(char* buffer, ch_word len)
 //{
@@ -133,13 +134,11 @@ static void on_new_buff(camio_muxable_t* muxable)
     }
 
     //Figure out how much we should send. -- Just some basic sanity checking
-//    const ch_word req_bytes     = MAX((size_t)options.len, sizeof(camio_perf_packet_head_t));
-//    const ch_word bytes_to_send = MIN(req_bytes,res->buffer->data_len);
-//
-    //Initialize the packet with some non zero junk
-//    for(int i = 0; i < bytes_to_send; i++){
-//        *((char*)res->buffer->data_start + i) = i % 27 + 'A';
-//    }
+    const ch_word req_bytes     = MAX((size_t)options.len, sizeof(camio_perf_packet_head_t));
+    const ch_word bytes_to_send = MIN(req_bytes,res->buffer->data_len);
+
+    //Put data in the packet from the temporary packet
+    memcpy(res->buffer->data_start, packet_data, bytes_to_send);
 
     //Now that we have a buffer, try to send
     send_message(muxable);
@@ -223,6 +222,18 @@ int camio_perf_clinet(ch_cstr client_channel_uri, ch_word* stop)
     DBG("Staring main loop\n");
     camio_muxable_t* muxable     = NULL;
     ch_word which                = 0;
+
+
+    //Initialize a packet with some non zero junk
+    packet_data = (char*)calloc(1,options.len);
+    if(!packet_data){
+        DBG("Could not allocate temporary packet data memory\n");
+        return CAMIO_ENOMEM;
+    }
+    for(int i = 0; i < options.len; i++){
+        packet_data [i] = i % 27 + 'A';
+    }
+
 
     while(!*stop){
         gettimeofday(&now, NULL);
