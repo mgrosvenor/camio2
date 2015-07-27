@@ -133,13 +133,13 @@ static void on_new_buff(camio_muxable_t* muxable)
     }
 
     //Figure out how much we should send. -- Just some basic sanity checking
-    const ch_word req_bytes     = MAX((size_t)options.len, sizeof(camio_perf_packet_head_t));
-    const ch_word bytes_to_send = MIN(req_bytes,res->buffer->data_len);
-
+//    const ch_word req_bytes     = MAX((size_t)options.len, sizeof(camio_perf_packet_head_t));
+//    const ch_word bytes_to_send = MIN(req_bytes,res->buffer->data_len);
+//
     //Initialize the packet with some non zero junk
-    for(int i = 0; i < bytes_to_send; i++){
-        *((char*)res->buffer->data_start + i) = i % 27 + 'A';
-    }
+//    for(int i = 0; i < bytes_to_send; i++){
+//        *((char*)res->buffer->data_start + i) = i % 27 + 'A';
+//    }
 
     //Now that we have a buffer, try to send
     send_message(muxable);
