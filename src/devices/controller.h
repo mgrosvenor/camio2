@@ -18,11 +18,7 @@
 #include <src/multiplexers/muxable.h>
 #include <src/utils/uri_parser/uri_parser.h>
 
-typedef struct camio_chan_req_s {
-    camio_channel_t* channel;
-    ch_word id;
-    ch_word status;
-} camio_chan_req_t;
+#include "messages.h"
 
 #define CAMIO_CTRL_REQ_INF 0x001
 
@@ -35,9 +31,8 @@ typedef camio_error_t (*camio_conn_construct_f)(camio_controller_t* controller_o
  */
 typedef struct camio_controller_interface_s{
     camio_conn_construct_f construct;
-    camio_error_t (*channel_request)( camio_controller_t* this, camio_chan_req_t* req_vec, ch_word* vec_len_io);
-    camio_error_t (*channel_ready)( camio_controller_t* this );
-    camio_error_t (*channel_result)( camio_controller_t* this, camio_chan_req_t** res_o );
+    camio_error_t (*channel_request)( camio_controller_t* this, camio_msg_t* req_vec, ch_word* vec_len_io);
+    camio_error_t (*channel_result)( camio_controller_t* this, camio_msg_t* res_vec, ch_word* vec_len_io);
     void (*destroy)(camio_controller_t* this);
 } camio_controller_interface_t;
 

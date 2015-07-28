@@ -38,7 +38,7 @@
  *  CAMIO_ETOOMANY - the request slots have run-out
  *  CAMIO_ENOMORE  - the device has run out of communication channels, no more requests will succeed.
  */
-camio_error_t camio_ctrl_chan_req( camio_controller_t* this, camio_chan_req_t* req_vec, ch_word* vec_len_io);
+camio_error_t camio_ctrl_chan_req( camio_controller_t* this, camio_msg_t* req_vec, ch_word* vec_len_io);
 
 
 /**
@@ -60,7 +60,7 @@ camio_error_t camio_ctrl_chan_ready( camio_controller_t* this );
  * Return values:
  * CAMIO_ENOERROR
  */
-camio_error_t camio_ctrl_chan_res( camio_controller_t* this, camio_chan_req_t** req_o );
+camio_error_t camio_ctrl_chan_res( camio_controller_t* this, camio_msg_t* res_vec, ch_word* vec_len_io);
 
 
 /**
@@ -130,7 +130,7 @@ void camio_mux_destroy(camio_mux_t* this);
 /**
  * Try to acquire a buffer for read data into.
  */
-camio_error_t camio_chan_rd_buff_req(camio_channel_t* this, camio_rd_req_t* req_vec,  ch_word* vec_len_io );
+camio_error_t camio_chan_rd_buff_req(camio_channel_t* this, camio_msg_t* req_vec,  ch_word* vec_len_io );
 
 /**
  * Try to acquire a buffer for read data into.
@@ -140,7 +140,7 @@ camio_error_t camio_chan_rd_buff_ready(camio_channel_t* this);
 /**
  * Try get the results of a read buffer request
  */
-camio_error_t camio_chan_rd_buff_res(camio_channel_t* this, camio_rd_req_t** res_o);
+camio_error_t camio_chan_rd_buff_res(camio_channel_t* this, camio_msg_t* res_vec, ch_word* vec_len_io);
 
 /**
  * Relinquish resources associated with the given read buffer. Streams with the async_arrv feature enabled support
@@ -154,7 +154,7 @@ camio_error_t camio_chan_rd_buff_res(camio_channel_t* this, camio_rd_req_t** res
  * - EINVALID: Your data got trashed, time to recover!
  * - EBADSEQ:  You cannot release this buffer without releasing previous buffers in the sequence too
  */
-camio_error_t camio_chan_rd_buff_release(camio_channel_t* this, camio_rd_buffer_t* buffer);
+camio_error_t camio_chan_rd_buff_release(camio_channel_t* this, camio_buffer_t* buffer);
 
 /**
  * This function requests new data from the CamIO channel called 'this'. Read requests are supplied as a vector of
@@ -187,7 +187,7 @@ camio_error_t camio_chan_rd_buff_release(camio_channel_t* this, camio_rd_buffer_
  * TODO XXX: Another way to build this interface would be to register the buffer pointer here as well. I feel that it is less
  * elegant as the meaning of the API is now obscured, but it could be faster. Hmmm.. Defer to a later decision point
  */
-camio_error_t camio_chan_rd_req( camio_channel_t* this, camio_rd_req_t* req_vec, ch_word* vec_len_io );
+camio_error_t camio_chan_rd_req( camio_channel_t* this, camio_msg_t* req_vec, ch_word* vec_len_io );
 
 
 /**
@@ -210,7 +210,7 @@ camio_error_t camio_chan_rd_ready( camio_channel_t* this);
  * - ENOBUFFS:  The channel could not allocate more buffers for the read. Free some buffers by releasing an outstanding read
  *              or write transaction.
  */
-camio_error_t camio_chan_rd_res( camio_channel_t* this, camio_rd_req_t** res_o);
+camio_error_t camio_chan_rd_res( camio_channel_t* this, camio_msg_t* res_vec, ch_word* vec_len_io);
 
 
 
@@ -229,7 +229,7 @@ camio_error_t camio_chan_rd_res( camio_channel_t* this, camio_rd_req_t** res_o);
  *  - ENOSLOTS: The channel could not allocate more slots for the read. Free some slots by releasing a read or write
  *              transaction.
  */
-camio_error_t camio_chan_wr_buff_req(camio_channel_t* this, camio_wr_req_t* req_vec,  ch_word* vec_len_io );
+camio_error_t camio_chan_wr_buff_req(camio_channel_t* this, camio_msg_t* req_vec,  ch_word* vec_len_io );
 
 /**
  * Try to acquire a buffer for writing data into. You can hang on to this buffers as long as the channel permits, but beware,
@@ -246,7 +246,7 @@ camio_error_t camio_chan_wr_buff_ready(camio_channel_t* this);
 /**
  * Try get the results of a write buffer request
  */
-camio_error_t camio_chan_wr_buff_res(camio_channel_t* this, camio_wr_req_t** res_o);
+camio_error_t camio_chan_wr_buff_res(camio_channel_t* this, camio_msg_t* res_vec, ch_word* vec_len_io);
 
 
 /* Write data described by the , or buffer_chain to the channel called 'this'. Write may or may not block. Use a
@@ -257,7 +257,7 @@ camio_error_t camio_chan_wr_buff_res(camio_channel_t* this, camio_wr_req_t** res
  * - ENOERROR: Completed successfully.
  * - TODO XXX: Add more here
  */
-camio_error_t camio_chan_wr_req(camio_channel_t* this, camio_wr_req_t* req_vec,  ch_word* vec_len_io );
+camio_error_t camio_chan_wr_req(camio_channel_t* this, camio_msg_t* req_vec,  ch_word* vec_len_io );
 
 /**
  * Check if the channel is ready to write.
@@ -267,7 +267,7 @@ camio_error_t camio_chan_wr_ready( camio_channel_t* this);
 /**
  * Try get the results of a write request
  */
-camio_error_t camio_chan_wr_res(camio_channel_t* this, camio_wr_req_t** res_o);
+camio_error_t camio_chan_wr_res(camio_channel_t* this, camio_msg_t* res_vec, ch_word* vec_len_io);
 
 
 
@@ -278,7 +278,7 @@ camio_error_t camio_chan_wr_res(camio_channel_t* this, camio_wr_req_t** res_o);
  * - ENOERROR: All good, please continue.
  * - EBADSEQ:  You cannot release this buffer without releasing previous buffers in the sequence too.
  */
-camio_error_t camio_chan_wr_buff_release(camio_channel_t* this, camio_wr_buffer_t* buffer);
+camio_error_t camio_chan_wr_buff_release(camio_channel_t* this, camio_buffer_t* buffer);
 
 
 /**
@@ -298,8 +298,8 @@ void camio_channel_destroy(camio_channel_t* this);
  *  - ENOBYTESCOPPIED:  Completed successfully, no bytes were copied.
  */
 camio_error_t camio_copy_rw(
-        camio_wr_buffer_t** wr_buffer,
-        camio_rd_buffer_t** rd_buffer,
+        camio_buffer_t** wr_buffer,
+        camio_buffer_t** rd_buffer,
         ch_word src_offset,
         ch_word dst_offset,
         ch_word copy_len
@@ -314,7 +314,7 @@ camio_error_t camio_copy_rw(
  *  - ENOERROR: The operation completed successfully
  *  - TODO XXX: Fill in more here
  */
-camio_error_t camio_ignore(camio_wr_buffer_t** wr_buffer, camio_rd_buffer_t** rd_buffer, ch_word offset, ch_word copy_len);
+camio_error_t camio_ignore(camio_buffer_t** wr_buffer, camio_buffer_t** rd_buffer, ch_word offset, ch_word copy_len);
 
 
 

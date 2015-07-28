@@ -49,7 +49,7 @@
     }
 
 
-camio_error_t camio_ctrl_chan_req( camio_controller_t* this, camio_chan_req_t* req_vec, ch_word* vec_len_io)
+camio_error_t camio_ctrl_chan_req( camio_controller_t* this, camio_msg_t* req_vec, ch_word* vec_len_io)
 {
     #ifdef DO_SANITY_CHECKS
         CHECK(NULL == this,"This is null???\n")
@@ -72,14 +72,15 @@ camio_error_t camio_ctrl_chan_ready( camio_controller_t* this )
 }
 
 
-camio_error_t camio_ctrl_chan_res( camio_controller_t* this, camio_chan_req_t** res_o )
+camio_error_t camio_ctrl_chan_res( camio_controller_t* this, camio_msg_t* res_vec, ch_word* vec_len_io)
 {
     #ifdef DO_SANITY_CHECKS //Only apply these checks in debug mode. Keep the speed when we need it?
         CHECK( NULL == this,"This is null???\n")
-        CHECK( NULL == res_o,"Request result pointer supplied is NULL\n")
+        CHECK( NULL == res_vec,"Request result pointer supplied is NULL\n")
+        CHECK( 0 >= *vec_len_io, "You supplied an empty vector? Did you mean this?")
     #endif
 
-    return this->vtable.channel_result(this, res_o);
+    return this->vtable.channel_result(this, res_vec, vec_len_io);
 }
 
 
@@ -93,7 +94,7 @@ void camio_controller_destroy(camio_controller_t* this)
 }
 
 
-camio_error_t camio_chan_rd_buff_req(camio_channel_t* this, camio_rd_req_t* req_vec, ch_word* vec_len_io )
+camio_error_t camio_chan_rd_buff_req(camio_channel_t* this, camio_msg_t* req_vec, ch_word* vec_len_io )
 {
     #ifdef DO_SANITY_CHECKS
         CHECK( NULL == this,"This is null???\n")
@@ -116,16 +117,18 @@ camio_error_t camio_chan_rd_buff_ready(camio_channel_t* this)
 }
 
 
-camio_error_t camio_chan_rd_buff_res(camio_channel_t* this, camio_rd_req_t** req_o)
+camio_error_t camio_chan_rd_buff_res(camio_channel_t* this, camio_msg_t* res_vec, ch_word* vec_len_io)
 {
     #ifdef DO_SANITY_CHECKS
         CHECK( NULL == this,"This is null???\n")
+        CHECK( NULL == res_vec, "Empty response vector?")
+        CHECK( 0 >= *vec_len_io,"Supplied read request vector is empty\n")
     #endif
 
-    return this->vtable.read_buffer_result(this, req_o);
+    return this->vtable.read_buffer_result(this, res_vec, vec_len_io);
 }
 
-camio_error_t camio_chan_rd_req( camio_channel_t* this, camio_rd_req_t* req_vec, ch_word* vec_len_io )
+camio_error_t camio_chan_rd_req( camio_channel_t* this, camio_msg_t* req_vec, ch_word* vec_len_io )
 {
     #ifdef DO_SANITY_CHECKS
         CHECK(NULL == this,"This is null???\n")
@@ -148,18 +151,20 @@ camio_error_t camio_chan_rd_ready( camio_channel_t* this)
 }
 
 
-camio_error_t camio_chan_rd_res( camio_channel_t* this, camio_rd_req_t** res_o)
+camio_error_t camio_chan_rd_res( camio_channel_t* this, camio_msg_t* res_vec, ch_word* vec_len_io)
 {
     #ifdef DO_SANITY_CHECKS //Only apply these checks in debug mode. Keep the speed when we need it?
         CHECK( NULL == this,"This is null???\n")
-        CHECK( NULL == res_o,"Request result pointer supplied is NULL\n")
+        CHECK( NULL == res_vec, "Empty response vector?")
+        CHECK( 0 >= *vec_len_io,"Supplied read request vector is empty\n")
+
     #endif
 
-    return this->vtable.read_result(this, res_o);
+    return this->vtable.read_result(this, res_vec, vec_len_io);
 }
 
 
-camio_error_t camio_chan_rd_buff_release(camio_channel_t* this, camio_rd_buffer_t* buffer)
+camio_error_t camio_chan_rd_buff_release(camio_channel_t* this, camio_buffer_t* buffer)
 {
     #ifdef DO_SANITY_CHECKS
         CHECK( NULL == this,"This is null???\n")
@@ -172,7 +177,7 @@ camio_error_t camio_chan_rd_buff_release(camio_channel_t* this, camio_rd_buffer_
 }
 
 
-camio_error_t camio_chan_wr_buff_req(camio_channel_t* this, camio_wr_req_t* req_vec, ch_word* vec_len_io )
+camio_error_t camio_chan_wr_buff_req(camio_channel_t* this, camio_msg_t* req_vec, ch_word* vec_len_io )
 {
     #ifdef DO_SANITY_CHECKS
         CHECK( NULL == this,"This is null???\n")
@@ -195,16 +200,19 @@ camio_error_t camio_chan_wr_buff_ready(camio_channel_t* this)
 }
 
 
-camio_error_t camio_chan_wr_buff_res(camio_channel_t* this, camio_wr_req_t** req_o)
+camio_error_t camio_chan_wr_buff_res(camio_channel_t* this, camio_msg_t* res_vec, ch_word* vec_len_io)
 {
     #ifdef DO_SANITY_CHECKS
         CHECK( NULL == this,"This is null???\n")
+        CHECK( NULL == res_vec, "Empty response vector?")
+        CHECK( 0 >= *vec_len_io,"Supplied read request vector is empty\n")
+
     #endif
 
-    return this->vtable.write_buffer_result(this, req_o);
+    return this->vtable.write_buffer_result(this, res_vec, vec_len_io);
 }
 
-camio_error_t camio_chan_wr_req(camio_channel_t* this, camio_wr_req_t* req_vec, ch_word* vec_len_io )
+camio_error_t camio_chan_wr_req(camio_channel_t* this, camio_msg_t* req_vec, ch_word* vec_len_io )
 {
     #ifdef DO_SANITY_CHECKS
         CHECK( NULL == this,"This is null???\n")
@@ -225,18 +233,20 @@ camio_error_t camio_chan_wr_ready( camio_channel_t* this)
 }
 
 
-camio_error_t camio_chan_wr_res(camio_channel_t* this, camio_wr_req_t** res_o)
+camio_error_t camio_chan_wr_res(camio_channel_t* this, camio_msg_t* res_vec, ch_word* vec_len_io)
 {
     #ifdef DO_SANITY_CHECKS
         CHECK( NULL == this,"This is null???\n")
-        CHECK( NULL == res_o,"Request result pointer supplied is NULL\n")
+        CHECK( NULL == res_vec, "Empty response vector?")
+        CHECK( 0 >= *vec_len_io,"Supplied read request vector is empty\n")
+
     #endif
 
-    return this->vtable.write_result(this, res_o);
+    return this->vtable.write_result(this, res_vec, vec_len_io);
 }
 
 
-camio_error_t camio_chan_wr_buff_release(camio_channel_t* this, camio_wr_buffer_t* buffer)
+camio_error_t camio_chan_wr_buff_release(camio_channel_t* this, camio_buffer_t* buffer)
 {
     #ifdef DO_SANITY_CHECKS
         CHECK( NULL == this,"This is null???\n")
@@ -313,8 +323,8 @@ inline void camio_mux_destroy(camio_mux_t* this)
 
 
 inline camio_error_t camio_copy_rw(
-        camio_wr_buffer_t** wr_buffer,
-        camio_rd_buffer_t** rd_buffer,
+        camio_buffer_t** wr_buffer,
+        camio_buffer_t** rd_buffer,
         ch_word dst_offset,
         ch_word src_offset,
         ch_word copy_len
@@ -326,8 +336,8 @@ inline camio_error_t camio_copy_rw(
         return CAMIO_NOTIMPLEMENTED;
     }
 
-    camio_wr_buffer_t* wr_buff =  *wr_buffer;
-    camio_wr_buffer_t* rd_buff =  *rd_buffer;
+    camio_buffer_t* wr_buff =  *wr_buffer;
+    camio_buffer_t* rd_buff =  *rd_buffer;
 
 
     //TODO XXX this is temporary until the actual copy function is implemented. The real copy should check if the source and

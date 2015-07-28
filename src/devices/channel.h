@@ -16,28 +16,9 @@
 #include <src/types/types.h>
 #include <src/multiplexers/muxable.h>
 #include <src/buffers/buffer.h>
-
+#include "messages.h"
 #include "features.h"
 
-#define CAMIO_READ_REQ_SIZE_ANY (-1)
-#define CAMIO_READ_REQ_SRC_OFFSET_NONE (-1)
-#define CAMIO_READ_REQ_DST_OFFSET_NONE (0)
-typedef struct camio_read_req_s {
-    ch_word src_offset_hint;
-    ch_word dst_offset_hint;
-    ch_word read_size_hint;
-    camio_rd_buffer_t* buffer;
-    ch_word status;
-} camio_rd_req_t;
-
-#define CAMIO_WRITE_REQ_DST_OFFSET_NONE (-1)
-#define CAMIO_WRITE_REQ_SRC_OFFSET_NONE (0)
-typedef struct camio_write_req_s {
-    ch_word src_offset_hint;
-    ch_word dst_offset_hint;
-    camio_wr_buffer_t* buffer;
-    ch_word status;
-} camio_wr_req_t;
 
 
 /**
@@ -48,18 +29,18 @@ typedef struct camio_channel_interface_s{
     void (*destroy)(camio_channel_t* this);
 
     //Read operations
-    camio_error_t (*read_buffer_request)(camio_channel_t* this, camio_rd_req_t* req_vec, ch_word* vec_len_io );
-    camio_error_t (*read_buffer_result) (camio_channel_t* this, camio_rd_req_t** res_o);
-    camio_error_t (*read_request)(camio_channel_t* this, camio_rd_req_t* req_vec, ch_word* vec_len_io );
-    camio_error_t (*read_result) (camio_channel_t* this, camio_rd_req_t** res_o);
-    camio_error_t (*read_buffer_release)(camio_channel_t* this, camio_rd_buffer_t* buffer_o);
+    camio_error_t (*read_buffer_request)(camio_channel_t* this, camio_msg_t* req_vec, ch_word* vec_len_io );
+    camio_error_t (*read_buffer_result) (camio_channel_t* this, camio_msg_t* res_vec, ch_word* vec_len_io );
+    camio_error_t (*read_request)(camio_channel_t* this, camio_msg_t* req_vec, ch_word* vec_len_io );
+    camio_error_t (*read_result) (camio_channel_t* this, camio_msg_t* res_vec, ch_word* vec_len_io );
+    camio_error_t (*read_buffer_release)(camio_channel_t* this, camio_buffer_t* buffer_o);
 
     //Write operations
-    camio_error_t (*write_buffer_request)(camio_channel_t* this, camio_wr_req_t* req_vec, ch_word* vec_len_io );
-    camio_error_t (*write_buffer_result) (camio_channel_t* this, camio_wr_req_t** res_o);
-    camio_error_t (*write_request)(camio_channel_t* this, camio_wr_req_t* req_vec, ch_word* vec_len_io );
-    camio_error_t (*write_result) (camio_channel_t* this, camio_wr_req_t** res_o);
-    camio_error_t (*write_buffer_release)(camio_channel_t* this, camio_wr_buffer_t* buffer_o);
+    camio_error_t (*write_buffer_request)(camio_channel_t* this, camio_msg_t* req_vec, ch_word* vec_len_io );
+    camio_error_t (*write_buffer_result) (camio_channel_t* this, camio_msg_t* res_vec, ch_word* vec_len_io);
+    camio_error_t (*write_request)(camio_channel_t* this, camio_msg_t* req_vec, ch_word* vec_len_io );
+    camio_error_t (*write_result) (camio_channel_t* this, camio_msg_t* res_vec, ch_word* vec_len_io);
+    camio_error_t (*write_buffer_release)(camio_channel_t* this, camio_buffer_t* buffer_o);
 
 } camio_channel_interface_t;
 

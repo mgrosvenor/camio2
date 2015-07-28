@@ -79,10 +79,6 @@ typedef struct camio_buffer_s {
 
 } camio_buffer_t;
 
-typedef camio_buffer_t camio_rd_buffer_t; //We make these incompatible so that the type checker will help us. The only way to
-typedef camio_buffer_t camio_wr_buffer_t; //get from a read (rd) buffer to a write (wr) buffer is to do a buffer copy.
-                                          //Sometimes a real copy will happen as a result.
-
 
 /**
  * Some macros to make life easier BUFFER_GET_PRIVATE helps us grab the private members out of the public controller_t and

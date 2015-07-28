@@ -57,18 +57,18 @@ typedef struct bring_priv_s {
  * Connect functions
  **************************************************************************************************************************/
 
-camio_error_t bring_channel_request( camio_controller_t* this, camio_chan_req_t* req_vec, ch_word* vec_len_io)
+camio_error_t bring_channel_request( camio_controller_t* this, camio_msg_t* req_vec, ch_word* vec_len_io)
 {
     //DBG("Doing bring channel request...!\n");
 
     bring_controller_priv_t* priv = CONTROLLER_GET_PRIVATE(this);
 
-    ch_word items = cbuff_push_back_carray(priv->chan_req_queue, &req_vec,*vec_len_io);
-    if(unlikely( items < 0)){
-        ERR("Could not push items on to queue. Error code is", items);
+    if(unlikely(NULL == cbuff_push_back_carray(priv->chan_req_queue, req_vec,vec_len_io))){
+        ERR("Could not push any items on to queue.");
         return CAMIO_EINVALID;
     }
-    *vec_len_io = items;
+
+    DBG("Bring channel request done - %lli requests added\n", *vec_len_io);
 
     //DBG("Bring channel request added!\n");
     return CAMIO_ENOERROR;
@@ -408,7 +408,6 @@ static camio_error_t bring_connect_peek(camio_controller_t* this)
 
 static camio_error_t bring_channel_ready(camio_muxable_t* this)
 {
-
     bring_controller_priv_t* priv = CONTROLLER_GET_PRIVATE(this->parent.controller);
     //DBG("Doing channel ready\n");
 
@@ -421,7 +420,7 @@ static camio_error_t bring_channel_ready(camio_muxable_t* this)
     return bring_connect_peek(this->parent.controller);
 }
 
-static camio_error_t bring_channel_result(camio_controller_t* this, camio_chan_req_t** res_o )
+static camio_error_t bring_channel_result(camio_controller_t* this, camio_msg_t* res_vec, ch_word* vec_len_io )
 {
     DBG("Getting bring connect result\n");
     bring_controller_priv_t* priv = CONTROLLER_GET_PRIVATE(this);
@@ -435,33 +434,53 @@ static camio_error_t bring_channel_result(camio_controller_t* this, camio_chan_r
             return err;
         }
     }
-    camio_chan_req_t** req_p = cbuff_peek_front(priv->chan_req_queue);
-    camio_chan_req_t* res = *req_p;
 
-    if(priv->is_connected){
-        DBG("Only channel already supplied! No more channels available\n");
-        res->status = CAMIO_EALLREADYCONNECTED; // We're already connected!
-        *res_o = *req_p;
-        //Error code is in the request, the result is returned successfully even though the result was not a success
-        return CAMIO_ENOERROR;
+    const ch_word count = MIN(priv->chan_req_queue->count, *vec_len_io);
+    *vec_len_io = count;
+    for(ch_word i = 0; i < count; i++, cbuff_pop_front(priv->chan_req_queue)){
+        camio_msg_t* msg = cbuff_peek_front(priv->chan_req_queue);
+        if(msg->type == CAMIO_MSG_TYPE_IGNORE){
+            continue; //We don't care about this message
+        }
+
+        if(msg->type != CAMIO_MSG_TYPE_CHAN_REQ){
+            ERR("Expected a channel request message (%lli) but got %lli instead.\n",CAMIO_MSG_TYPE_CHAN_REQ, msg->type);
+            continue;
+        }
+
+
+        res_vec[i] = *msg;
+        camio_chan_res_t* res = &res_vec[i]->ch_res;
+        msg->type = CAMIO_MSG_TYPE_CHAN_RES;
+
+        if(priv->is_connected){
+            DBG("Only channel already supplied! No more channels available\n");
+            res->status = CAMIO_EALLREADYCONNECTED; // We're already connected!
+            //Error code is in the request, the result is returned successfully even though the result was not a success
+            continue;
+        }
+
+        res->channel = NEW_CHANNEL(bring);
+        if(!res->channel){
+            res->status = CAMIO_ENOMEM;
+            //Error code is in the request, the result is returned successfully even though the result was not a success
+            continue;
+        }
+
+        camio_error_t err = bring_channel_construct(res->channel, this, priv->bring_head, priv->params, priv->bring_fd);
+
+        if(err){
+            res->status = err;
+            continue;
+        }
+
+        priv->is_connected = true;
+        DBG("Done returning channel result\n");
     }
 
-    res->channel = NEW_CHANNEL(bring);
-    if(!res->channel){
-        res->status = CAMIO_ENOMEM;
-        //Error code is in the request, the result is returned successfully even though the result was not a success
-        return CAMIO_ENOERROR;
-    }
-
-    camio_error_t err = bring_channel_construct(res->channel, this, priv->bring_head, priv->params, priv->bring_fd);
-    if(err){
-       return err;
-    }
-    cbuff_pop_front(priv->chan_req_queue);
-    *res_o = *req_p;
-    priv->is_connected = true;
-    DBG("Done returning channel result\n");
+    DBG("Returning %lli channel results\n", count);
     return CAMIO_ENOERROR;
+
 }
 
 
