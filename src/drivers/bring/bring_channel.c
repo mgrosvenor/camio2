@@ -480,7 +480,7 @@ static camio_error_t bring_write_buffer_ready(camio_muxable_t* this)
         }
 
         if(msg->type != CAMIO_MSG_TYPE_WRITE_BUFF_REQ){
-            ERR("Expected a read data response (%lli) but got %lli instead.\n",CAMIO_MSG_TYPE_WRITE_BUFF_REQ, msg->type);
+            ERR("Expected a write buffer request (%lli) but got %lli instead.\n",CAMIO_MSG_TYPE_WRITE_BUFF_REQ, msg->type);
             continue;
         }
 
@@ -550,10 +550,9 @@ camio_error_t bring_write_buffer_result(camio_channel_t* this, camio_msg_t* res_
         }
 
         if(msg->type != CAMIO_MSG_TYPE_WRITE_BUFF_RES){
-            ERR("Expected a read data response (%lli) but got %lli instead.\n",CAMIO_MSG_TYPE_WRITE_BUFF_RES, msg->type);
+            ERR("Expected a write buffer result (%lli) but got %lli instead.\n",CAMIO_MSG_TYPE_WRITE_BUFF_RES, msg->type);
             continue;
         }
-
 
         res_vec[i] = *msg;
         const camio_wr_data_res_t* res = &res_vec[i].wr_data_res;
@@ -626,7 +625,17 @@ static camio_error_t bring_write_request(camio_channel_t* this, camio_msg_t* req
     //Try to perform the write requests
     ch_word i = 0;
     for(i = 0 ; i < vec_len; i++){
+         camio_msg_t* msg = &req_vec[i];
 
+        //Sanity check the message first
+        if(msg->type == CAMIO_MSG_TYPE_IGNORE){
+            continue; //We don't care about this message
+        }
+
+        if(msg->type != CAMIO_MSG_TYPE_WRITE_DATA_REQ){
+            ERR("Expected a write data request (%lli) but got %lli instead.\n",CAMIO_MSG_TYPE_WRITE_DATA_REQ, msg->type);
+            continue;
+        }
 
         camio_wr_data_req_t* req = &req_vec[i].wr_data_req;
         req_vec[i].type= CAMIO_MSG_TYPE_WRITE_DATA_RES;
@@ -636,7 +645,7 @@ static camio_error_t bring_write_request(camio_channel_t* this, camio_msg_t* req
         //DBG("Trying to process write data request of size %lli with data start=%p index=%lli\n",
         //        req->buffer->data_len, req->buffer->data_start, req->buffer->__internal.__buffer_id);
 
-        camio_msg_t* msg = cbuff_push_back(priv->wr_req_queue,req);
+        msg = cbuff_push_back(priv->wr_req_queue,req);
         if(unlikely(!msg)){
             ERR("Could not push item on to queue??");
             return CAMIO_EINVALID; //Exit now, this is unrecoverable
@@ -703,6 +712,16 @@ static camio_error_t bring_write_ready(camio_muxable_t* this)
 
     camio_msg_t* msg = NULL;
     for( msg = cbuff_use_front(priv->wr_req_queue); msg != NULL; msg = cbuff_use_front(priv->wr_req_queue)){
+        //Sanity check the message first
+        if(msg->type == CAMIO_MSG_TYPE_IGNORE){
+            continue; //We don't care about this message
+        }
+
+        if(msg->type != CAMIO_MSG_TYPE_WRITE_DATA_RES){
+            ERR("Expected a write data response (%lli) but got %lli instead.\n",CAMIO_MSG_TYPE_WRITE_DATA_RES, msg->type);
+            continue;
+        }
+
 
         camio_wr_data_res_t* res = &msg->wr_data_res;
         const ch_word buff_idx = res->buffer->__internal.__buffer_id;
@@ -722,7 +741,8 @@ static camio_error_t bring_write_ready(camio_muxable_t* this)
 
         volatile ch_word data_size = get_head_size(priv->wr_buffers, buff_idx);
         DBG("Buffer at index=%lli is ready with %lli bytes written!\n", buff_idx, data_size);
-        (void)data_size;
+        res->written = data_size;
+
         //This is an auto release channel, once buffer is written out, it goes away, you'll need to acquire another
         camio_error_t err = camio_chan_wr_buff_release(this->parent.channel,res->buffer);
         if(err){
@@ -769,8 +789,20 @@ static camio_error_t bring_write_result(camio_channel_t* this, camio_msg_t* res_
     *vec_len_io = count;
     for(ch_word i = 0; i < count; i++){
         camio_msg_t* msg = cbuff_peek_front(priv->wr_req_queue);
-        const camio_rd_data_res_t* res = &msg->rd_data_res;
+
+        //Sanity check the message first
+        if(msg->type == CAMIO_MSG_TYPE_IGNORE){
+            continue; //We don't care about this message
+        }
+
+        if(msg->type != CAMIO_MSG_TYPE_WRITE_DATA_RES){
+            ERR("Expected a write data response (%lli) but got %lli instead.\n",CAMIO_MSG_TYPE_WRITE_DATA_RES, msg->type);
+            continue;
+        }
+
         res_vec[i] = *msg;
+        const camio_rd_data_res_t* res = &res_vec[i].rd_data_res;
+
         cbuff_unuse_front(priv->wr_req_queue);
         cbuff_pop_front(priv->wr_req_queue);
 

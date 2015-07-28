@@ -59,8 +59,9 @@ typedef struct camio_write_data_req_s {
 
 
 typedef struct camio_write_data_res_s {
-    camio_error_t status;       //Return code indicating what happened to the request.
-    camio_buffer_t* buffer;  //This will be populated if the return code is CAMIO_ENOERROR
+    camio_error_t status;     //Return code indicating what happened to the request.
+    camio_buffer_t* buffer;   //This will be populated if the return code is CAMIO_ENOERROR
+    ch_word written;
 } camio_wr_data_res_t;
 
 

@@ -450,7 +450,7 @@ static camio_error_t bring_channel_result(camio_controller_t* this, camio_msg_t*
 
 
         res_vec[i] = *msg;
-        camio_chan_res_t* res = &res_vec[i]->ch_res;
+        camio_chan_res_t* res = &res_vec[i].ch_res;
         msg->type = CAMIO_MSG_TYPE_CHAN_RES;
 
         if(priv->is_connected){
