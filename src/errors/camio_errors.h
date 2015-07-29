@@ -54,6 +54,7 @@ typedef enum camio_error_e {
     CAMIO_ENOMORE,              //36
     CAMIO_ENOREQS,              //37
     CAMIO_ERELBUFF,             //38
+    CAMIO_ERRMUXTIMEOUT,        //39
 } camio_error_t;
 
 #endif /* CAMIO_ERRORS_H_ */

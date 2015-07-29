@@ -144,7 +144,8 @@ camio_error_t camio_chan_rd_ready( camio_channel_t* this)
 {
     #ifdef DO_SANITY_CHECKS
         CHECK( NULL == this,"This is null???\n")
-        CHECK( this->rd_muxable.mode != CAMIO_MUX_MODE_READ, "Wrong kind of muxable mode! Expected CAMIO_MUX_MODE_READ\n")
+        CHECK( this->rd_muxable.mode != CAMIO_MUX_MODE_READ_DATA,
+                "Wrong kind of muxable mode! Expected CAMIO_MUX_MODE_READ\n")
     #endif
 
     return this->rd_muxable.vtable.ready(&this->rd_muxable);
@@ -226,7 +227,8 @@ camio_error_t camio_chan_wr_ready( camio_channel_t* this)
 {
     #ifdef DO_SANITY_CHECKS
         CHECK( NULL == this,"This is null???\n")
-        CHECK( this->rd_muxable.mode != CAMIO_MUX_MODE_WRITE,"Wrong kind of muxable mode! Expected CAMIO_MUX_MODE_WRITE\n")
+        CHECK( this->rd_muxable.mode != CAMIO_MUX_MODE_WRITE_DATA,
+                "Wrong kind of muxable mode! Expected CAMIO_MUX_MODE_WRITE\n")
     #endif
 
     return this->wr_muxable.vtable.ready(&this->wr_muxable);
@@ -269,14 +271,14 @@ void camio_channel_destroy(camio_channel_t* this)
 
 
 
-inline camio_error_t camio_mux_insert(camio_mux_t* this, camio_muxable_t* muxable, ch_word id)
+inline camio_error_t camio_mux_insert(camio_mux_t* this, camio_muxable_t* muxable, void* callback, void* usr_state, ch_word id)
 {
     #ifdef DO_SANITY_CHECKS
         CHECK( NULL == this,"This is null???\n")
         CHECK( NULL == muxable, "Muxable is null??\n");
     #endif
 
-    return this->vtable.insert(this,muxable,id);
+    return this->vtable.insert(this,muxable,callback, usr_state, id);
 }
 
 
@@ -291,15 +293,14 @@ inline camio_error_t camio_mux_remove(camio_mux_t* this, camio_muxable_t* muxabl
 }
 
 
-inline camio_error_t camio_mux_select(camio_mux_t* this, camio_muxable_t** muxable_o, ch_word* which_o)
+inline camio_error_t camio_mux_select(camio_mux_t* this, struct timeval* timeout, camio_muxable_t** muxable_o)
 {
     #ifdef DO_SANITY_CHECKS
         CHECK( NULL == this,"This is null???\n")
         CHECK( NULL == muxable_o, "Muxable_o is null??\n")
-        CHECK( NULL == which_o,"which_o is null???\n")
     #endif
 
-    return this->vtable.select(this, /*timeout,*/ muxable_o, which_o);
+    return this->vtable.select(this, timeout, muxable_o);
 }
 
 ch_word camio_mux_count(camio_mux_t* this)

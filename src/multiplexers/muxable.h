@@ -17,10 +17,10 @@
 
 typedef enum {
     CAMIO_MUX_MODE_NONE,         //Default case. Error.
-    CAMIO_MUX_MODE_READ,         //Selector will fire when muxable is ready to read
+    CAMIO_MUX_MODE_READ_DATA,    ///Selector will fire when muxable is ready to read
     CAMIO_MUX_MODE_READ_BUFF,    //Selector will fire when muxable is ready to give a new buffer
-    CAMIO_MUX_MODE_WRITE,        //Selector will fire when muxable is ready to write
     CAMIO_MUX_MODE_WRITE_BUFF,   //Selector will fire when muxable is ready to give a new buffer
+    CAMIO_MUX_MODE_WRITE_DATA,   //Selector will fire when muxable is ready to write
     CAMIO_MUX_MODE_CONNECT,      //Selector will fire when muxable is ready to connect
 } camio_mux_mode_e;
 
@@ -51,20 +51,35 @@ typedef struct camio_muxable_s {
      */
     int fd;
 
-    union{
-        camio_channel_t*    channel;    //Gives access back to the channel or controller which is the parent of this
-        camio_controller_t* controller;
-    } parent;
-
     /**
      * Let the mux know what sort of event's we are looking for.
      */
     camio_mux_mode_e mode;
 
     /**
-     * Store an ID here for a simple way to know which channel this is. This is kind of a hack.
+     * Gives access back to the channel or controller (figure out which by looking at the mux_mode above
      */
+    union{
+        camio_channel_t*    channel;
+        camio_controller_t* controller;
+    } parent;
+
+    //Let users keep a pointer to some local state, this is ignored by CamIO
+    void* usr_state;
+
+    //Call back for users when this muxable is ready
+    union{
+        camio_error_t (*on_new_channels)(camio_controller_t* this, camio_error_t err, void* usr_state, ch_word id);
+        camio_error_t (*on_new_rd_buffs)(camio_channel_t* this, camio_error_t err, void* usr_state, ch_word id);
+        camio_error_t (*on_new_rd_datas)(camio_channel_t* this, camio_error_t err, void* usr_state, ch_word id);
+        camio_error_t (*on_new_wr_buffs)(camio_channel_t* this, camio_error_t err, void* usr_state, ch_word id);
+        camio_error_t (*on_new_wr_datas)(camio_channel_t* this, camio_error_t err, void* usr_state, ch_word id);
+        void* any;
+    } call_back;
+
+    //To easily identify this muxable
     ch_word id;
+
 } camio_muxable_t;
 
 

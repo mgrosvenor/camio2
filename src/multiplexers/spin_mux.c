@@ -33,12 +33,14 @@ camio_error_t spin_construct(camio_mux_t* this){
 }
 
 
-camio_error_t spin_insert(camio_mux_t* this, camio_muxable_t* muxable, ch_word id)
+camio_error_t spin_insert(camio_mux_t* this, camio_muxable_t* muxable, void* callback, void* usr_state, ch_word id)
 {
     //DBG("Inserting %p into mux with id=%i\n",muxable,id);
     mux_spin_priv_t* priv = MUX_GET_PRIVATE(this);
     CH_VECTOR(CAMIO_MUXABLE_VEC)* muxables = priv->muxables;
-    muxable->id = id;
+    muxable->call_back.any  = callback;
+    muxable->usr_state      = usr_state;
+    muxable->id             = id;
     muxables->push_back(muxables, *muxable);
     return CAMIO_ENOERROR;
 }
@@ -59,37 +61,89 @@ camio_error_t spin_remove(camio_mux_t* this, camio_muxable_t* muxable)
 }
 
 
-camio_error_t spin_select(camio_mux_t* this, /*struct timespec timeout,*/ camio_muxable_t** muxable_o, ch_word* which_o)
+camio_error_t spin_select(camio_mux_t* this, struct timeval* timeout, camio_muxable_t** muxable_o)
 {
-   /* (void)timeout; //Ignore the timeouts for the moment TODO - Implement this! */
 
     mux_spin_priv_t* priv = MUX_GET_PRIVATE(this);
     CH_VECTOR(CAMIO_MUXABLE_VEC)* muxables = priv->muxables;
     //DBG("Selecting over %i items\n", muxables->count);
 
+
+    //Initialize the timing. A time out of 0 returns immediately, a timeout of NULL blocks forever
+    const ch_word time_end = 0;
+    const ch_word timeout_ns = 0;
+    ch_word time_now_ns = 0;
+    struct timeval now = {0};
+    if(timeout){
+        gettimeofday(&now, NULL);
+        time_now_ns = now->tv_sec * 1000 * 1000 * 1000 + now.tv_usec * 1000;
+        timeout_ns  = timeout->tv_sec * 1000 * 1000 * 1000 + timeout->tv_usec * 1000;
+        time_end    = time_now_ns + timeout_ns;
+    }
+
     while(1){
-        //usleep(1);
-        //priv->idx %= muxables->count; //Adjust for overflow
-        camio_muxable_t* muxable = muxables->off(muxables,priv->idx);
-        camio_error_t err = muxable->vtable.ready(muxable);
-        if(err == CAMIO_ENOERROR){
-            DBG("Found ready item at index %i\n", priv->idx);
-            priv->idx = priv->idx >= muxables->count - 1 ? 0 : priv->idx + 1;//Make sure we look at the next device first
-            *muxable_o = muxable;
-            *which_o = muxable->id;
-            return CAMIO_ENOERROR;
-        }
+        //Take a look at every item once so we can exit if the timeout is 0 and nothing fires
+        for(ch_word i = 0; i < muxables->count; i++){
+            priv->idx = priv->idx >= muxables->count - 1 ? 0 : priv->idx + 1;
 
-        if(err != CAMIO_ETRYAGAIN){
-            DBG("Muxable had an unexpected error = %i\n", err);
-            *muxable_o = muxable;
-            *which_o = muxable->id;
+            //usleep(1); //-- Slow things down for debugging
+
+            if(timeout){ //Only check this if we really want the timeout
+                gettimeofday(&now, NULL);
+                ch_word time_now_ns = now.tv_sec * 1000 * 1000 * 1000 + now.tv_usec * 1000;
+                if(time_now_ns >= time_end){
+                    return CAMIO_ERRMUXTIMEOUT;
+                }
+            }
+
+            //Get the next muxable and find out if it's ready
+            //Not using off() here to save a few cycles in this critical loop
+            camio_muxable_t* muxable = muxables->first + priv->idx;
+            camio_error_t err        = muxable->vtable.ready(muxable);
+            if(err == CAMIO_ETRYAGAIN){
+                continue;  //Nothing more to see here folks, come back later
+            }
+
+            //-------------------------------------------------------------------------------------------------------------
+            //Point of guaranteed return -- After this point, we will call return, so we make sure the return muxable is
+            //populated and increment the idx to make sure that next time we look at the next device first. This gives some
+            //degree of "fairness".
+            *muxable_o  = muxable;
+            priv->idx   = priv->idx >= muxables->count - 1 ? 0 : priv->idx + 1;
+
+            //At this point, the only return value is ENOERROR!
+            DBG("Found ready item at index %i with error code=%lli\n", priv->idx, err);
+
+            //Execute the callback if it's populated
+            if(muxable->call_back.any){
+                switch(muxable->mode){
+                    //This is a controller that's just fired
+                    case CAMIO_MUX_MODE_CONNECT:    return muxable->call_back.on_new_channels(
+                            muxable->parent.controller, err, muxable->usr_state, muxable->id);
+                    case CAMIO_MUX_MODE_READ_BUFF:  return muxable->call_back.on_new_rd_buffs(
+                            muxable->parent.channel, err, muxable->usr_state, muxable->id);
+                    case CAMIO_MUX_MODE_READ_DATA:  return muxable->call_back.on_new_rd_datas(
+                            muxable->parent.channel, err, muxable->usr_state, muxable->id);
+                    case CAMIO_MUX_MODE_WRITE_BUFF: return muxable->call_back.on_new_wr_buffs(
+                            muxable->parent.channel, err, muxable->usr_state, muxable->id);
+                    case CAMIO_MUX_MODE_WRITE_DATA: return muxable->call_back.on_new_wr_datas(
+                            muxable->parent.channel, err, muxable->usr_state, muxable->id);
+                    case CAMIO_MUX_MODE_NONE:
+                        ERR("Um? What?? Selector found a MUX_MODE_NONE. This shouldn't happen!\n");
+                        return CAMIO_EINVALID; //TODO XXX -- Need a better error code
+                        //case default: There is no default case, this is intentional so that the compiler will catch us if
+                        //              we add a new enum
+                }
+            }
+
             return err;
+
         }
 
-        priv->idx = priv->idx >= muxables->count - 1 ? 0 : priv->idx + 1;
-        __asm__ __volatile__("pause;");
-
+        //If we get here, then we have checked everything once and failed.
+        if(timeout && timeout_ns == 0){
+            return CAMIO_ERRMUXTIMEOUT;
+        }
     }
 
     //Unreachable

@@ -81,8 +81,7 @@ void camio_controller_destroy(camio_controller_t* this);
 
 
 /**
- * Insert an object into a selector. Include a mode. For selectors that do not support the mode of operation requested, an
- * error will be returned. Modes can be OR'd together for example ( CAMIO_SELECTOR_MODE_WRITE | AMIO_SELECTOR_MODE_READ).
+ * Insert an object into a selector.
  * Return values:
  * - ENOERROR: All good, please continue.
  * - ENOREAD: This selectable does not support reading
@@ -90,7 +89,7 @@ void camio_controller_destroy(camio_controller_t* this);
  * - ENOCONNECT: This selectable does not support connecting
  * - TODO XXX: More errors here
  */
-camio_error_t camio_mux_insert(camio_mux_t* this, camio_muxable_t* muxable, ch_word id);
+camio_error_t camio_mux_insert(camio_mux_t* this, camio_muxable_t* muxable, void* callback, void* usr_state, ch_word id);
 
 
 /**
@@ -110,7 +109,7 @@ camio_error_t camio_mux_remove(camio_mux_t* this, camio_muxable_t* muxable);
  * - ENOERROR: All good, please continue.
  * - TODO XXX: More errors here
  */
-camio_error_t camio_mux_select(camio_mux_t* this, camio_muxable_t** muxable_o, ch_word* id );
+camio_error_t camio_mux_select(camio_mux_t* this, struct timeval* timeout, camio_muxable_t** muxable_o);
 
 
 ch_word camio_mux_count(camio_mux_t* this);
