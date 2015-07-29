@@ -31,6 +31,7 @@ typedef struct camio_muxable_interface_s{
     camio_error_t (*ready)(camio_muxable_t* this);
 } camio_muxable_interface_t;
 
+typedef camio_error_t (*mux_callback_f)(camio_muxable_t* muxable, camio_error_t err, void* usr_state, ch_word id);
 
 /**
  * This is a basic CamIO muxable structure. All muxables must implement this. Transports can use the macros provided
@@ -68,14 +69,7 @@ typedef struct camio_muxable_s {
     void* usr_state;
 
     //Call back for users when this muxable is ready
-    union{
-        camio_error_t (*on_new_channels)(camio_controller_t* this, camio_error_t err, void* usr_state, ch_word id);
-        camio_error_t (*on_new_rd_buffs)(camio_channel_t* this, camio_error_t err, void* usr_state, ch_word id);
-        camio_error_t (*on_new_rd_datas)(camio_channel_t* this, camio_error_t err, void* usr_state, ch_word id);
-        camio_error_t (*on_new_wr_buffs)(camio_channel_t* this, camio_error_t err, void* usr_state, ch_word id);
-        camio_error_t (*on_new_wr_datas)(camio_channel_t* this, camio_error_t err, void* usr_state, ch_word id);
-        void* any;
-    } call_back;
+    mux_callback_f callback;
 
     //To easily identify this muxable
     ch_word id;

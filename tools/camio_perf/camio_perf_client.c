@@ -34,7 +34,6 @@ static ch_bool started                = false;
 //Statistics keeping
 static ch_word time_now_ns            = 0;
 static ch_word seq                    = 0;
-//static ch_word inflight_bytes         = 0;
 static ch_word intv_bytes             = 0;
 static ch_word intv_samples           = 0;
 
@@ -86,12 +85,22 @@ static camio_error_t connect_delim(ch_cstr client_channel_uri, camio_controller_
     return CAMIO_ENOERROR;
 }
 
-static camio_error_t on_sent_perf_messages(camio_muxable_t* muxable)
+
+static camio_error_t on_new_wr_datas(camio_muxable_t* muxable, camio_error_t err, void* usr_state, ch_word id)
 {
     DBG("Handling write complete()\n");
 
+    //Currently ignoring these values
+    (void)usr_state;
+    (void)id;
+
+    if(err){
+        DBG("Unexpected error %lli\n", err);
+        return err;
+    }
+
     msgs_len = MSGS_MAX;
-    camio_error_t err = camio_chan_wr_res(muxable->parent.channel, msgs, &msgs_len );
+    err = camio_chan_wr_data_res(muxable->parent.channel, msgs, &msgs_len );
     if(err){
         return err;
     }
@@ -117,7 +126,7 @@ static camio_error_t on_sent_perf_messages(camio_muxable_t* muxable)
         }
 
         camio_wr_data_res_t* res = &msgs[i].wr_data_res;
-        if(res->status != CAMIO_ENOERROR && res->status != CAMIO_ERELBUFF){
+        if(res->status != CAMIO_ENOERROR && res->status != CAMIO_EBUFFRELEASED){
             DBG("Failure to write data at [%lli] error=%lli\n", i, err);
             msgs[i].type = CAMIO_MSG_TYPE_IGNORE;
             continue;
@@ -127,8 +136,8 @@ static camio_error_t on_sent_perf_messages(camio_muxable_t* muxable)
         intv_bytes +=  res->written;
         intv_samples++;
 
-        if(res->status != CAMIO_ERELBUFF){
-            DBG("Buffer at index [%lli] has been auto-released.\n", i);
+        if(res->status != CAMIO_EBUFFRELEASED){
+            DBG("Buffer at index [%lli] cannot be resused has been auto-released.\n", i);
             msgs[i].type = CAMIO_MSG_TYPE_IGNORE;
             continue;
         }
@@ -182,7 +191,7 @@ static camio_error_t send_perf_messages(camio_channel_t* channel)
     }
 
     DBG("Trying to send %lli bytes in %lli messages\n", inflight_bytes, msgs_len);
-    err = camio_chan_wr_req(channel,msgs,&msgs_len);
+    err = camio_chan_wr_data_req(channel,msgs,&msgs_len);
     if(err != CAMIO_ENOERROR){
         ERR("Unexpected write error %lli\n", err);
         return err;
@@ -229,20 +238,31 @@ static void prepare_msgs(void)
 }
 
 
-static void on_new_buff(camio_muxable_t* muxable)
+static camio_error_t on_new_wr_buffs(camio_muxable_t* muxable, camio_error_t err, void* usr_state, ch_word id)
 {
-    DBG("Handling new buff\n");
+    DBG("Handling new buffs\n");
+
+    //Currently ignoring these values
+    (void)usr_state;
+    (void)id;
+
+    if(err){
+        DBG("Unexpected error %lli\n", err);
+        return err;
+    }
+
     msgs_len = MSGS_MAX;
-    camio_error_t err = camio_chan_wr_buff_res(muxable->parent.channel, msgs, &msgs_len);
+    err = camio_chan_wr_buff_res(muxable->parent.channel, msgs, &msgs_len);
     if(err){
         ERR("Could not get a writing buffers\n");
-        return;
+        return CAMIO_EINVALID;
     }
-    DBG("Got %lli new writing buffers\n", msgs_len);
 
+    DBG("Got %lli new writing buffers\n", msgs_len);
     prepare_msgs();
 
-    send_perf_messages(muxable->parent.channel);
+    DBG("Sending new buffers\n", msgs_len);
+    return send_perf_messages(muxable->parent.channel);
 }
 
 
@@ -267,12 +287,42 @@ static camio_error_t get_new_buffers(camio_channel_t* channel)
     return CAMIO_ENOERROR;
 }
 
+static camio_error_t on_new_rd_buffs(camio_muxable_t* muxable, camio_error_t err, void* usr_state, ch_word id)
+{
+    DBG("Got new read buffers?? I didn't expect to get these?\n");
+    (void)muxable;
+    (void)err;
+    (void)usr_state;
+    (void)id;
+    return CAMIO_EINVALID;
+}
 
-static camio_error_t on_new_channels(camio_muxable_t* muxable)
+static camio_error_t on_new_rd_datas(camio_muxable_t* muxable, camio_error_t err, void* usr_state, ch_word id)
+{
+    DBG("Got new read data?? I didn't expect to get these?\n");
+    (void)muxable;
+    (void)err;
+    (void)usr_state;
+    (void)id;
+    return CAMIO_EINVALID;
+}
+
+
+static camio_error_t on_new_channels(camio_muxable_t* muxable, camio_error_t err, void* usr_state, ch_word id)
 {
     DBG("Handling got new connect\n");
+
+    //Currently ignoring these values
+    (void)usr_state;
+    (void)id;
+
+    if(err){
+        DBG("Unexpected error %lli\n", err);
+        return err;
+    }
+
     msgs_len = MSGS_MAX;
-    camio_error_t err = camio_ctrl_chan_res(muxable->parent.controller, msgs, &msgs_len );
+    err = camio_ctrl_chan_res(muxable->parent.controller, msgs, &msgs_len );
     if(err){
         return err;
     }
@@ -308,10 +358,10 @@ static camio_error_t on_new_channels(camio_muxable_t* muxable)
             continue;
         }
 
-        camio_mux_insert(mux,&res->channel->rd_muxable,CONNECTOR_ID + 1);
-        camio_mux_insert(mux,&res->channel->rd_buff_muxable,CONNECTOR_ID + 2);
-        camio_mux_insert(mux,&res->channel->wr_muxable,CONNECTOR_ID + 3);
-        camio_mux_insert(mux,&res->channel->wr_buff_muxable,CONNECTOR_ID + 4);
+        camio_mux_insert(mux,&res->channel->rd_data_muxable,on_new_rd_datas, NULL, CONNECTOR_ID + 1);
+        camio_mux_insert(mux,&res->channel->rd_buff_muxable,on_new_rd_buffs, NULL, CONNECTOR_ID + 2);
+        camio_mux_insert(mux,&res->channel->wr_data_muxable,on_new_wr_datas, NULL, CONNECTOR_ID + 3);
+        camio_mux_insert(mux,&res->channel->wr_buff_muxable,on_new_wr_buffs, NULL, CONNECTOR_ID + 4);
 
         //Kick things off by asking for some new write buffers on the channel
         get_new_buffers(res->channel);
@@ -362,7 +412,7 @@ int camio_perf_clinet(ch_cstr client_channel_uri, ch_word* stop)
     }
 
     //Insert the controller into the mux
-    err = camio_mux_insert(mux,&controller->muxable, CONNECTOR_ID);
+    err = camio_mux_insert(mux,&controller->muxable, on_new_channels, NULL, CONNECTOR_ID);
     if(err){
         DBG("Could not insert controller into multiplexer\n");
         return CAMIO_EINVALID;
@@ -389,7 +439,6 @@ int camio_perf_clinet(ch_cstr client_channel_uri, ch_word* stop)
 
     DBG("Staring main loop\n");
     camio_muxable_t* muxable     = NULL;
-    ch_word which                = 0;
 
     while(!*stop){
 
@@ -424,38 +473,8 @@ int camio_perf_clinet(ch_cstr client_channel_uri, ch_word* stop)
         }
 
         //Block waiting for a channel to be ready to read or connect
-        camio_mux_select(mux,&muxable,&which);
+        camio_mux_select(mux,NULL,&muxable);
 
-        //Have a look at what we have
-        switch(muxable->mode){
-            //This is a controller that's just fired
-            case CAMIO_MUX_MODE_CONNECT:{
-                err = on_new_channels(muxable);
-                if( err ) { return err; } //We can't recover from connection failure
-                break;
-            }
-            case CAMIO_MUX_MODE_READ:{
-                ERR("Handling read ready() -- I didn't expect this...\n");
-                break;
-            }
-            case CAMIO_MUX_MODE_READ_BUFF:{
-                ERR("Handling read buffer ready() -- I didn't expect this...\n");
-                break;
-            }
-            case CAMIO_MUX_MODE_WRITE_BUFF:{
-                on_new_buff(muxable);
-                break;
-            }
-            case CAMIO_MUX_MODE_WRITE:{
-                on_sent_perf_messages(muxable);
-                break;
-            }
-
-            case CAMIO_MUX_MODE_NONE:{
-                ERR("Um? What?? This shouldn't happen!\n");
-            }
-            //There is no default case, this is intentional so that the compiler will catch us if we add a new enum
-        }
     }
 
 //    if(wr_buffer){

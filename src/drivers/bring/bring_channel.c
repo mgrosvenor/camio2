@@ -245,7 +245,7 @@ static camio_error_t bring_read_buffer_result( camio_channel_t* this, camio_msg_
 
     //Is there any data waiting? If not, try to get some
     if(unlikely(priv->rd_buff_queue->in_use <= 0)){
-        camio_error_t err = bring_read_buffer_ready(&this->rd_muxable);
+        camio_error_t err = bring_read_buffer_ready(&this->rd_data_muxable);
         if(err){
             ERR("There is no data available to return. Did you use read_ready()?\n");
             return err;
@@ -267,6 +267,9 @@ static camio_error_t bring_read_buffer_result( camio_channel_t* this, camio_msg_
         }
 
         res_vec[i] = *msg;
+        camio_rd_buff_res_t* res = &res_vec[i].rd_buff_res;
+        res->status = CAMIO_ECANNOTREUSE; //Let the user know that this is a once only buffer, it cannot be reused
+
         cbuff_unuse_front(priv->rd_buff_queue);
         cbuff_pop_front(priv->rd_buff_queue);
         DBG("Returning read buffer result data_start=%p, data_size=%lli\n", res_vec[i].rd_buff_res.buffer->data_start, res_vec[i].rd_buff_res.buffer->data_len );
@@ -405,7 +408,7 @@ static camio_error_t bring_read_result( camio_channel_t* this, camio_msg_t* res_
 
     //Is there any data waiting? If not, try to get some
     if(unlikely(priv->rd_req_queue->in_use <= 0)){
-        camio_error_t err = bring_read_ready(&this->rd_muxable);
+        camio_error_t err = bring_read_ready(&this->rd_data_muxable);
         if(err){
             ERR("There is no data available to return. Did you use read_ready()?\n");
             return err;
@@ -751,7 +754,7 @@ static camio_error_t bring_write_ready(camio_muxable_t* this)
 
         //Tell the user that we released this buffer!
         res->buffer = NULL;
-        res->status = CAMIO_ERELBUFF;
+        res->status = CAMIO_EBUFFRELEASED;
     }
 
     if(msg != NULL){
@@ -778,7 +781,7 @@ static camio_error_t bring_write_result(camio_channel_t* this, camio_msg_t* res_
 
     //Is there any data waiting? If not, try to get some
     if(priv->wr_req_queue->in_use <= 0){
-        camio_error_t err = bring_write_buffer_ready(&this->wr_muxable);
+        camio_error_t err = bring_write_buffer_ready(&this->wr_data_muxable);
         if(err){
             ERR("There are no new buffers available to return, try again another time\n");
             return err;
@@ -838,10 +841,10 @@ static void bring_destroy(camio_channel_t* this)
         priv->bring_head = NULL;
     }
 
-    if(this->rd_muxable.fd > -1){
-        close(this->rd_muxable.fd);
-        this->rd_muxable.fd = -1; //Make this reentrant safe
-        this->wr_muxable.fd = -1; //Make this reentrant safe
+    if(this->rd_data_muxable.fd > -1){
+        close(this->rd_data_muxable.fd);
+        this->rd_data_muxable.fd = -1; //Make this reentrant safe
+        this->wr_data_muxable.fd = -1; //Make this reentrant safe
     }
 
     if(priv->rd_req_queue){

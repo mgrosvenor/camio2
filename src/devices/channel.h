@@ -66,9 +66,9 @@ typedef struct camio_channel_s {
     /**
      * Holds the multiplexable structures for adding into a multiplexor
      */
-    camio_muxable_t rd_muxable; //For reading
+    camio_muxable_t rd_data_muxable; //For reading
     camio_muxable_t rd_buff_muxable; //For read buffers
-    camio_muxable_t wr_muxable; //For writing
+    camio_muxable_t wr_data_muxable; //For writing
     camio_muxable_t wr_buff_muxable; //For write buffers
 
 
@@ -110,15 +110,15 @@ typedef struct camio_channel_s {
         result->rd_buff_muxable.vtable.ready    = NAME##_read_buffer_ready;\
         result->rd_buff_muxable.fd              = -1;\
         \
-        result->rd_muxable.mode                 = CAMIO_MUX_MODE_READ;\
-        result->rd_muxable.parent.channel       = result;\
-        result->rd_muxable.vtable.ready         = NAME##_read_ready;\
-        result->rd_muxable.fd                   = -1;\
+        result->rd_data_muxable.mode            = CAMIO_MUX_MODE_READ_DATA;\
+        result->rd_data_muxable.parent.channel  = result;\
+        result->rd_data_muxable.vtable.ready    = NAME##_read_ready;\
+        result->rd_data_muxable.fd              = -1;\
         \
-        result->wr_muxable.mode                 = CAMIO_MUX_MODE_WRITE;\
-        result->wr_muxable.parent.channel       = result;\
-        result->wr_muxable.vtable.ready         = NAME##_write_ready;\
-        result->wr_muxable.fd                   = -1;\
+        result->wr_data_muxable.mode            = CAMIO_MUX_MODE_WRITE_DATA;\
+        result->wr_data_muxable.parent.channel  = result;\
+        result->wr_data_muxable.vtable.ready    = NAME##_write_ready;\
+        result->wr_data_muxable.fd              = -1;\
         \
         result->wr_buff_muxable.mode            = CAMIO_MUX_MODE_WRITE_BUFF;\
         result->wr_buff_muxable.parent.channel  = result;\

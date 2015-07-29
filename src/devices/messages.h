@@ -12,14 +12,15 @@
 #define MESSAGES_H_
 
 typedef struct camio_read_buff_req_s {
+    camio_buffer_t* _;          //This is a placeholder - the order is important
     ch_word src_offset_hint;
     ch_word dst_offset_hint;
     ch_word read_size_hint;
 } camio_rd_buff_req_t;
 
 typedef struct camio_read_buff_res_s {
-    camio_error_t status;       //Return code indicating what happened to the request.
-    camio_buffer_t* buffer;  //This will be populated if the return code is CAMIO_ENOERROR
+    camio_buffer_t* buffer ; //This will be populated if the return code is CAMIO_ENOERROR -- the order is important
+    camio_error_t status;    //Return code indicating what happened to the request.
 } camio_rd_buff_res_t;
 
 
@@ -27,50 +28,50 @@ typedef struct camio_read_buff_res_s {
 #define CAMIO_READ_REQ_SRC_OFFSET_NONE (-1)
 #define CAMIO_READ_REQ_DST_OFFSET_NONE (0)
 typedef struct camio_read_data_req_s {
+    camio_buffer_t* buffer;     //-- the order is important
     ch_word src_offset_hint;
     ch_word dst_offset_hint;
     ch_word read_size_hint;
-    camio_buffer_t* buffer;
 } camio_rd_data_req_t;
 
 typedef struct camio_read_data_res_s {
+    camio_buffer_t* buffer;     //This will be populated if the return code is CAMIO_ENOERROR -- the order is important
     camio_error_t status;       //Return code indicating what happened to the request.
-    camio_buffer_t* buffer;  //This will be populated if the return code is CAMIO_ENOERROR
 } camio_rd_data_res_t;
 
 
 typedef struct camio_write_buff_req_s {
-    ch_word _;                  //C11 does not permit empty structures
+    camio_buffer_t* _;          //This is a placeholder - the order is important
 } camio_wr_buff_req_t;
 
 typedef struct camio_write_buff_res_s {
-    camio_error_t status;       //Return code indicating what happened to the request.
-    camio_buffer_t* buffer;  //This will be populated if the return code is CAMIO_ENOERROR
+    camio_buffer_t* buffer;  //This will be populated if the return code is CAMIO_ENOERROR -- the order is important
+    camio_error_t status;    //Return code indicating what happened to the request.
 } camio_wr_buff_res_t;
 
 
 #define CAMIO_WRITE_REQ_DST_OFFSET_NONE (-1)
 #define CAMIO_WRITE_REQ_SRC_OFFSET_NONE (0)
 typedef struct camio_write_data_req_s {
+    camio_buffer_t* buffer; //-- The order is important
     ch_word src_offset_hint;
     ch_word dst_offset_hint;
-    camio_buffer_t* buffer;
 } camio_wr_data_req_t;
 
 
 typedef struct camio_write_data_res_s {
+    camio_buffer_t* buffer;   //This will be populated if the return code is CAMIO_ENOERROR -- the order is important
     camio_error_t status;     //Return code indicating what happened to the request.
-    camio_buffer_t* buffer;   //This will be populated if the return code is CAMIO_ENOERROR
     ch_word written;
 } camio_wr_data_res_t;
 
 
 typedef struct camio_chan_req_s {
-    ch_word _; //C11 does not support empty structures
+    camio_channel_t* _;     //This is a place holder -- the order is important
 } camio_chan_req_t;
 
 typedef struct camio_chan_res_s {
-    camio_channel_t* channel;
+    camio_channel_t* channel; //-- the order is important
     ch_word id;
     ch_word status;
 } camio_chan_res_t;

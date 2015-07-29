@@ -89,7 +89,7 @@ void camio_controller_destroy(camio_controller_t* this);
  * - ENOCONNECT: This selectable does not support connecting
  * - TODO XXX: More errors here
  */
-camio_error_t camio_mux_insert(camio_mux_t* this, camio_muxable_t* muxable, void* callback, void* usr_state, ch_word id);
+camio_error_t camio_mux_insert(camio_mux_t* this, camio_muxable_t* muxable, mux_callback_f callback, void* usr_state, ch_word id);
 
 
 /**
@@ -186,7 +186,7 @@ camio_error_t camio_chan_rd_buff_release(camio_channel_t* this, camio_buffer_t* 
  * TODO XXX: Another way to build this interface would be to register the buffer pointer here as well. I feel that it is less
  * elegant as the meaning of the API is now obscured, but it could be faster. Hmmm.. Defer to a later decision point
  */
-camio_error_t camio_chan_rd_req( camio_channel_t* this, camio_msg_t* req_vec, ch_word* vec_len_io );
+camio_error_t camio_chan_rd_data_req( camio_channel_t* this, camio_msg_t* req_vec, ch_word* vec_len_io );
 
 
 /**
@@ -196,7 +196,7 @@ camio_error_t camio_chan_rd_req( camio_channel_t* this, camio_msg_t* req_vec, ch
  * - ETRYAGAIN - the channel is not ready to be read, try again later
  * - other - some other error has happened on the underlying channel
  */
-camio_error_t camio_chan_rd_ready( camio_channel_t* this);
+camio_error_t camio_chan_rd_data_ready( camio_channel_t* this);
 
 
 /**
@@ -209,7 +209,7 @@ camio_error_t camio_chan_rd_ready( camio_channel_t* this);
  * - ENOBUFFS:  The channel could not allocate more buffers for the read. Free some buffers by releasing an outstanding read
  *              or write transaction.
  */
-camio_error_t camio_chan_rd_res( camio_channel_t* this, camio_msg_t* res_vec, ch_word* vec_len_io);
+camio_error_t camio_chan_rd_data_res( camio_channel_t* this, camio_msg_t* res_vec, ch_word* vec_len_io);
 
 
 
@@ -256,17 +256,17 @@ camio_error_t camio_chan_wr_buff_res(camio_channel_t* this, camio_msg_t* res_vec
  * - ENOERROR: Completed successfully.
  * - TODO XXX: Add more here
  */
-camio_error_t camio_chan_wr_req(camio_channel_t* this, camio_msg_t* req_vec,  ch_word* vec_len_io );
+camio_error_t camio_chan_wr_data_req(camio_channel_t* this, camio_msg_t* req_vec,  ch_word* vec_len_io );
 
 /**
  * Check if the channel is ready to write.
  */
-camio_error_t camio_chan_wr_ready( camio_channel_t* this);
+camio_error_t camio_chan_wr_data_ready( camio_channel_t* this);
 
 /**
  * Try get the results of a write request
  */
-camio_error_t camio_chan_wr_res(camio_channel_t* this, camio_msg_t* res_vec, ch_word* vec_len_io);
+camio_error_t camio_chan_wr_data_res(camio_channel_t* this, camio_msg_t* res_vec, ch_word* vec_len_io);
 
 
 

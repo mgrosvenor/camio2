@@ -109,7 +109,7 @@ camio_error_t camio_chan_rd_buff_ready(camio_channel_t* this)
     #ifdef DO_SANITY_CHECKS
         CHECK( NULL == this,"This is null???\n")
         CHECK( NULL == this,"This is null???\n")
-        CHECK( this->rd_muxable.mode != CAMIO_MUX_MODE_READ_BUFF,
+        CHECK( this->rd_buff_muxable.mode != CAMIO_MUX_MODE_READ_BUFF,
                "rdong kind of muxable mode. Expected CAMIO_MUX_MODE_read_BUFF !\n")
     #endif
 
@@ -128,7 +128,7 @@ camio_error_t camio_chan_rd_buff_res(camio_channel_t* this, camio_msg_t* res_vec
     return this->vtable.read_buffer_result(this, res_vec, vec_len_io);
 }
 
-camio_error_t camio_chan_rd_req( camio_channel_t* this, camio_msg_t* req_vec, ch_word* vec_len_io )
+camio_error_t camio_chan_rd_data_req( camio_channel_t* this, camio_msg_t* req_vec, ch_word* vec_len_io )
 {
     #ifdef DO_SANITY_CHECKS
         CHECK(NULL == this,"This is null???\n")
@@ -140,19 +140,19 @@ camio_error_t camio_chan_rd_req( camio_channel_t* this, camio_msg_t* req_vec, ch
 }
 
 
-camio_error_t camio_chan_rd_ready( camio_channel_t* this)
+camio_error_t camio_chan_rd_data_ready( camio_channel_t* this)
 {
     #ifdef DO_SANITY_CHECKS
         CHECK( NULL == this,"This is null???\n")
-        CHECK( this->rd_muxable.mode != CAMIO_MUX_MODE_READ_DATA,
+        CHECK( this->rd_data_muxable.mode != CAMIO_MUX_MODE_READ_DATA,
                 "Wrong kind of muxable mode! Expected CAMIO_MUX_MODE_READ\n")
     #endif
 
-    return this->rd_muxable.vtable.ready(&this->rd_muxable);
+    return this->rd_data_muxable.vtable.ready(&this->rd_data_muxable);
 }
 
 
-camio_error_t camio_chan_rd_res( camio_channel_t* this, camio_msg_t* res_vec, ch_word* vec_len_io)
+camio_error_t camio_chan_rd_data_res( camio_channel_t* this, camio_msg_t* res_vec, ch_word* vec_len_io)
 {
     #ifdef DO_SANITY_CHECKS //Only apply these checks in debug mode. Keep the speed when we need it?
         CHECK( NULL == this,"This is null???\n")
@@ -193,7 +193,7 @@ camio_error_t camio_chan_wr_buff_ready(camio_channel_t* this)
     #ifdef DO_SANITY_CHECKS
         CHECK( NULL == this,"This is null???\n")
         CHECK( NULL == this,"This is null???\n")
-        CHECK( this->rd_muxable.mode != CAMIO_MUX_MODE_WRITE_BUFF,
+        CHECK( this->wr_buff_muxable.mode != CAMIO_MUX_MODE_WRITE_BUFF,
                "Wrong kind of muxable mode. Expected CAMIO_MUX_MODE_WRITE_BUFF !\n")
     #endif
 
@@ -213,7 +213,7 @@ camio_error_t camio_chan_wr_buff_res(camio_channel_t* this, camio_msg_t* res_vec
     return this->vtable.write_buffer_result(this, res_vec, vec_len_io);
 }
 
-camio_error_t camio_chan_wr_req(camio_channel_t* this, camio_msg_t* req_vec, ch_word* vec_len_io )
+camio_error_t camio_chan_wr_data_req(camio_channel_t* this, camio_msg_t* req_vec, ch_word* vec_len_io )
 {
     #ifdef DO_SANITY_CHECKS
         CHECK( NULL == this,"This is null???\n")
@@ -223,19 +223,19 @@ camio_error_t camio_chan_wr_req(camio_channel_t* this, camio_msg_t* req_vec, ch_
     return this->vtable.write_request(this, req_vec, vec_len_io);
 }
 
-camio_error_t camio_chan_wr_ready( camio_channel_t* this)
+camio_error_t camio_chan_wr_data_ready( camio_channel_t* this)
 {
     #ifdef DO_SANITY_CHECKS
         CHECK( NULL == this,"This is null???\n")
-        CHECK( this->rd_muxable.mode != CAMIO_MUX_MODE_WRITE_DATA,
+        CHECK( this->wr_data_muxable.mode != CAMIO_MUX_MODE_WRITE_DATA,
                 "Wrong kind of muxable mode! Expected CAMIO_MUX_MODE_WRITE\n")
     #endif
 
-    return this->wr_muxable.vtable.ready(&this->wr_muxable);
+    return this->wr_data_muxable.vtable.ready(&this->wr_data_muxable);
 }
 
 
-camio_error_t camio_chan_wr_res(camio_channel_t* this, camio_msg_t* res_vec, ch_word* vec_len_io)
+camio_error_t camio_chan_wr_data_res(camio_channel_t* this, camio_msg_t* res_vec, ch_word* vec_len_io)
 {
     #ifdef DO_SANITY_CHECKS
         CHECK( NULL == this,"This is null???\n")
@@ -271,7 +271,7 @@ void camio_channel_destroy(camio_channel_t* this)
 
 
 
-inline camio_error_t camio_mux_insert(camio_mux_t* this, camio_muxable_t* muxable, void* callback, void* usr_state, ch_word id)
+inline camio_error_t camio_mux_insert(camio_mux_t* this, camio_muxable_t* muxable, mux_callback_f callback, void* usr_state, ch_word id)
 {
     #ifdef DO_SANITY_CHECKS
         CHECK( NULL == this,"This is null???\n")

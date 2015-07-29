@@ -16,12 +16,14 @@
 #include "muxable.h"
 #include <time.h>
 
+
+
 /**
  * Every CamIO mux must implement this interface. See mux.h and api.h for more details.
  */
 typedef struct camio_mux_interface_s{
     camio_error_t (*construct)(camio_mux_t* this);
-    camio_error_t (*insert)(camio_mux_t* this, camio_muxable_t* muxable, void* callback, void* usr_state, ch_word id);
+    camio_error_t (*insert)(camio_mux_t* this, camio_muxable_t* muxable, mux_callback_f callback, void* usr_state, ch_word id);
     camio_error_t (*remove)(camio_mux_t* this, camio_muxable_t* muxable);
     camio_error_t (*select)(camio_mux_t* this, struct timeval* timeout, camio_muxable_t** muxable_o);
     ch_word (*count)(camio_mux_t* this);
