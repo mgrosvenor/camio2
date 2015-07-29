@@ -30,7 +30,7 @@ static ch_word ctrl_msgs_len            = MSGS_MAX;
 static camio_msg_t data_msgs[MSGS_MAX]  = {{0}};
 static ch_word data_msgs_len            = MSGS_MAX;
 static ch_bool started                  = false;
-ch_word seq_exp                         = 1; //Sequence numbers start at 1
+ch_word seq_exp                         = 0;
 
 //Statistics keeping
 struct timeval now                      = {0};
@@ -144,22 +144,22 @@ static camio_error_t on_new_rd_datas(camio_muxable_t* muxable, camio_error_t err
             continue;
         }
 
-        if(data_msgs[i].type != CAMIO_MSG_TYPE_READ_BUFF_RES){
-            ERR("Expected to get read data response message (%lli), but got %lli instead.\n",
-                    CAMIO_MSG_TYPE_READ_BUFF_RES, data_msgs[i].type);
+        if(data_msgs[i].type != CAMIO_MSG_TYPE_READ_DATA_RES){
+            ERR("Expected to get read data response message (%lli), but got %i instead.\n",
+                    CAMIO_MSG_TYPE_READ_DATA_RES, data_msgs[i].type);
             data_msgs[i].type = CAMIO_MSG_TYPE_IGNORE;
             continue;
         }
 
         camio_rd_buff_res_t* res = &data_msgs[i].rd_buff_res;
-        if(res->status){
-            ERR("Error %lli getting buffer with id=%lli\n", res->status, data_msgs[i].id);
+        if(res->status && res->status != CAMIO_ECANNOTREUSE){
+            ERR("Error %i getting buffer with id=%lli\n", res->status, data_msgs[i].id);
             data_msgs[i].type = CAMIO_MSG_TYPE_IGNORE;
             continue;
         }
 
         camio_buffer_t* buffer = res->buffer;
-        DBG("Received %lli bytes\n", buffer->data_len);
+        DBG("Received %i bytes\n", buffer->data_len);
         if(buffer->data_len <= 0){
             ERR("Stream has ended, removing\n");
             camio_mux_remove(mux, muxable);
@@ -182,8 +182,6 @@ static camio_error_t on_new_rd_datas(camio_muxable_t* muxable, camio_error_t err
             total_latency += latency;
         }
         seq_exp = head->seq_number + 1;
-
-        //printf("ts=%lli, len=%lli, seq=%lli, \n", head->time_stamp, head->size, head->seq_number );
 
         if(res->status == CAMIO_ECANNOTREUSE){
             data_msgs[i].type = CAMIO_MSG_TYPE_IGNORE;
@@ -239,7 +237,7 @@ static camio_error_t on_new_rd_buffs(camio_muxable_t* muxable, camio_error_t err
         }
 
         if(data_msgs[i].type != CAMIO_MSG_TYPE_READ_BUFF_RES){
-            ERR("Expected to get read buffer response message (%lli), but got %lli instead.\n",
+            ERR("Expected to get read buffer response message (%lli), but got %i instead.\n",
                     CAMIO_MSG_TYPE_READ_BUFF_RES, data_msgs[i].type);
             data_msgs[i].type = CAMIO_MSG_TYPE_IGNORE;
             continue;
@@ -247,7 +245,7 @@ static camio_error_t on_new_rd_buffs(camio_muxable_t* muxable, camio_error_t err
 
         camio_rd_buff_res_t* res = &data_msgs[i].rd_buff_res;
         if(res->status){
-            ERR("Error %lli getting buffer with id=%lli\n", res->status, data_msgs[i].id);
+            ERR("Error %i getting buffer with id=%lli\n", res->status, data_msgs[i].id);
             data_msgs[i].type = CAMIO_MSG_TYPE_IGNORE;
             continue;
         }

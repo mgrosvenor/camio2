@@ -108,7 +108,7 @@ static inline ch_word get_head_size(camio_buffer_t* buffers, ch_word idx)
 
 static inline void set_head(camio_buffer_t* buffers, ch_word idx, ch_word seq_no, ch_word data_size)
 {
-    DBG("Setting header at %lli seq no=%lli data size=%lli\n", idx, seq_no, data_size);
+    //DBG("Setting header at %lli seq no=%lli data size=%lli\n", idx, seq_no, data_size);
 
     //Is there new data -- calculate where to look for it
     volatile char* slot_mem    = (volatile void*)buffers[idx].__internal.__mem_start;
@@ -140,9 +140,9 @@ static camio_error_t bring_read_buffer_request(camio_channel_t* this, camio_msg_
     }
 
     DBG("Bring read buffer request done - %lli requests added\n", *vec_len_io);
-    for(ch_word i = 0; i < *vec_len_io; i++){
-        DBG("[%lli] request_type=%i\n", i, req_vec[i].type);
-    }
+//    for(ch_word i = 0; i < *vec_len_io; i++){
+//        DBG("[%lli] request_type=%i\n", i, req_vec[i].type);
+//    }
 
     return CAMIO_ENOERROR;
 
@@ -200,6 +200,9 @@ static camio_error_t bring_read_buffer_ready(camio_muxable_t* this)
                 seq_no,
                 priv->rd_sync_counter
             );
+            msg->type = CAMIO_MSG_TYPE_READ_BUFF_RES;
+            camio_rd_buff_res_t* res = &msg->rd_buff_res;
+            res->status = CAMIO_EWRONGBUFF; //TODO better error code here!
             return CAMIO_EWRONGBUFF;
         }
 
@@ -222,6 +225,9 @@ static camio_error_t bring_read_buffer_ready(camio_muxable_t* this)
         res->buffer->valid                = true;
         res->buffer->__internal.__in_use  = true;
 
+        //DBG("Got new data size = %lli acq_index=%lli buffers_count=%lli result msg=%p msg_typ=%i\n",
+        //        data_size, priv->rd_acq_index, priv->rd_buffers_count, msg, msg->type);
+
         //And increment everything to look for the next one
         priv->rd_sync_counter++;
         priv->rd_acq_index++;   //Move to the next index
@@ -229,14 +235,11 @@ static camio_error_t bring_read_buffer_ready(camio_muxable_t* this)
             priv->rd_acq_index = 0;
         }
 
-        DBG("Got new data size = %lli acq_index=%lli buffers_count=%lli\n",
-                data_size, priv->rd_acq_index, priv->rd_buffers_count);
-
         //Continue around the loop here
     }
 
     if(msg != NULL){
-        //DBG("Freeing unused request\n");
+        //DBG("Freeing unused request %p\n", msg);
         cbuff_unuse_front(priv->rd_buff_queue);
     }
 
@@ -245,6 +248,7 @@ static camio_error_t bring_read_buffer_ready(camio_muxable_t* this)
         return CAMIO_ETRYAGAIN;
     }
 
+    DBG("There are %lli new buffer to read from\n", priv->rd_buff_queue->in_use);
     return CAMIO_ENOERROR;
 }
 
@@ -265,25 +269,37 @@ static camio_error_t bring_read_buffer_result( camio_channel_t* this, camio_msg_
 
     const ch_word count = MIN(priv->rd_buff_queue->in_use, *vec_len_io);
     *vec_len_io = count;
-    for(ch_word i = 0; i < count; i++){
+    for(ch_word i = 0; i < count; i++, cbuff_pop_front(priv->rd_buff_queue) ){
         camio_msg_t* msg = cbuff_peek_front(priv->rd_buff_queue);
+
+        res_vec[i] = *msg;
+        camio_rd_buff_res_t* res = &res_vec[i].rd_buff_res;
+
+        //DBG("msg=%p msg_typ=%i\n", msg, msg->type);
+
+
         //Sanity check the message first
         if(msg->type == CAMIO_MSG_TYPE_IGNORE){
+            res_vec[i].type = CAMIO_MSG_TYPE_IGNORE;
+            res->status = CAMIO_EINVALID;
             continue; //We don't care about this message
         }
 
         if(msg->type != CAMIO_MSG_TYPE_READ_BUFF_RES){
-            ERR("Expected a read buffer response message (%lli) but got %lli instead.\n",CAMIO_MSG_TYPE_READ_BUFF_RES, msg->type);
+            ERR("Expected a read buffer response message (%i) but got %i instead.\n",
+                    CAMIO_MSG_TYPE_READ_BUFF_RES, msg->type);
+
+            res_vec[i].type = CAMIO_MSG_TYPE_IGNORE;
+            res->status = CAMIO_EINVALID;
             continue;
         }
 
-        res_vec[i] = *msg;
-        camio_rd_buff_res_t* res = &res_vec[i].rd_buff_res;
-        res->status = CAMIO_ECANNOTREUSE; //Let the user know that this is a once only buffer, it cannot be reused
+        //DBG("Got new data size = %lli acq_index=%lli/%lli result msg=%p msg_typ=%i\n",
+        //        res->buffer->data_len, res->buffer->__internal.__buffer_id, priv->rd_buffers_count, msg, msg->type);
 
-        cbuff_unuse_front(priv->rd_buff_queue);
-        cbuff_pop_front(priv->rd_buff_queue);
-        DBG("Returning read buffer result data_start=%p, data_size=%lli\n", res_vec[i].rd_buff_res.buffer->data_start, res_vec[i].rd_buff_res.buffer->data_len );
+
+        res->status = CAMIO_ENOERROR;
+        //DBG("Returning read buffer result data_start=%p, data_size=%lli\n", res_vec[i].rd_buff_res.buffer->data_start, res_vec[i].rd_buff_res.buffer->data_len );
     }
 
     DBG("Returning %lli read buffers\n", count);
@@ -307,7 +323,7 @@ static camio_error_t bring_read_buffer_release(camio_channel_t* this, camio_buff
     }
 
     //DBG("Trying to release buffer at index=%lli\n", priv->rd_rel_index);
-    set_head(priv->rd_buffers,priv->rd_rel_index,0,0xFF);
+    set_head(priv->rd_buffers,priv->rd_rel_index,0,0);
 
     buffer->__internal.__in_use   = false;
     buffer->valid                 = false;
@@ -340,7 +356,7 @@ static camio_error_t bring_read_data_request(camio_channel_t* this, camio_msg_t*
         return CAMIO_EINVALID;
     }
 
-    DBG("Bring read request done - %lli requests added\n", *vec_len_io);
+    DBG("Bring read data request done - %lli requests added\n", *vec_len_io);
     return CAMIO_ENOERROR;
 }
 
@@ -358,15 +374,19 @@ static camio_error_t bring_read_data_ready(camio_muxable_t* this)
     //Try to fill as many read requests as we can
     camio_msg_t* msg = NULL;
     for( msg = cbuff_use_front(priv->rd_req_queue); msg != NULL; msg = cbuff_use_front(priv->rd_req_queue)){
+        DBG("Got msg=%p\n", msg);
+
         //Sanity check the message first
         if(msg->type == CAMIO_MSG_TYPE_IGNORE){
             continue; //We don't care about this message
         }
 
         if(msg->type != CAMIO_MSG_TYPE_READ_DATA_REQ){
-            ERR("Expected a read data request message (%lli) but got %lli instead.\n",CAMIO_MSG_TYPE_READ_DATA_REQ, msg->type);
+            ERR("Expected a read data request message (%i) but got %i instead.\n",CAMIO_MSG_TYPE_READ_DATA_REQ, msg->type);
             continue;
         }
+
+
 
         camio_rd_data_req_t* req = &msg->rd_data_req;
         camio_rd_data_res_t* res = &msg->rd_data_res;
@@ -395,10 +415,13 @@ static camio_error_t bring_read_data_ready(camio_muxable_t* this)
             res->status = CAMIO_EINVALID; //TODO better error code here!
             continue;
         }
+
+        DBG("Data is ready on msg=%p\n", msg);
+        res->status = CAMIO_ENOERROR; //TODO better error code here!
     }
 
     if(msg != NULL){
-        //DBG("Freeing unused request\n");
+        DBG("Freeing unused msg %p\n", msg);
         cbuff_unuse_front(priv->rd_req_queue);
     }
 
@@ -441,7 +464,7 @@ static camio_error_t bring_read_data_result( camio_channel_t* this, camio_msg_t*
         }
 
         res_vec[i] = *msg;
-        const camio_rd_data_res_t* res = &res_vec[i].rd_data_res;
+        camio_rd_data_res_t* res = &res_vec[i].rd_data_res;
         cbuff_unuse_front(priv->rd_req_queue);
         cbuff_pop_front(priv->rd_req_queue);
 
@@ -451,6 +474,8 @@ static camio_error_t bring_read_data_result( camio_channel_t* this, camio_msg_t*
         else{
             DBG("Error returning read data result. Err=%i\n", msg->rd_data_res.status);
         }
+
+        res->status = CAMIO_ECANNOTREUSE; //Let the user know that this is a once only buffer, it cannot be reused
     }
 
     DBG("Returning %lli read data responses\n", count);
