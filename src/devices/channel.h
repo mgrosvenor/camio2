@@ -88,14 +88,14 @@ typedef struct camio_channel_s {
             .read_buffer_request    = NAME##_read_buffer_request,\
             .read_buffer_result     = NAME##_read_buffer_result,\
             .read_buffer_release    = NAME##_read_buffer_release,\
-            .read_request           = NAME##_read_request,\
-            .read_result            = NAME##_read_result,\
+            .read_request           = NAME##_read_data_request,\
+            .read_result            = NAME##_read_data_result,\
             \
             .write_buffer_request   = NAME##_write_buffer_request,\
             .write_buffer_result    = NAME##_write_buffer_result,\
             .write_buffer_release   = NAME##_write_buffer_release,\
-            .write_request          = NAME##_write_request,\
-            .write_result           = NAME##_write_result,\
+            .write_request          = NAME##_write_data_request,\
+            .write_result           = NAME##_write_data_result,\
             .destroy                = NAME##_destroy,\
     };\
     \
@@ -112,12 +112,12 @@ typedef struct camio_channel_s {
         \
         result->rd_data_muxable.mode            = CAMIO_MUX_MODE_READ_DATA;\
         result->rd_data_muxable.parent.channel  = result;\
-        result->rd_data_muxable.vtable.ready    = NAME##_read_ready;\
+        result->rd_data_muxable.vtable.ready    = NAME##_read_data_ready;\
         result->rd_data_muxable.fd              = -1;\
         \
         result->wr_data_muxable.mode            = CAMIO_MUX_MODE_WRITE_DATA;\
         result->wr_data_muxable.parent.channel  = result;\
-        result->wr_data_muxable.vtable.ready    = NAME##_write_ready;\
+        result->wr_data_muxable.vtable.ready    = NAME##_write_data_ready;\
         result->wr_data_muxable.fd              = -1;\
         \
         result->wr_buff_muxable.mode            = CAMIO_MUX_MODE_WRITE_BUFF;\

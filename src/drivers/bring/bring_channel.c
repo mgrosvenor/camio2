@@ -131,8 +131,7 @@ static inline void set_head(camio_buffer_t* buffers, ch_word idx, ch_word seq_no
  **************************************************************************************************************************/
 static camio_error_t bring_read_buffer_request(camio_channel_t* this, camio_msg_t* req_vec, ch_word* vec_len_io )
 {
-    DBG("Doing bring read request...!\n");
-
+    DBG("Doing bring read buffer request...!\n");
     bring_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this);
 
     if(unlikely(NULL == cbuff_push_back_carray(priv->rd_buff_queue, req_vec,vec_len_io))){
@@ -141,6 +140,10 @@ static camio_error_t bring_read_buffer_request(camio_channel_t* this, camio_msg_
     }
 
     DBG("Bring read buffer request done - %lli requests added\n", *vec_len_io);
+    for(ch_word i = 0; i < *vec_len_io; i++){
+        DBG("[%lli] request_type=%i\n", i, req_vec[i].type);
+    }
+
     return CAMIO_ENOERROR;
 
 }
@@ -154,29 +157,32 @@ static camio_error_t bring_read_buffer_ready(camio_muxable_t* this)
     //Try to fill as many read requests as we can
     camio_msg_t* msg = NULL;
     for( msg = cbuff_use_front(priv->rd_buff_queue); msg != NULL; msg = cbuff_use_front(priv->rd_buff_queue)){
+
         //Sanity check the message first
         if(msg->type == CAMIO_MSG_TYPE_IGNORE){
             continue; //We don't care about this message
         }
 
         if(msg->type != CAMIO_MSG_TYPE_READ_BUFF_REQ){
-            ERR("Expected a read buffer request message (%lli) but got %lli instead.\n",CAMIO_MSG_TYPE_READ_BUFF_REQ, msg->type);
+            ERR("Expected a read buffer request message (%i) but got %i instead.\n",CAMIO_MSG_TYPE_READ_BUFF_REQ, msg->type);
             continue;
         }
 
         //Extract the request and response pointers, convert this message to a response
         camio_rd_buff_req_t* req = &msg->rd_buff_req;
-        camio_rd_buff_res_t* res = &msg->rd_buff_res;
-        msg->type = CAMIO_MSG_TYPE_READ_BUFF_RES;
 
         //Check that the request is a valid one
         if(unlikely(req->dst_offset_hint != CAMIO_READ_REQ_DST_OFFSET_NONE)){
-            ERR("Could not enqueue request %i, DST_OFFSET must be NONE\n");
+            ERR("Could not enqueue request %lli, DST_OFFSET must be NONE\n");
+            msg->type = CAMIO_MSG_TYPE_READ_BUFF_RES;
+            camio_rd_buff_res_t* res = &msg->rd_buff_res;
             res->status = CAMIO_EINVALID; //TODO better error code here!
             continue;
         }
         if(unlikely(req->src_offset_hint != CAMIO_READ_REQ_SRC_OFFSET_NONE)){
-            ERR("Could not enqueue request %i, SRC_OFFSET must be NONE\n");
+            ERR("Could not enqueue request %lli, SRC_OFFSET must be NONE\n");
+            msg->type = CAMIO_MSG_TYPE_READ_BUFF_RES;
+            camio_rd_buff_res_t* res = &msg->rd_buff_res;
             res->status = CAMIO_EINVALID; //TODO better error code here!
             continue;
         }
@@ -188,6 +194,7 @@ static camio_error_t bring_read_buffer_ready(camio_muxable_t* this)
         if(likely(seq_no == 0)){
             break; //There is no data available. Exit the loop which will return ETRYAGAIN
         }
+
         if(unlikely( seq_no != priv->rd_sync_counter)){
             DBG( "Ring synchronization error. This should not happen with a blocking ring %llu to %llu\n",
                 seq_no,
@@ -195,6 +202,10 @@ static camio_error_t bring_read_buffer_ready(camio_muxable_t* this)
             );
             return CAMIO_EWRONGBUFF;
         }
+
+        //From this point onwards, we're going to return something.
+        msg->type = CAMIO_MSG_TYPE_READ_BUFF_RES;
+        camio_rd_buff_res_t* res = &msg->rd_buff_res;
 
         volatile ch_word data_size = get_head_size(priv->rd_buffers,priv->rd_acq_index);
         //Do some sanity checks
@@ -318,7 +329,7 @@ static camio_error_t bring_read_buffer_release(camio_channel_t* this, camio_buff
  **************************************************************************************************************************/
 
 
-static camio_error_t bring_read_request(camio_channel_t* this, camio_msg_t* req_vec, ch_word* vec_len_io )
+static camio_error_t bring_read_data_request(camio_channel_t* this, camio_msg_t* req_vec, ch_word* vec_len_io )
 {
     //DBG("Doing bring read request...!\n");
 
@@ -339,7 +350,7 @@ static camio_error_t bring_read_request(camio_channel_t* this, camio_msg_t* req_
 //forward the buffer back out to the user. This complicated little dance is necessary to make other transports work.
 //In theory, we could make this function actually take buffers from the outside world by acquiring an internal buffer and
 //copying. There is a bit of dancing required to get around the async calls so I'll defer this work to a TODO XXX.
-static camio_error_t bring_read_ready(camio_muxable_t* this)
+static camio_error_t bring_read_data_ready(camio_muxable_t* this)
 {
     bring_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this->parent.channel);
     //DBG("Doing read ready\n");
@@ -400,7 +411,7 @@ static camio_error_t bring_read_ready(camio_muxable_t* this)
 }
 
 
-static camio_error_t bring_read_result( camio_channel_t* this, camio_msg_t* res_vec, ch_word* vec_len_io )
+static camio_error_t bring_read_data_result( camio_channel_t* this, camio_msg_t* res_vec, ch_word* vec_len_io )
 {
     DBG("Trying to get read result\n");
 
@@ -408,7 +419,7 @@ static camio_error_t bring_read_result( camio_channel_t* this, camio_msg_t* res_
 
     //Is there any data waiting? If not, try to get some
     if(unlikely(priv->rd_req_queue->in_use <= 0)){
-        camio_error_t err = bring_read_ready(&this->rd_data_muxable);
+        camio_error_t err = bring_read_data_ready(&this->rd_data_muxable);
         if(err){
             ERR("There is no data available to return. Did you use read_ready()?\n");
             return err;
@@ -438,7 +449,7 @@ static camio_error_t bring_read_result( camio_channel_t* this, camio_msg_t* res_
             DBG("Returning read result data_start=%p, data_size=%lli\n", res->buffer->data_start, res->buffer->data_len );
         }
         else{
-            DBG("Error returning read data result. Err=%lli\n", msg->rd_data_res.status);
+            DBG("Error returning read data result. Err=%i\n", msg->rd_data_res.status);
         }
     }
 
@@ -566,7 +577,7 @@ camio_error_t bring_write_buffer_result(camio_channel_t* this, camio_msg_t* res_
             DBG("Returning write buffer data_start=%p, data_size=%lli\n", res->buffer->data_start, res->buffer->data_len );
         }
         else{
-            DBG("Error returning write buffer result. Err=%lli\n", msg->rd_data_res.status);
+            DBG("Error returning write buffer result. Err=%i\n", msg->rd_data_res.status);
         }
     }
 
@@ -614,7 +625,7 @@ static camio_error_t bring_write_buffer_release(camio_channel_t* this, camio_buf
  **************************************************************************************************************************/
 //This should queue up a new request or requests. In this case, since writes simply require some checks and a bit flip
 //the actual "write" is going to happen here
-static camio_error_t bring_write_request(camio_channel_t* this, camio_msg_t* req_vec, ch_word* vec_len_io)
+static camio_error_t bring_write_data_request(camio_channel_t* this, camio_msg_t* req_vec, ch_word* vec_len_io)
 {
    // DBG("Doing write request\n");
     bring_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this);
@@ -709,7 +720,7 @@ static camio_error_t bring_write_request(camio_channel_t* this, camio_msg_t* req
 
 
 //Is the underlying channel done writing and ready for more?
-static camio_error_t bring_write_ready(camio_muxable_t* this)
+static camio_error_t bring_write_data_ready(camio_muxable_t* this)
 {
     bring_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this->parent.channel);
 
@@ -726,16 +737,15 @@ static camio_error_t bring_write_ready(camio_muxable_t* this)
         }
 
 
-        camio_wr_data_res_t* res = &msg->wr_data_res;
-        const ch_word buff_idx = res->buffer->__internal.__buffer_id;
 
         //DBG("Checking if buffer at index=%lli is ready\n", buff_idx);
-
+        camio_wr_data_res_t* res = &msg->wr_data_res;
         if(res->status){
             //An error was detected, so there's no point in going on with this request.
             continue;
         }
 
+        const ch_word buff_idx = res->buffer->__internal.__buffer_id;
         volatile ch_word seq_no = get_head_seq(priv->wr_buffers, buff_idx);
 
         if( seq_no != 0x00ULL){
@@ -773,7 +783,7 @@ static camio_error_t bring_write_ready(camio_muxable_t* this)
 }
 
 
-static camio_error_t bring_write_result(camio_channel_t* this, camio_msg_t* res_vec, ch_word* vec_len_io)
+static camio_error_t bring_write_data_result(camio_channel_t* this, camio_msg_t* res_vec, ch_word* vec_len_io)
 {
    // DBG("Getting write buffer result\n");
 
@@ -813,7 +823,7 @@ static camio_error_t bring_write_result(camio_channel_t* this, camio_msg_t* res_
             DBG("Returning write result data_start=%p, data_size=%lli\n", res->buffer->data_start, res->buffer->data_len );
         }
         else{
-            DBG("Error returning write result. Err=%lli\n", msg->rd_data_res.status);
+            DBG("Error returning write result. Err=%i\n", msg->rd_data_res.status);
         }
     }
 

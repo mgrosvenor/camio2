@@ -246,7 +246,7 @@ static camio_error_t delim_read_ready(camio_muxable_t* this)
         return CAMIO_ENOTREADY;
     }
 
-    ERR("Something bad happened err=%lli!\n", err);
+    ERR("Something bad happened err=%i!\n", err);
     return err;
 
 

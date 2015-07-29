@@ -73,21 +73,21 @@ typedef struct camio_chan_req_s {
 typedef struct camio_chan_res_s {
     camio_channel_t* channel; //-- the order is important
     ch_word id;
-    ch_word status;
+    camio_error_t status;
 } camio_chan_res_t;
 
 typedef enum camio_msg_type_en {
-    CAMIO_MSG_TYPE_NONE,
-    CAMIO_MSG_TYPE_CHAN_REQ,
-    CAMIO_MSG_TYPE_CHAN_RES,
-    CAMIO_MSG_TYPE_READ_BUFF_REQ,
-    CAMIO_MSG_TYPE_READ_BUFF_RES,
-    CAMIO_MSG_TYPE_READ_DATA_REQ,
-    CAMIO_MSG_TYPE_READ_DATA_RES,
-    CAMIO_MSG_TYPE_WRITE_BUFF_REQ,
-    CAMIO_MSG_TYPE_WRITE_BUFF_RES,
-    CAMIO_MSG_TYPE_WRITE_DATA_REQ,
-    CAMIO_MSG_TYPE_WRITE_DATA_RES,
+    CAMIO_MSG_TYPE_NONE = 0,            //0
+    CAMIO_MSG_TYPE_CHAN_REQ,            //1
+    CAMIO_MSG_TYPE_CHAN_RES,            //2
+    CAMIO_MSG_TYPE_READ_BUFF_REQ,       //3
+    CAMIO_MSG_TYPE_READ_BUFF_RES,       //4
+    CAMIO_MSG_TYPE_READ_DATA_REQ,       //5
+    CAMIO_MSG_TYPE_READ_DATA_RES,       //6
+    CAMIO_MSG_TYPE_WRITE_BUFF_REQ,      //7
+    CAMIO_MSG_TYPE_WRITE_BUFF_RES,      //8
+    CAMIO_MSG_TYPE_WRITE_DATA_REQ,      //9
+    CAMIO_MSG_TYPE_WRITE_DATA_RES,      //10
     CAMIO_MSG_TYPE_IGNORE,
 } camio_msg_type_e;
 

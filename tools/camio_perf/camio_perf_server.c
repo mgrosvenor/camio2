@@ -22,29 +22,32 @@
 
 
 extern struct options_t options;
-static camio_mux_t* mux               = NULL;
+static camio_mux_t* mux                 = NULL;
+static camio_controller_t* controller   = NULL;
 #define MSGS_MAX 1024
-static camio_msg_t msgs[MSGS_MAX]     = {{0}};
-static ch_word msgs_len               = MSGS_MAX;
-static camio_controller_t* controller = NULL;
-static ch_bool started                = false;
-ch_word seq_exp                       = 1; //Sequence numbers start at 1
+static camio_msg_t ctrl_msgs[MSGS_MAX]  = {{0}};
+static ch_word ctrl_msgs_len            = MSGS_MAX;
+static camio_msg_t data_msgs[MSGS_MAX]  = {{0}};
+static ch_word data_msgs_len            = MSGS_MAX;
+static ch_bool started                  = false;
+ch_word seq_exp                         = 1; //Sequence numbers start at 1
 
 //Statistics keeping
-struct timeval now              = {0};
-static ch_word time_now_ns      = 0;
-static ch_word intv_bytes       = 0;
-//static ch_word intv_samples     = 0;
-static ch_word lost_count       = 0;
-static ch_word found_count      = 0;
-static ch_word min_latency      = INT64_MAX;
-static ch_word max_latency      = INT64_MIN;
-static ch_word total_latency    = 0;
+struct timeval now                      = {0};
+static ch_word time_now_ns              = 0;
+static ch_word intv_bytes               = 0;
+//static ch_word intv_samples             = 0;
+static ch_word lost_count               = 0;
+static ch_word found_count              = 0;
+static ch_word min_latency              = INT64_MAX;
+static ch_word max_latency              = INT64_MIN;
+static ch_word total_latency            = 0;
 
 
 
 static camio_error_t get_new_buffers(camio_channel_t* channel);
 static camio_error_t on_new_rd_buffs(camio_muxable_t* muxable, camio_error_t err, void* usr_state, ch_word id);
+static camio_error_t get_new_channels();
 
 #define CONNECTOR_ID 0
 //static ch_word delimit(char* buffer, ch_word len)
@@ -121,37 +124,37 @@ static camio_error_t on_new_rd_datas(camio_muxable_t* muxable, camio_error_t err
         return err;
     }
 
-    msgs_len = MSGS_MAX;
-    err = camio_chan_rd_data_res(muxable->parent.channel, msgs, &msgs_len );
+    data_msgs_len = MSGS_MAX;
+    err = camio_chan_rd_data_res(muxable->parent.channel, data_msgs, &data_msgs_len );
     if(err){
         return err;
     }
 
-    if(msgs_len == 0){
+    if(data_msgs_len == 0){
         DBG("Got no new read completions?\n");
         return CAMIO_EINVALID;
     }
 
     ch_word reusable_buffs = 0; //See how many buffers we can potentially reuse
 
-    for(ch_word i = 0; i < msgs_len; i++){
+    for(ch_word i = 0; i < data_msgs_len; i++){
 
-        if(msgs[i].type == CAMIO_MSG_TYPE_IGNORE){
+        if(data_msgs[i].type == CAMIO_MSG_TYPE_IGNORE){
             DBG("Ignoring message at index %lli\n", i);
             continue;
         }
 
-        if(msgs[i].type != CAMIO_MSG_TYPE_READ_BUFF_RES){
+        if(data_msgs[i].type != CAMIO_MSG_TYPE_READ_BUFF_RES){
             ERR("Expected to get read data response message (%lli), but got %lli instead.\n",
-                    CAMIO_MSG_TYPE_READ_BUFF_RES, msgs[i].type);
-            msgs[i].type = CAMIO_MSG_TYPE_IGNORE;
+                    CAMIO_MSG_TYPE_READ_BUFF_RES, data_msgs[i].type);
+            data_msgs[i].type = CAMIO_MSG_TYPE_IGNORE;
             continue;
         }
 
-        camio_rd_buff_res_t* res = &msgs[i].rd_buff_res;
+        camio_rd_buff_res_t* res = &data_msgs[i].rd_buff_res;
         if(res->status){
-            ERR("Error %lli getting buffer with id=%lli\n", res->status, msgs[i].id);
-            msgs[i].type = CAMIO_MSG_TYPE_IGNORE;
+            ERR("Error %lli getting buffer with id=%lli\n", res->status, data_msgs[i].id);
+            data_msgs[i].type = CAMIO_MSG_TYPE_IGNORE;
             continue;
         }
 
@@ -183,7 +186,7 @@ static camio_error_t on_new_rd_datas(camio_muxable_t* muxable, camio_error_t err
         //printf("ts=%lli, len=%lli, seq=%lli, \n", head->time_stamp, head->size, head->seq_number );
 
         if(res->status == CAMIO_ECANNOTREUSE){
-            msgs[i].type = CAMIO_MSG_TYPE_IGNORE;
+            data_msgs[i].type = CAMIO_MSG_TYPE_IGNORE;
             err = camio_chan_rd_buff_release(muxable->parent.channel, buffer);
             if(err){
                 DBG("WTF? Error releasing buffer??\n");
@@ -221,43 +224,43 @@ static camio_error_t on_new_rd_buffs(camio_muxable_t* muxable, camio_error_t err
         return err;
     }
 
-    msgs_len = MSGS_MAX;
-    err = camio_chan_rd_buff_res(muxable->parent.channel, msgs, &msgs_len);
+    data_msgs_len = MSGS_MAX;
+    err = camio_chan_rd_buff_res(muxable->parent.channel, data_msgs, &data_msgs_len);
     if(err){
         ERR("Could not get a writing buffers\n");
         return err;
     }
 
-    for(ch_word i = 0; i < msgs_len; i++){
+    for(ch_word i = 0; i < data_msgs_len; i++){
 
-        if(msgs[i].type == CAMIO_MSG_TYPE_IGNORE){
+        if(data_msgs[i].type == CAMIO_MSG_TYPE_IGNORE){
             DBG("Ignoring read buffer at index %lli\n", i);
             continue;
         }
 
-        if(msgs[i].type != CAMIO_MSG_TYPE_READ_BUFF_RES){
+        if(data_msgs[i].type != CAMIO_MSG_TYPE_READ_BUFF_RES){
             ERR("Expected to get read buffer response message (%lli), but got %lli instead.\n",
-                    CAMIO_MSG_TYPE_READ_BUFF_RES, msgs[i].type);
-            msgs[i].type = CAMIO_MSG_TYPE_IGNORE;
+                    CAMIO_MSG_TYPE_READ_BUFF_RES, data_msgs[i].type);
+            data_msgs[i].type = CAMIO_MSG_TYPE_IGNORE;
             continue;
         }
 
-        camio_rd_buff_res_t* res = &msgs[i].rd_buff_res;
+        camio_rd_buff_res_t* res = &data_msgs[i].rd_buff_res;
         if(res->status){
-            ERR("Error %lli getting buffer with id=%lli\n", res->status, msgs[i].id);
-            msgs[i].type = CAMIO_MSG_TYPE_IGNORE;
+            ERR("Error %lli getting buffer with id=%lli\n", res->status, data_msgs[i].id);
+            data_msgs[i].type = CAMIO_MSG_TYPE_IGNORE;
             continue;
         }
 
-        msgs[i].type = CAMIO_MSG_TYPE_READ_DATA_REQ;
-        camio_rd_data_req_t* req = &msgs[i].rd_data_req;
+        data_msgs[i].type = CAMIO_MSG_TYPE_READ_DATA_REQ;
+        camio_rd_data_req_t* req = &data_msgs[i].rd_data_req;
 
         req->dst_offset_hint = CAMIO_READ_REQ_DST_OFFSET_NONE;
         req->src_offset_hint = CAMIO_READ_REQ_SRC_OFFSET_NONE;
         req->read_size_hint  = CAMIO_READ_REQ_SIZE_ANY;
     }
 
-    err = camio_chan_rd_data_req(muxable->parent.channel, msgs, &msgs_len);
+    err = camio_chan_rd_data_req(muxable->parent.channel, data_msgs, &data_msgs_len);
     if(err){
         ERR("Could not request read data\n");
         return err;
@@ -271,22 +274,22 @@ static camio_error_t get_new_buffers(camio_channel_t* channel)
 
     //Initialize a batch of messages to request some write buffers
     for(int i = 0; i < MSGS_MAX; i++){
-        msgs[i].type = CAMIO_MSG_TYPE_WRITE_BUFF_REQ;
-        msgs[i].id = i;
-        camio_rd_buff_req_t* req = &msgs[i].rd_buff_req;
+        data_msgs[i].type = CAMIO_MSG_TYPE_READ_BUFF_REQ;
+        data_msgs[i].id = i;
+        camio_rd_buff_req_t* req = &data_msgs[i].rd_buff_req;
         req->dst_offset_hint = CAMIO_READ_REQ_DST_OFFSET_NONE;
         req->src_offset_hint = CAMIO_READ_REQ_SRC_OFFSET_NONE;
         req->read_size_hint  = CAMIO_READ_REQ_SIZE_ANY;
     }
 
-    msgs_len = MSGS_MAX;
+    data_msgs_len = MSGS_MAX;
     DBG("Requesting %lli read_buffs\n", MSGS_MAX);
-    camio_error_t err = camio_chan_rd_buff_req( channel, msgs, &msgs_len);
+    camio_error_t err = camio_chan_rd_buff_req( channel, data_msgs, &data_msgs_len);
     if(err){
         DBG("Could not request buffers with error %lli\n", err);
         return err;
     }
-    DBG("Successfully issued %lli buffer requests\n", msgs_len);
+    DBG("Successfully issued %lli buffer requests\n", data_msgs_len);
 
     return CAMIO_ENOERROR;
 }
@@ -305,41 +308,43 @@ static camio_error_t on_new_channels(camio_muxable_t* muxable, camio_error_t err
         return err;
     }
 
-    msgs_len = MSGS_MAX;
-    err = camio_ctrl_chan_res(muxable->parent.controller, msgs, &msgs_len );
+    ctrl_msgs_len = MSGS_MAX;
+    err = camio_ctrl_chan_res(muxable->parent.controller, ctrl_msgs, &ctrl_msgs_len );
     if(err){
         return err;
     }
 
-    if(msgs_len == 0){
+    DBG("Got %lli new channels\n", ctrl_msgs_len);
+
+    if(ctrl_msgs_len == 0){
         DBG("Got no new connections?\n");
         return CAMIO_EINVALID;
     }
 
-    for(ch_word i = 0; i < msgs_len; i++){
-        if(msgs[i].type == CAMIO_MSG_TYPE_IGNORE){
+    for(ch_word i = 0; i < ctrl_msgs_len; i++){
+        if(ctrl_msgs[i].type == CAMIO_MSG_TYPE_IGNORE){
             DBG("Ignoring connect response message at index %lli\n", i);
             continue;
         }
 
-        if(msgs[i].type != CAMIO_MSG_TYPE_CHAN_RES){
+        if(ctrl_msgs[i].type != CAMIO_MSG_TYPE_CHAN_RES){
             ERR("Expected to get connect response message (%lli), but got %lli instead.\n",
-                    CAMIO_MSG_TYPE_CHAN_RES, msgs[i].type);
-            msgs[i].type = CAMIO_MSG_TYPE_IGNORE;
+                    CAMIO_MSG_TYPE_CHAN_RES, ctrl_msgs[i].type);
+            ctrl_msgs[i].type = CAMIO_MSG_TYPE_IGNORE;
             continue;
         }
 
-        camio_chan_res_t* res = &msgs[i].ch_res;
+        camio_chan_res_t* res = &ctrl_msgs[i].ch_res;
         if(res->status == CAMIO_EALLREADYCONNECTED){
             DBG("No more connections on this controller\n", err);
             camio_mux_remove(mux,muxable);
-            continue;
+            return CAMIO_ENOERROR; //Bail out here. The controller is gone
         }
 
         if(res->status){
             DBG("Could not get channel. Removing broken controller with error=%lli\n", err);
             camio_mux_remove(mux,muxable);
-            continue;
+            return CAMIO_ENOERROR; //Bail out here. The controller is gone
         }
 
         camio_mux_insert(mux,&res->channel->rd_data_muxable,on_new_rd_datas, NULL, CONNECTOR_ID + 1);
@@ -352,28 +357,30 @@ static camio_error_t on_new_channels(camio_muxable_t* muxable, camio_error_t err
     }
 
     started = true; //Tell the stats that we're going!
-    return CAMIO_ENOERROR;
+    //And see if we can grab some more
+    return get_new_channels();
 
 }
 
 
 static camio_error_t get_new_channels()
 {
+    DBG("Trying to get some new channels\n");
     //Initialize a batch of messages
     for(int i = 0; i < MSGS_MAX; i++){
-        msgs[i].type = CAMIO_MSG_TYPE_CHAN_REQ;
-        msgs[i].id = i;
+        ctrl_msgs[i].type = CAMIO_MSG_TYPE_CHAN_REQ;
+        ctrl_msgs[i].id = i;
     }
 
-    msgs_len = MSGS_MAX;
-    DBG("Requesting %lli wirte_buffs\n", MSGS_MAX);
-    camio_error_t err = camio_ctrl_chan_req(controller, msgs, &msgs_len);
+    ctrl_msgs_len = MSGS_MAX;
+    DBG("Requesting %lli channel\n", MSGS_MAX);
+    camio_error_t err = camio_ctrl_chan_req(controller, ctrl_msgs, &ctrl_msgs_len);
 
     if(err){
         DBG("Could not request channels with error %lli\n", err);
         return err;
     }
-    DBG("Successfully issued %lli channel requests\n", msgs_len);
+    DBG("Successfully issued %lli channel requests\n", ctrl_msgs_len);
 
     return CAMIO_ENOERROR;
 }

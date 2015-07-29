@@ -21,7 +21,7 @@ typedef struct {
 } mux_spin_priv_t;
 
 camio_error_t spin_construct(camio_mux_t* this){
-    DBG("Making new vector spin mux\n");
+    //DBG("Making new vector spin mux\n");
 
     mux_spin_priv_t* priv = MUX_GET_PRIVATE(this);
     priv->muxables = CH_VECTOR_NEW(CAMIO_MUXABLE_VEC,1024,CH_VECTOR_CMP(CAMIO_MUXABLE_VEC));
@@ -38,10 +38,10 @@ camio_error_t spin_insert(camio_mux_t* this, camio_muxable_t* muxable, mux_callb
 {
     //DBG("Inserting %p into mux with id=%i\n",muxable,id);
     mux_spin_priv_t* priv = MUX_GET_PRIVATE(this);
-    CH_VECTOR(CAMIO_MUXABLE_VEC)* muxables = priv->muxables;
     muxable->callback       = callback;
     muxable->usr_state      = usr_state;
     muxable->id             = id;
+    CH_VECTOR(CAMIO_MUXABLE_VEC)* muxables = priv->muxables;
     muxables->push_back(muxables, *muxable);
     return CAMIO_ENOERROR;
 }
@@ -84,8 +84,8 @@ camio_error_t spin_select(camio_mux_t* this, struct timeval* timeout, camio_muxa
 
     while(1){
         //Take a look at every item once so we can exit if the timeout is 0 and nothing fires
-        for(ch_word i = 0; i < muxables->count; i++){
-            priv->idx = priv->idx >= muxables->count - 1 ? 0 : priv->idx + 1;
+        for(ch_word i = 0; i < muxables->count; i++,
+            priv->idx = priv->idx >= muxables->count - 1 ? 0 : priv->idx + 1){
 
             //usleep(1); //-- Slow things down for debugging
 
@@ -98,22 +98,25 @@ camio_error_t spin_select(camio_mux_t* this, struct timeval* timeout, camio_muxa
             }
 
             //Get the next muxable and find out if it's ready
-            //Not using off() here to save a few cycles in this critical loop
+            //Not using off() here to save a few cycles in this critical loop where we know it's safe to do so
             camio_muxable_t* muxable = muxables->first + priv->idx;
             camio_error_t err        = muxable->vtable.ready(muxable);
+
             if(err == CAMIO_ETRYAGAIN){
                 continue;  //Nothing more to see here folks, come back later
             }
+
+            DBG("Found ready item at index %i with error code=%i\n", priv->idx, err);
+
 
             //-------------------------------------------------------------------------------------------------------------
             //Point of guaranteed return -- After this point, we will call return, so we make sure the return muxable is
             //populated and increment the idx to make sure that next time we look at the next device first. This gives some
             //degree of "fairness".
+
             *muxable_o  = muxable;
             priv->idx   = priv->idx >= muxables->count - 1 ? 0 : priv->idx + 1;
 
-            //At this point, the only return value is ENOERROR!
-            DBG("Found ready item at index %i with error code=%lli\n", priv->idx, err);
 
             //Execute the callback if it's populated
             if(muxable->callback){

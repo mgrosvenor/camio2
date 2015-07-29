@@ -86,7 +86,7 @@ camio_error_t camio_channel_new(char* uri, camio_channel_t** channel)
        return CAMIO_ETOOMANY;
    }
    if(msg.ch_res.status){
-       return DBG("Error getting channel response. Err=%lli\n", msg.ch_res.status);
+       return DBG("Error getting channel response. Err=%i\n", msg.ch_res.status);
        return msg.ch_res.status;
    }
 

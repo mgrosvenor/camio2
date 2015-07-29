@@ -384,7 +384,7 @@ static camio_error_t bring_connect_peek(camio_controller_t* this)
 
     if(priv->params->server){
         result = bring_connect_peek_server(this);
-        if(!result == CAMIO_ENOERROR){
+        if(result != CAMIO_ENOERROR){
             return result;
         }
 
@@ -394,6 +394,7 @@ static camio_error_t bring_connect_peek(camio_controller_t* this)
             return CAMIO_ENOERROR;
         }
 
+        //DBG("Returning %lli\n", CAMIO_ETRYAGAIN);
         return CAMIO_ETRYAGAIN;
 
     }
@@ -431,6 +432,7 @@ static camio_error_t bring_channel_result(camio_controller_t* this, camio_msg_t*
         camio_error_t err = bring_connect_peek(this);
         if(err){
             DBG("There are no channels available to return. Did you use chan_ready()?\n");
+            *vec_len_io = 0;
             return err;
         }
     }
@@ -450,8 +452,8 @@ static camio_error_t bring_channel_result(camio_controller_t* this, camio_msg_t*
 
 
         res_vec[i] = *msg;
+        res_vec[i].type = CAMIO_MSG_TYPE_CHAN_RES;
         camio_chan_res_t* res = &res_vec[i].ch_res;
-        msg->type = CAMIO_MSG_TYPE_CHAN_RES;
 
         if(priv->is_connected){
             DBG("Only channel already supplied! No more channels available\n");
