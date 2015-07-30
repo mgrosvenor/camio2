@@ -326,6 +326,7 @@ static camio_error_t on_new_channels(camio_muxable_t* muxable, camio_error_t err
 
     if(err){
         ERR("Unexpected error %lli\n", err);
+        camio_mux_remove(mux,muxable);
         return err;
     }
 

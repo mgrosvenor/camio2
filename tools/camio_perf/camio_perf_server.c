@@ -43,8 +43,6 @@ static ch_word min_latency              = INT64_MAX;
 static ch_word max_latency              = INT64_MIN;
 static ch_word total_latency            = 0;
 
-
-
 static camio_error_t get_new_buffers(camio_channel_t* channel);
 static camio_error_t on_new_rd_buffs(camio_muxable_t* muxable, camio_error_t err, void* usr_state, ch_word id);
 static camio_error_t get_new_channels();
@@ -302,6 +300,7 @@ static camio_error_t on_new_channels(camio_muxable_t* muxable, camio_error_t err
     (void)id;
 
     if(err){
+        camio_mux_remove(mux,muxable);
         ERR("Unexpected error %lli\n", err);
         return err;
     }
