@@ -16,7 +16,7 @@
 #include <deps/chaste/utils/util.h>
 #include <src/api/api.h>
 
-#include "../../camio_debug.h"
+#include <deps/chaste/utils/debug.h>
 
 #include "delim_channel.h"
 
@@ -36,13 +36,13 @@ typedef struct delim_channel_priv_s {
     camio_buffer_t rd_result_buff;
 
     //The base variables are used to gather data from the underlying channel
-    camio_buffer_t* rd_base_buff;
-    camio_rd_req_t* rd_base_req_vec;
-    ch_word rd_base_req_vec_len;
-    ch_bool rd_base_registered;
+//    camio_buffer_t* rd_base_buff;
+//    camio_rd_req_t* rd_base_req_vec;
+//    ch_word rd_base_req_vec_len;
+//    ch_bool rd_base_registered;
 
     ch_bool is_rd_closed;
-    ch_bool read_registered;
+//    ch_bool read_registered;
 
     ch_word (*delim_fn)(char* buffer, ch_word len);
 
@@ -567,25 +567,13 @@ camio_error_t delim_channel_construct(
 {
     (void)controller; //Nothing to do with this
 
-    //Basic sanity checks -- TODO DELIM: Should these be made into (compile time optional?) asserts for runtime performance?
-    if( NULL == this){
-        ERR("This null???\n"); //WTF?
-        return CAMIO_EINVALID;
-    }
     delim_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this);
 
     priv->delim_fn  = delim_fn;
     priv->base      = base_channel;
 
-    this->rd_muxable.mode              = CAMIO_MUX_MODE_READ;
-    this->rd_muxable.parent.channel     = this;
-    this->rd_muxable.vtable.ready      = delim_read_ready;
-    this->rd_muxable.fd                = base_channel->rd_muxable.fd;
-
-    this->wr_muxable.mode              = CAMIO_MUX_MODE_WRITE;
-    this->wr_muxable.parent.channel     = this;
-    this->wr_muxable.vtable.ready      = delim_write_ready;
-    this->wr_muxable.fd                = base_channel->wr_muxable.fd;
+    this->rd_data_muxable.fd                = base_channel->rd_data_muxable.fd;
+    this->wr_data_muxable.fd                = base_channel->wr_data_muxable.fd;
 
     priv->rd_working_buff.__internal.__mem_start = calloc(1,DELIM_BUFFER_DEFAULT_SIZE);
     priv->rd_working_buff.__internal.__mem_len   = DELIM_BUFFER_DEFAULT_SIZE;

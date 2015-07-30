@@ -68,8 +68,6 @@ camio_error_t bring_channel_request( camio_controller_t* this, camio_msg_t* req_
     }
 
     //DBG("Bring channel request done - %lli requests added\n", *vec_len_io);
-
-    //DBG("Bring channel request added!\n");
     return CAMIO_ENOERROR;
 }
 

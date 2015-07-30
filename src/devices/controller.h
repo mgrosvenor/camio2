@@ -90,10 +90,10 @@ typedef struct camio_controller_s {
         camio_controller_t* result = (camio_controller_t*)calloc(1,sizeof(camio_controller_t) + sizeof(PRIVATE_TYPE));\
         if(!result) return NULL;\
         if(!result) return ((void *)0);\
-        result->vtable                      = bring_controller_interface;\
+        result->vtable                      = NAME##_controller_interface;\
         result->muxable.mode                = CAMIO_MUX_MODE_CONNECT;\
         result->muxable.parent.controller   = result;\
-        result->muxable.vtable.ready        = bring_channel_ready;\
+        result->muxable.vtable.ready        = NAME##_channel_ready;\
         result->muxable.fd                  = -1;\
         return result;\
     }

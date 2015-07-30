@@ -13,6 +13,6 @@
 
 #include "../../devices/controller.h"
 
-NEW_CONNECTOR_DECLARE(delim);
+NEW_CONTROLLER_DECLARE(delim);
 
 #endif /* SRC_DRIVERS_DELIM_DELIM_CONNECTOR_H_ */

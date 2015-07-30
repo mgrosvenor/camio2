@@ -12,7 +12,7 @@
 #include <stddef.h>
 
 #include <src/camio.h>
-#include <src/camio_debug.h>
+#include <deps/chaste/utils/debug.h>
 #include <src/types/device_params_vec.h>
 
 #include "delim_controller.h"

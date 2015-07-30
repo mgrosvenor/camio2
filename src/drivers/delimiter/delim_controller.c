@@ -9,9 +9,8 @@
  *  <INSERT DESCRIPTION HERE> 
  */
 
-#include "../../devices/controller.h"
-#include "../../camio.h"
-#include "../../camio_debug.h"
+#include <src/devices/controller.h>
+#include <deps/chaste/utils/debug.h>
 
 #include "delim_device.h"
 #include "delim_controller.h"
@@ -39,39 +38,96 @@ typedef struct delim_priv_s {
 /**************************************************************************************************************************
  * Connect functions
  **************************************************************************************************************************/
-static camio_error_t delim_controller_ready(camio_muxable_t* this)
+camio_error_t delim_channel_request( camio_controller_t* this, camio_msg_t* req_vec, ch_word* vec_len_io)
 {
-//    DBG("Checking if base controller is ready\n");
-    //Forward the ready function from the base controller. The delimiter is always ready to party!
-    delim_controller_priv_t* priv = CONNECTOR_GET_PRIVATE(this->parent.controller);
-    return camio_controller_ready(priv->base);
+    DBG("Doing delim channel request...!\n");
 
+    //Simply forward the request to the base controller.
+    delim_controller_priv_t* priv = CONTROLLER_GET_PRIVATE(this);
+    const camio_error_t err = camio_ctrl_chan_req(priv->base,req_vec,vec_len_io);
+
+    DBG("Delim channel request done - %lli requests added\n", *vec_len_io);
+    return err;
 }
 
-static camio_error_t delim_connect(camio_controller_t* this, camio_channel_t** channel_o )
+
+static camio_error_t delim_channel_ready(camio_muxable_t* this)
+{
+    delim_controller_priv_t* priv = CONNECTOR_GET_PRIVATE(this->parent.controller);
+    DBG("Doing channel ready\n");
+
+    //Simply forward the ready to the base controller.
+    const camio_error_t err = camio_ctrl_chan_ready(priv->base);
+
+    return err;
+}
+
+
+
+static camio_error_t delim_channel_result(camio_controller_t* this, camio_msg_t* res_vec, ch_word* vec_len_io )
 {
     delim_controller_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
-    camio_channel_t* base_channel;
-    DBG("Doing connect on base controller\n");
-    camio_error_t err = camio_connect(priv->base, &base_channel);
+
+    DBG("Getting result from base controller\n");
+    camio_error_t err = camio_ctrl_chan_res(priv->base,res_vec,vec_len_io);
     if(err){
-        if(err != CAMIO_ETRYAGAIN){//ETRYAGAIN is ok.
-            DBG("EEK unexpected error trying to call connect on base channel\n");
-        }
+        DBG("Base controller returned error=%i\n", err);
         return err;
     }
-
-    DBG("Making new delimiter channel\n");
-    camio_channel_t* channel = NEW_CHANNEL(delim);
-    if(!channel){
-        ERR("No memory for new delimter\n");
-        *channel_o = NULL;
-        return CAMIO_ENOMEM;
+    if(0 == *vec_len_io){
+        DGB("WTF? Base controller returned no new channels and no error\n");
+        return CAMIO_EINVALID; //TODO XXX -- better error code
     }
-    *channel_o = channel;
+    DBG("Base controller returned %lli new channels\n", *vec_len_io);
 
-    DBG("Constructing delimiter delimfn=%p\n", priv->params->delim_fn);
-    return delim_channel_construct(channel,this,base_channel, priv->params->delim_fn);
+    //Iterate over the channels returned, and replace them with delimiter channels
+    ch_word channels = 0;
+    for(ch_word i = 0; i < *vec_len_io; i++){
+        //Do a bunch of sanity checking -- should probably compile this stuff out for high speed runtime
+        if(res_vec[i].type == CAMIO_MSG_TYPE_IGNORE){
+            DBG("Ignoring message at index %lli\n", i);
+            continue;
+        }
+        if(res_vec[i].type != CAMIO_MSG_TYPE_CHAN_RES){
+            DBG("Expected a channel response message (%i) at index %lli but got %i\n",
+                    CAMIO_MSG_TYPE_CHAN_RES, i, res_vec[i].type);
+            continue;
+        }
+        camio_chan_res_t res = &res_vec[i].ch_res;
+        if(!res.channel){
+            DBG("Expected a channel response, but got NULL and no error?\n");
+            res->status = CAMIO_EINVALID;
+            continue;
+        }
+
+        //OK. We can be pretty sure that we have a valid channel from the base controller. Try to make a delimiter for it.
+        DBG("Making new delimiter channel at index %lli\n", i);
+        camio_channel_t* delim_channel = NEW_CHANNEL(delim);
+        if(!delim_channel){
+            ERR("No memory for new delimiter\n"); //EEk! Ok, bug out
+            camio_channel_destroy(res->channel);
+            res->status = CAMIO_ENOMEM;
+            continue;
+        }
+
+        //Nice, we have memory and a delimiter channel. Set everything up for it
+        DBG("Done Constructing delimiter with delimfn=%p\n", priv->params->delim_fn);
+        err = delim_channel_construct(delim_channel,this,res->channel, priv->params->delim_fn);
+        if(err){
+            DBG("Unexpected error construction delimiter\n");
+            res->status = err;
+            continue;
+        }
+
+        //Now that the delimiter channel is looking after the base channel, we can do the old switch-a-roo
+        res->channel = delim_channel;
+        res->status = CAMIO_ENOERROR;
+        channels++;
+    }
+
+    DBG("Delimiter created %lli channels from %lli responese\n", channels, *vec_len_io);
+    *vec_len_io = channels;
+    return CAMIO_ENOERROR;
 }
 
 
@@ -119,12 +175,8 @@ static camio_error_t delim_construct(camio_controller_t* this, void** params, ch
     }
 
 
-    //Populate the muxable structure
-    this->muxable.mode              = CAMIO_MUX_MODE_CONNECT;
-    this->muxable.parent.controller  = this;
-    this->muxable.vtable.ready      = delim_controller_ready;
-    this->muxable.fd                = priv->base->muxable.id; //Pass this out, but retain the ready function.
-                                                              //Smells a bit bad, but is probably ok.
+    this->muxable.fd = priv->base->muxable.fd; //Pass this out, but retain the ready function.
+                                               //Smells a bit bad, but is probably ok.
 
     DBG("Finished constructing delimiter controller and base controller\n");
     return CAMIO_ENOERROR;
@@ -143,4 +195,4 @@ static void delim_destroy(camio_controller_t* this)
     DBG("Done destroying delim controller structure\n");
 }
 
-NEW_CONNECTOR_DEFINE(delim, delim_controller_priv_t)
+NEW_CONTROLLER_DEFINE(delim, delim_controller_priv_t)

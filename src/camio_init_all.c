@@ -8,7 +8,7 @@
 //#include <src/drivers/netmap/netmap_device.h>
 //#include <src/drivers/udp/udp_device.h>
 //#include <src/drivers/tcp/tcp_device.h>
-//#include <src/drivers/delimiter/delim_device.h>
+#include <src/drivers/delimiter/delim_device.h>
 //#include <src/drivers/fileio/fio_device.h>
 //#include <src/drivers/memfileio/mfio_device.h>
 //#include <src/drivers/stdio/stdio_device.h>
@@ -36,7 +36,7 @@ camio_error_t camio_init_all_devices(){
     //netmap_init();
 //    udp_init();
 //    tcp_init();
-//    delim_init();
+    delim_init();
 //    fio_init();
 //    mfio_init();
 //    stdio_init();

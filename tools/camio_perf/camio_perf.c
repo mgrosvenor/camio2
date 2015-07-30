@@ -27,9 +27,10 @@ struct options_t options;
 
 int main(int argc, char** argv)
 {
-#ifdef NDEBUG
+    #ifdef NDEBUG
     printf("NDEBUG defined\n");
     #endif
+
     DBG("Starting camio perf!\n");
     ch_opt_addsi(CH_OPTION_OPTIONAL, 'c', "client","name or that the client should connect to", &options.client, NULL);
     ch_opt_addsi(CH_OPTION_OPTIONAL, 's', "server","put camio_perf in server mode", &options.server, NULL);
