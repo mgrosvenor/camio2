@@ -363,7 +363,7 @@ static camio_error_t on_new_channels(camio_muxable_t* muxable, camio_error_t err
         }
 
         if(res->status){
-            ERR("Could not get channel. Removing broken controller with error=%lli\n", err);
+            ERR("Could not get channel. Removing broken controller with error=%li\n", res->status);
             camio_mux_remove(mux,muxable);
             return CAMIO_ENOERROR; //The controller is dead. Exit here
         }

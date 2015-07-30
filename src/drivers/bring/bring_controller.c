@@ -422,7 +422,7 @@ static camio_error_t bring_channel_ready(camio_muxable_t* this)
 
 static camio_error_t bring_channel_result(camio_controller_t* this, camio_msg_t* res_vec, ch_word* vec_len_io )
 {
-    //DBG("Getting bring connect result\n");
+    DBG("Getting bring connect result\n");
     bring_controller_priv_t* priv = CONTROLLER_GET_PRIVATE(this);
 
     //Is there any data waiting? If not, try to get some
@@ -455,7 +455,7 @@ static camio_error_t bring_channel_result(camio_controller_t* this, camio_msg_t*
         camio_chan_res_t* res = &res_vec[i].ch_res;
 
         if(priv->is_connected){
-            //DBG("Only channel already supplied! No more channels available\n");
+            DBG("Only channel already supplied! No more channels available\n");
             res->status = CAMIO_EALLREADYCONNECTED; // We're already connected!
             //Error code is in the request, the result is returned successfully even though the result was not a success
             continue;
@@ -464,6 +464,7 @@ static camio_error_t bring_channel_result(camio_controller_t* this, camio_msg_t*
         res->channel = NEW_CHANNEL(bring);
         if(!res->channel){
             res->status = CAMIO_ENOMEM;
+            ERR("No memory trying to allocate channel!\n"); 
             //Error code is in the request, the result is returned successfully even though the result was not a success
             continue;
         }
@@ -476,10 +477,11 @@ static camio_error_t bring_channel_result(camio_controller_t* this, camio_msg_t*
         }
 
         priv->is_connected = true;
-        //DBG("Done returning channel result\n");
+        res->status = CAMIO_ENOERROR;
+        DBG("Done successfully returning channel result\n");
     }
 
-    //DBG("Returning %lli channel results\n", count);
+    DBG("Returning %lli channel results\n", count);
     return CAMIO_ENOERROR;
 
 }

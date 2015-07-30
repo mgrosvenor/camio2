@@ -985,10 +985,8 @@ camio_error_t bring_channel_construct(
     priv->wr_buff_queue     = ch_cbuff_new(priv->wr_buffers_count,sizeof(camio_msg_t));
     priv->wr_req_queue      = ch_cbuff_new(priv->wr_buffers_count,sizeof(camio_msg_t));
 
-
-
     (void)fd;
-   // DBG("Done constructing BRING channel with fd=%i\n", fd);
+    DBG("Done constructing BRING channel with fd=%i\n", fd);
     //exit(1);
     return CAMIO_ENOERROR;
 
