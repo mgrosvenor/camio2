@@ -21,7 +21,6 @@
 
 #include <src/devices/controller.h>
 #include <src/camio.h>
-#include <src/camio_debug.h>
 
 #include <deps/chaste/utils/util.h>
 #include <deps/chaste/data_structs/circular_buffer/circular_buffer.h>
@@ -68,7 +67,7 @@ camio_error_t bring_channel_request( camio_controller_t* this, camio_msg_t* req_
         return CAMIO_EINVALID;
     }
 
-    DBG("Bring channel request done - %lli requests added\n", *vec_len_io);
+    //DBG("Bring channel request done - %lli requests added\n", *vec_len_io);
 
     //DBG("Bring channel request added!\n");
     return CAMIO_ENOERROR;
@@ -390,7 +389,7 @@ static camio_error_t bring_connect_peek(camio_controller_t* this)
 
         __sync_synchronize();
         if(priv->bring_head->magic == (volatile ch_word)BRING_MAGIC_CLIENT){
-            DBG("Head magic found!\n");
+            //DBG("Head magic found!\n");
             return CAMIO_ENOERROR;
         }
 
@@ -414,7 +413,7 @@ static camio_error_t bring_channel_ready(camio_muxable_t* this)
 
     //DBG("req_queue count=%lli\n", priv->chan_req_queue->count);
     if(priv->chan_req_queue->count == 0){
-        DBG("No channel requests yet received\n");
+        //DBG("No channel requests yet received\n");
         return CAMIO_ETRYAGAIN;
     }
 
@@ -423,15 +422,15 @@ static camio_error_t bring_channel_ready(camio_muxable_t* this)
 
 static camio_error_t bring_channel_result(camio_controller_t* this, camio_msg_t* res_vec, ch_word* vec_len_io )
 {
-    DBG("Getting bring connect result\n");
+    //DBG("Getting bring connect result\n");
     bring_controller_priv_t* priv = CONTROLLER_GET_PRIVATE(this);
 
     //Is there any data waiting? If not, try to get some
     if(unlikely(priv->chan_req_queue->count <= 0)){
-        DBG("No requests have been added, are you sure you called request first?\n");
+        //DBG("No requests have been added, are you sure you called request first?\n");
         camio_error_t err = bring_connect_peek(this);
         if(err){
-            DBG("There are no channels available to return. Did you use chan_ready()?\n");
+            //DBG("There are no channels available to return. Did you use chan_ready()?\n");
             *vec_len_io = 0;
             return err;
         }
@@ -456,7 +455,7 @@ static camio_error_t bring_channel_result(camio_controller_t* this, camio_msg_t*
         camio_chan_res_t* res = &res_vec[i].ch_res;
 
         if(priv->is_connected){
-            DBG("Only channel already supplied! No more channels available\n");
+            //DBG("Only channel already supplied! No more channels available\n");
             res->status = CAMIO_EALLREADYCONNECTED; // We're already connected!
             //Error code is in the request, the result is returned successfully even though the result was not a success
             continue;
@@ -477,10 +476,10 @@ static camio_error_t bring_channel_result(camio_controller_t* this, camio_msg_t*
         }
 
         priv->is_connected = true;
-        DBG("Done returning channel result\n");
+        //DBG("Done returning channel result\n");
     }
 
-    DBG("Returning %lli channel results\n", count);
+    //DBG("Returning %lli channel results\n", count);
     return CAMIO_ENOERROR;
 
 }

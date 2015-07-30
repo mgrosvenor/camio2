@@ -12,8 +12,8 @@
 
 #include "mux.h"
 #include <src/types/muxable_vec.h>
-#include <src/camio_debug.h>
 #include <sys/time.h>
+#include <deps/chaste/utils/debug.h>
 
 typedef struct {
     CH_VECTOR(CAMIO_MUXABLE_VEC)* muxables;
@@ -87,7 +87,7 @@ camio_error_t spin_select(camio_mux_t* this, struct timeval* timeout, camio_muxa
         for(ch_word i = 0; i < muxables->count; i++,
             priv->idx = priv->idx >= muxables->count - 1 ? 0 : priv->idx + 1){
 
-            //usleep(1); //-- Slow things down for debugging
+            //usleep(1000 * 731); //-- Slow things down for debugging
 
             if(timeout){ //Only check this if we really want the timeout
                 gettimeofday(&now, NULL);
@@ -106,7 +106,7 @@ camio_error_t spin_select(camio_mux_t* this, struct timeval* timeout, camio_muxa
                 continue;  //Nothing more to see here folks, come back later
             }
 
-            DBG("Found ready item at index %i with error code=%i\n", priv->idx, err);
+            //DBG("Found ready item at index %i with error code=%i\n", priv->idx, err);
 
 
             //-------------------------------------------------------------------------------------------------------------

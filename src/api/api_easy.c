@@ -9,8 +9,8 @@
  *  <INSERT DESCRIPTION HERE> 
  */
 #include "api_easy.h"
-#include <src/camio_debug.h>
 #include <assert.h>
+#include <deps/chaste/utils/debug.h>
 
 camio_error_t camio_channel_new(char* uri, camio_channel_t** channel)
 {
@@ -86,7 +86,7 @@ camio_error_t camio_channel_new(char* uri, camio_channel_t** channel)
        return CAMIO_ETOOMANY;
    }
    if(msg.ch_res.status){
-       return DBG("Error getting channel response. Err=%i\n", msg.ch_res.status);
+       DBG("Error getting channel response. Err=%i\n", msg.ch_res.status);
        return msg.ch_res.status;
    }
 

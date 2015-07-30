@@ -11,7 +11,6 @@
 
 #include <stdio.h>
 #include <src/api/api_easy.h>
-#include <src/camio_debug.h>
 #include <deps/chaste/chaste.h>
 
 #include "camio_perf_client.h"

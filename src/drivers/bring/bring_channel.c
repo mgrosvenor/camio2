@@ -19,7 +19,6 @@
 #include <src/buffers/buffer_malloc_linear.h>
 #include <deps/chaste/utils/util.h>
 #include <src/api/api.h>
-#include <src/camio_debug.h>
 #include <deps/chaste/data_structs/circular_buffer/circular_buffer.h>
 
 #include "bring_channel.h"
@@ -28,9 +27,14 @@
 /**************************************************************************************************************************
  * PER CHANNEL STATE
  **************************************************************************************************************************/
-#define CAMIO_BRING_BUFFER_SIZE (4 * 1024 * 1024)
+//#define CAMIO_BRING_BUFFER_SIZE (4 * 1024 * 1024)
 //Current (simple) BRING recv only does one buffer at a time, this could change with vectored I/O in the future.
-#define CAMIO_BRING_BUFFER_COUNT (1)
+//#define CAMIO_BRING_BUFFER_COUNT (1)
+
+
+#define BRING_SYNC_START 0x2ULL
+#define BRING_SYNC_BUFF_EMPTY 0x0ULL
+#define BRING_SYNC_BUFF_RXD   0x1ULL
 
 typedef struct bring_channel_priv_s {
     camio_controller_t controller;
@@ -58,7 +62,7 @@ typedef struct bring_channel_priv_s {
     ch_word wr_buffers_count;
     ch_word wr_ready_curr;
 
-    ch_word wr_sync_counter;        //Synchronization counter
+    ch_word wr_sync_counter;        //Synchronization counter. The assumptions is that this will never wrap around.
     ch_word wr_slot_size;           //Size of each slot in the ring
     ch_word wr_slot_count;          //Number of slots in the ring
 
@@ -155,8 +159,8 @@ static camio_error_t bring_read_buffer_ready(camio_muxable_t* this)
     //DBG("Doing read buffer ready\n");
 
     //Try to fill as many read requests as we can
-    camio_msg_t* msg = NULL;
-    for( msg = cbuff_use_front(priv->rd_buff_queue); msg != NULL; msg = cbuff_use_front(priv->rd_buff_queue)){
+    camio_msg_t* msg = cbuff_use_front(priv->rd_buff_queue);
+    for(; msg != NULL; msg = cbuff_use_front(priv->rd_buff_queue)){
 
         //Sanity check the message first
         if(msg->type == CAMIO_MSG_TYPE_IGNORE){
@@ -165,6 +169,9 @@ static camio_error_t bring_read_buffer_ready(camio_muxable_t* this)
 
         if(msg->type != CAMIO_MSG_TYPE_READ_BUFF_REQ){
             ERR("Expected a read buffer request message (%i) but got %i instead.\n",CAMIO_MSG_TYPE_READ_BUFF_REQ, msg->type);
+            DBG("!!!!!\n");
+            exit(255);
+
             continue;
         }
 
@@ -191,7 +198,7 @@ static camio_error_t bring_read_buffer_ready(camio_muxable_t* this)
         volatile ch_word seq_no = get_head_seq(priv->rd_buffers,priv->rd_acq_index);
 
         //Check if there is new data
-        if(likely(seq_no == 0)){
+        if(likely(seq_no == BRING_SYNC_BUFF_EMPTY || seq_no == BRING_SYNC_BUFF_RXD )){
             break; //There is no data available. Exit the loop which will return ETRYAGAIN
         }
 
@@ -225,7 +232,7 @@ static camio_error_t bring_read_buffer_ready(camio_muxable_t* this)
         res->buffer->valid                = true;
         res->buffer->__internal.__in_use  = true;
 
-        DBG("Got new data size = %lli acq_index=%lli buffers_count=%lli result msg=%p msg_typ=%i\n",
+        DBG("New data ready! size = %lli acq_index=%lli buffers_count=%lli result msg=%p msg_typ=%i\n",
                 data_size, priv->rd_acq_index, priv->rd_buffers_count, msg, msg->type);
 
         //And increment everything to look for the next one
@@ -239,7 +246,7 @@ static camio_error_t bring_read_buffer_ready(camio_muxable_t* this)
     }
 
     if(msg != NULL){
-        //DBG("Freeing unused request %p\n", msg);
+//        DBG("Freeing unused request %p\n", msg);
         cbuff_unuse_front(priv->rd_buff_queue);
     }
 
@@ -248,13 +255,13 @@ static camio_error_t bring_read_buffer_ready(camio_muxable_t* this)
         return CAMIO_ETRYAGAIN;
     }
 
-    DBG("There are %lli new buffer to read from\n", priv->rd_buff_queue->in_use);
+    DBG(")))) There are %lli new buffers to read into\n", priv->rd_buff_queue->in_use);
     return CAMIO_ENOERROR;
 }
 
 static camio_error_t bring_read_buffer_result( camio_channel_t* this, camio_msg_t* res_vec, ch_word* vec_len_io )
 {
-    DBG("Trying to get read buffer result\n");
+    DBG("Getting read buffer result\n");
 
     bring_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this);
 
@@ -270,13 +277,10 @@ static camio_error_t bring_read_buffer_result( camio_channel_t* this, camio_msg_
     const ch_word count = MIN(priv->rd_buff_queue->in_use, *vec_len_io);
     *vec_len_io = count;
     for(ch_word i = 0; i < count; i++, cbuff_pop_front(priv->rd_buff_queue) ){
-        camio_msg_t* msg = cbuff_peek_front(priv->rd_buff_queue);
 
+        camio_msg_t* msg = cbuff_peek_front(priv->rd_buff_queue);
         res_vec[i] = *msg;
         camio_rd_buff_res_t* res = &res_vec[i].rd_buff_res;
-
-        //DBG("msg=%p msg_typ=%i\n", msg, msg->type);
-
 
         //Sanity check the message first
         if(msg->type == CAMIO_MSG_TYPE_IGNORE){
@@ -286,23 +290,21 @@ static camio_error_t bring_read_buffer_result( camio_channel_t* this, camio_msg_
         }
 
         if(msg->type != CAMIO_MSG_TYPE_READ_BUFF_RES){
-            ERR("Expected a read buffer response message (%i) but got %i instead.\n",
-                    CAMIO_MSG_TYPE_READ_BUFF_RES, msg->type);
+            ERR("[%lli] Message %p - expected a read buffer response (%i) but got %i instead.\n",
+                    i, msg, CAMIO_MSG_TYPE_READ_BUFF_RES, msg->type);
 
             res_vec[i].type = CAMIO_MSG_TYPE_IGNORE;
             res->status = CAMIO_EINVALID;
             continue;
         }
 
-        //DBG("Got new data size = %lli acq_index=%lli/%lli result msg=%p msg_typ=%i\n",
-        //        res->buffer->data_len, res->buffer->__internal.__buffer_id, priv->rd_buffers_count, msg, msg->type);
-
-
         res->status = CAMIO_ENOERROR;
-        //DBG("Returning read buffer result data_start=%p, data_size=%lli\n", res_vec[i].rd_buff_res.buffer->data_start, res_vec[i].rd_buff_res.buffer->data_len );
+        DBG("Returning buffer result of size=%lli acq_index=%lli/%lli result msg=%p msg_typ=%i\n",
+                res->buffer->data_len, res->buffer->__internal.__buffer_id, priv->rd_buffers_count, msg, msg->type);
+
     }
 
-    DBG("Returning %lli read buffers\n", count);
+    DBG("**** There are now %lli read buffers ready for reading\n", count);
     return CAMIO_ENOERROR;
 }
 
@@ -323,7 +325,7 @@ static camio_error_t bring_read_buffer_release(camio_channel_t* this, camio_buff
     }
 
     //DBG("Trying to release buffer at index=%lli\n", priv->rd_rel_index);
-    set_head(priv->rd_buffers,priv->rd_rel_index,0,0);
+    set_head(priv->rd_buffers,priv->rd_rel_index,BRING_SYNC_BUFF_RXD,buffer->data_len);
 
     buffer->__internal.__in_use   = false;
     buffer->valid                 = false;
@@ -372,9 +374,8 @@ static camio_error_t bring_read_data_ready(camio_muxable_t* this)
     //DBG("Doing read ready\n");
 
     //Try to fill as many read requests as we can
-    camio_msg_t* msg = NULL;
-    for( msg = cbuff_use_front(priv->rd_req_queue); msg != NULL; msg = cbuff_use_front(priv->rd_req_queue)){
-        DBG("Got msg=%p\n", msg);
+    camio_msg_t* msg = cbuff_use_front(priv->rd_req_queue);
+    for(; msg != NULL; msg = cbuff_use_front(priv->rd_req_queue)){
 
         //Sanity check the message first
         if(msg->type == CAMIO_MSG_TYPE_IGNORE){
@@ -382,11 +383,9 @@ static camio_error_t bring_read_data_ready(camio_muxable_t* this)
         }
 
         if(msg->type != CAMIO_MSG_TYPE_READ_DATA_REQ){
-            ERR("Expected a read data request message (%i) but got %i instead.\n",CAMIO_MSG_TYPE_READ_DATA_REQ, msg->type);
+            ERR("Expected a read data request message (%i) but got %lli instead.\n",CAMIO_MSG_TYPE_READ_DATA_REQ, msg->type);
             continue;
         }
-
-
 
         camio_rd_data_req_t* req = &msg->rd_data_req;
         camio_rd_data_res_t* res = &msg->rd_data_res;
@@ -416,12 +415,12 @@ static camio_error_t bring_read_data_ready(camio_muxable_t* this)
             continue;
         }
 
-        DBG("Data is ready on msg=%p\n", msg);
+        //DBG("Data is ready on msg=%p\n", msg);
         res->status = CAMIO_ENOERROR; //TODO better error code here!
     }
 
     if(msg != NULL){
-        DBG("Freeing unused msg %p\n", msg);
+        //DBG("Freeing unused msg %p\n", msg);
         cbuff_unuse_front(priv->rd_req_queue);
     }
 
@@ -429,6 +428,8 @@ static camio_error_t bring_read_data_ready(camio_muxable_t* this)
         //DBG("There is nothing ready to read\n");
         return CAMIO_ETRYAGAIN;
     }
+
+    DBG("&&& There are now %lli new read datas available\n", priv->rd_req_queue->in_use);
 
     return CAMIO_ENOERROR;
 }
@@ -476,7 +477,7 @@ static camio_error_t bring_read_data_result( camio_channel_t* this, camio_msg_t*
         res->status = CAMIO_ECANNOTREUSE; //Let the user know that this is a once only buffer, it cannot be reused
     }
 
-    DBG("Returning %lli read data responses\n", count);
+    DBG("(((((( Returning %lli read data completions\n", count);
 
     return CAMIO_ENOERROR;
 }
@@ -491,8 +492,8 @@ static camio_error_t bring_read_data_result( camio_channel_t* this, camio_msg_t*
 //Ask for write buffers
 static camio_error_t bring_write_buffer_request(camio_channel_t* this, camio_msg_t* req_vec, ch_word* vec_len_io )
 {
-    DBG("Doing write buffer request\n");
     bring_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this);
+    DBG("Doing write buffer request. There are currently %lli items in the queue\n", priv->wr_buff_queue->count);
 
     if(unlikely(NULL == cbuff_push_back_carray(priv->wr_buff_queue, req_vec,vec_len_io))){
         ERR("Could not push any items on to queue.");
@@ -511,6 +512,7 @@ static camio_error_t bring_write_buffer_ready(camio_muxable_t* this)
 
     camio_msg_t* msg = cbuff_use_front(priv->wr_buff_queue);
     for( ; msg != NULL; msg = cbuff_use_front(priv->wr_buff_queue)){
+
         //Sanity check the message first
         if(msg->type == CAMIO_MSG_TYPE_IGNORE){
             continue; //We don't care about this message
@@ -521,25 +523,25 @@ static camio_error_t bring_write_buffer_ready(camio_muxable_t* this)
             continue;
         }
 
-        camio_wr_buff_res_t* res = &msg->wr_buff_res;
-        msg->type = CAMIO_MSG_TYPE_WRITE_BUFF_RES;
-
         //DBG("Trying to get buffer at index=%lli\n", priv->wr_buff_acq_idx);
 
         volatile ch_word seq_no = get_head_seq(priv->wr_buffers, priv->wr_buff_acq_idx);
 
-        if( seq_no != 0x00ULL){
+        if( seq_no != BRING_SYNC_BUFF_EMPTY){
             break;
         }
 
         //We have a request structure and a valid buffer, so we can return it
+        camio_wr_buff_res_t* res = &msg->wr_buff_res;
+        msg->type = CAMIO_MSG_TYPE_WRITE_BUFF_RES;
         res->buffer                       = &priv->wr_buffers[priv->wr_buff_acq_idx];
         res->buffer->data_start           = priv->wr_buffers[priv->wr_buff_acq_idx].__internal.__mem_start;
         res->buffer->data_len             = priv->wr_buffers[priv->wr_buff_acq_idx].__internal.__mem_len;
         res->buffer->valid                = true;
         res->buffer->__internal.__in_use  = true;
+        res->status = CAMIO_ENOERROR;
 
-        DBG("Got new buffer! acq_index=%lli buffers_count=%lli\n", priv->wr_buff_acq_idx, priv->wr_buffers_count);
+        //DBG("Got a free buffer! acq_index=%lli buffers_count=%lli\n", priv->wr_buff_acq_idx, priv->wr_buffers_count);
 
         //And increment everything to look for the next one
         priv->wr_buff_acq_idx++;
@@ -557,7 +559,7 @@ static camio_error_t bring_write_buffer_ready(camio_muxable_t* this)
         return CAMIO_ETRYAGAIN;
     }
 
-    //DBG("Current %lli new write requests outstanding to be consumed\n", priv->wr_buff_req_queue->in_use);
+    DBG("### There are now %lli new write buffers available and %lli items in total\n", priv->wr_buff_queue->in_use, priv->wr_buff_queue->count);
     return CAMIO_ENOERROR;
 }
 
@@ -592,20 +594,18 @@ camio_error_t bring_write_buffer_result(camio_channel_t* this, camio_msg_t* res_
         }
 
         res_vec[i] = *msg;
-        const camio_wr_data_res_t* res = &res_vec[i].wr_data_res;
+        const camio_wr_buff_res_t* res = &res_vec[i].wr_buff_res;
 
 
         if(res->status == CAMIO_ENOERROR){
-            DBG("Returning write buffer data_start=%p, data_size=%lli\n", res->buffer->data_start, res->buffer->data_len );
+            //DBG("Returning write buffer data_start=%p, data_size=%lli\n", res->buffer->data_start, res->buffer->data_len );
         }
         else{
-            DBG("Error returning write buffer result. Err=%i\n", msg->rd_data_res.status);
+            DBG("Error returning write buffer result. Err=%i\n", res->status);
         }
     }
 
-    DBG("Returning %lli write buffers\n", count);
-
-    //DBG("Returning a new write buffer. Data starts at %p\n", (*res_o)->buffer->data_start);
+    DBG("!!!! Returning %lli write buffers and %lli left. There are %lli outstanding\n", count, priv->wr_buff_queue->in_use, priv->wr_buff_queue->count);
     return CAMIO_ENOERROR;
 
 }
@@ -627,12 +627,17 @@ static camio_error_t bring_write_buffer_release(camio_channel_t* this, camio_buf
     }
 
     buffer->__internal.__in_use = false;
-    buffer->data_len            = -14;
-    buffer->data_start          = (void*)0xFF;
+    buffer->data_len            = 0;
+    buffer->data_start          = NULL;
+
+    set_head(priv->rd_buffers,priv->wr_rel_index,BRING_SYNC_BUFF_EMPTY,buffer->data_len);
+
     priv->wr_rel_index++;
     if(priv->wr_rel_index >= priv->wr_buffers_count){ //But loop around
         priv->wr_rel_index = 0;
     }
+
+
 
     //DBG("Done releasing write buffer\n");
 
@@ -649,18 +654,22 @@ static camio_error_t bring_write_buffer_release(camio_channel_t* this, camio_buf
 //the actual "write" is going to happen here
 static camio_error_t bring_write_data_request(camio_channel_t* this, camio_msg_t* req_vec, ch_word* vec_len_io)
 {
-   // DBG("Doing write request\n");
+
     bring_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this);
+    DBG("Doing write request -- there are currently %lli items in the queue\n", priv->wr_req_queue->count);
 
     //Trim so that we fit
     ch_word vec_len = *vec_len_io;
     if(vec_len > priv->wr_req_queue->size - priv->wr_req_queue->count){
+        DBG("Triming vec len was=%lli", vec_len);
         vec_len = priv->wr_req_queue->size - priv->wr_req_queue->count;
+        DBG2("now =%lli\n", vec_len);
+
     }
 
     //Try to perform the write requests
-    ch_word i = 0;
-    for(i = 0 ; i < vec_len; i++){
+    ch_word sent = 0;
+    for(ch_word i = 0 ; i < vec_len; i++){
          camio_msg_t* msg = &req_vec[i];
 
         //Sanity check the message first
@@ -669,7 +678,7 @@ static camio_error_t bring_write_data_request(camio_channel_t* this, camio_msg_t
         }
 
         if(msg->type != CAMIO_MSG_TYPE_WRITE_DATA_REQ){
-            ERR("Expected a write data request (%lli) but got %lli instead.\n",CAMIO_MSG_TYPE_WRITE_DATA_REQ, msg->type);
+            ERR("Expected a write data request (%i) but got %i instead.\n",CAMIO_MSG_TYPE_WRITE_DATA_REQ, msg->type);
             continue;
         }
 
@@ -678,8 +687,8 @@ static camio_error_t bring_write_data_request(camio_channel_t* this, camio_msg_t
         camio_buffer_t* buff = req->buffer;
         *vec_len_io = i;
 
-        DBG("Trying to process write data request of size %lli with data start=%p index=%lli\n",
-                req->buffer->data_len, req->buffer->data_start, req->buffer->__internal.__buffer_id);
+//        DBG("Trying to process write data request of size %lli with data start=%p index=%lli\n",
+//                req->buffer->data_len, req->buffer->data_start, req->buffer->__internal.__buffer_id);
 
         msg = cbuff_push_back(priv->wr_req_queue,msg);
         if(unlikely(!msg)){
@@ -708,6 +717,7 @@ static camio_error_t bring_write_data_request(camio_channel_t* this, camio_msg_t
                 priv->wr_out_index
             );
             res->status = CAMIO_EWRONGBUFF;
+            exit(1);
             continue;
         }
 
@@ -725,9 +735,10 @@ static camio_error_t bring_write_data_request(camio_channel_t* this, camio_msg_t
         //Make the write visible to the read side
         set_head(priv->wr_buffers,priv->wr_out_index,priv->wr_sync_counter,buff->data_len);
 
-        DBG("Write data request to idx=%lli of size %lli with data start=%p sent with seq=%lli\n",
-                priv->wr_out_index, req->buffer->data_len, req->buffer->data_start, priv->wr_sync_counter);
+//        DBG("Write data request to idx=%lli of size %lli with data start=%p sent with seq=%lli\n",
+//                priv->wr_out_index, req->buffer->data_len, req->buffer->data_start, priv->wr_sync_counter);
 
+        sent++;
         priv->wr_sync_counter++;
         priv->wr_out_index++;
         if(priv->wr_out_index >= (ch_word)priv->wr_buffers_count){
@@ -735,7 +746,7 @@ static camio_error_t bring_write_data_request(camio_channel_t* this, camio_msg_t
         }
     }
 
-    //DBG("Done adding new write requests there are %lli requests in flight\n", priv->wr_sync_counter -1);
+    DBG("^^^^ there are %lli write datas sent to the receiver from a total of %lli\n", sent, priv->wr_req_queue->count);
     return CAMIO_ENOERROR;
 }
 
@@ -746,8 +757,9 @@ static camio_error_t bring_write_data_ready(camio_muxable_t* this)
 {
     bring_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this->parent.channel);
 
-    camio_msg_t* msg = NULL;
-    for( msg = cbuff_use_front(priv->wr_req_queue); msg != NULL; msg = cbuff_use_front(priv->wr_req_queue)){
+    camio_msg_t* msg = cbuff_use_front(priv->wr_req_queue);
+    for(; msg != NULL; msg = cbuff_use_front(priv->wr_req_queue)){
+
         //Sanity check the message first
         if(msg->type == CAMIO_MSG_TYPE_IGNORE){
             continue; //We don't care about this message
@@ -767,12 +779,12 @@ static camio_error_t bring_write_data_ready(camio_muxable_t* this)
         const ch_word buff_idx = res->buffer->__internal.__buffer_id;
         volatile ch_word seq_no = get_head_seq(priv->wr_buffers, buff_idx);
 
-        if( seq_no != 0x00ULL){
+        if( seq_no != BRING_SYNC_BUFF_RXD){
             break;
         }
 
         volatile ch_word data_size = get_head_size(priv->wr_buffers, buff_idx);
-        DBG("Buffer at index=%lli is ready with %lli bytes written!\n", buff_idx, data_size);
+        //DBG("Buffer at index=%lli hass been read by the receiver. %lli bytes transfered!\n", buff_idx, data_size);
         res->written = data_size;
 
         //This is an auto release channel, once buffer is written out, it goes away, you'll need to acquire another
@@ -796,7 +808,7 @@ static camio_error_t bring_write_data_ready(camio_muxable_t* this)
         return CAMIO_ETRYAGAIN;
     }
 
-    //DBG("Currently %lli write requests ready to be consumed\n", priv->wr_req_queue->in_use);
+    DBG("$$$$ %lli write data requests have been RX'd. \n", priv->wr_req_queue->in_use);
     return CAMIO_ENOERROR;
 
 }
@@ -833,18 +845,20 @@ static camio_error_t bring_write_data_result(camio_channel_t* this, camio_msg_t*
         }
 
         res_vec[i] = *msg;
-        const camio_rd_data_res_t* res = &res_vec[i].rd_data_res;
+        const camio_wr_data_res_t* res = &res_vec[i].wr_data_res;
 
-
-        if(res->status == CAMIO_ENOERROR){
-            DBG("Returning write result data_start=%p, data_size=%lli\n", res->buffer->data_start, res->buffer->data_len );
+        if(res->status == CAMIO_ENOERROR ){
+            //DBG("Returning write result data_start=%p, data_size=%lli\n", res->buffer->data_start, res->buffer->data_len );
+        }
+        else if(res->status == CAMIO_EBUFFRELEASED){
+            //DBG("Returning write result [Buffer released!]\n" );
         }
         else{
-            DBG("Error returning write result. Err=%i\n", msg->rd_data_res.status);
+            DBG("Error returning write result. Err=%i\n", res->status);
         }
     }
 
-    DBG("Returning %lli write data responses\n", count);
+    DBG("@@@@ Returning %lli write data completion messages\n", count);
 
     return CAMIO_ENOERROR;
 }
@@ -961,8 +975,8 @@ camio_error_t bring_channel_construct(
         priv->rd_buffers             = tmp_buffers;
     }
 
-    priv->rd_sync_counter   = 1; //This is where we expect the first counter
-    priv->wr_sync_counter   = 1;
+    priv->rd_sync_counter   = 2; //This is where we expect the first counter
+    priv->wr_sync_counter   = 2;
 
 
     //TODO: Should wire in this parameter from the outside, 1024 will do for the moment.

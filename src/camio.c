@@ -13,7 +13,6 @@
 #include <stdarg.h>
 
 #include "camio.h"
-#include "camio_debug.h"
 #include "camio_init_all.h"
 #include <src/types/device_state_vec.h>
 #include <src/types/device_params_vec.h>

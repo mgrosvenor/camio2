@@ -5,7 +5,7 @@
  *      Author: mgrosvenor
  */
 #include "buffer_malloc_linear.h"
-#include "../camio_debug.h"
+#include <deps/chaste/utils/debug.h>
 
 typedef struct buffer_malloc_linear_s {
     ch_word buffer_size;

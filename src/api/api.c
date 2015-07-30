@@ -32,7 +32,6 @@
 #include <src/errors/camio_errors.h>
 #include "../types/types.h"
 #include "../buffers/buffer.h"
-#include "../camio_debug.h"
 #include "api.h"
 #include <deps/chaste/utils/util.h>
 

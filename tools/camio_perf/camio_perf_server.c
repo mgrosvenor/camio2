@@ -14,11 +14,11 @@
 #include <deps/chaste/chaste.h>
 
 #include <src/api/api_easy.h>
-#include <src/camio_debug.h>
 //#include <src/drivers/delimiter/delim_device.h>
 #include "camio_perf_packet.h"
 #include "camio_perf_server.h"
 #include "options.h"
+#include <deps/chaste/utils/debug.h>
 
 
 extern struct options_t options;
@@ -295,14 +295,14 @@ static camio_error_t get_new_buffers(camio_channel_t* channel)
 
 static camio_error_t on_new_channels(camio_muxable_t* muxable, camio_error_t err, void* usr_state, ch_word id)
 {
-    DBG("Handling got new connect\n");
+    //DBG("Handling got new connect\n");
 
     //Currently ignoring these values
     (void)usr_state;
     (void)id;
 
     if(err){
-        DBG("Unexpected error %lli\n", err);
+        ERR("Unexpected error %lli\n", err);
         return err;
     }
 
@@ -312,7 +312,7 @@ static camio_error_t on_new_channels(camio_muxable_t* muxable, camio_error_t err
         return err;
     }
 
-    DBG("Got %lli new channels\n", ctrl_msgs_len);
+    //DBG("Got %lli new channels\n", ctrl_msgs_len);
 
     if(ctrl_msgs_len == 0){
         DBG("Got no new connections?\n");
@@ -321,7 +321,7 @@ static camio_error_t on_new_channels(camio_muxable_t* muxable, camio_error_t err
 
     for(ch_word i = 0; i < ctrl_msgs_len; i++){
         if(ctrl_msgs[i].type == CAMIO_MSG_TYPE_IGNORE){
-            DBG("Ignoring connect response message at index %lli\n", i);
+            ERR("Ignoring connect response message at index %lli\n", i);
             continue;
         }
 
@@ -334,13 +334,13 @@ static camio_error_t on_new_channels(camio_muxable_t* muxable, camio_error_t err
 
         camio_chan_res_t* res = &ctrl_msgs[i].ch_res;
         if(res->status == CAMIO_EALLREADYCONNECTED){
-            DBG("No more connections on this controller\n", err);
+            //DBG("No more connections on this controller\n", err);
             camio_mux_remove(mux,muxable);
             return CAMIO_ENOERROR; //Bail out here. The controller is gone
         }
 
         if(res->status){
-            DBG("Could not get channel. Removing broken controller with error=%lli\n", err);
+            ERR("Could not get channel. Removing broken controller with error=%lli\n", err);
             camio_mux_remove(mux,muxable);
             return CAMIO_ENOERROR; //Bail out here. The controller is gone
         }
@@ -363,7 +363,7 @@ static camio_error_t on_new_channels(camio_muxable_t* muxable, camio_error_t err
 
 static camio_error_t get_new_channels()
 {
-    DBG("Trying to get some new channels\n");
+    //DBG("Trying to get some new channels\n");
     //Initialize a batch of messages
     for(int i = 0; i < MSGS_MAX; i++){
         ctrl_msgs[i].type = CAMIO_MSG_TYPE_CHAN_REQ;
@@ -371,14 +371,14 @@ static camio_error_t get_new_channels()
     }
 
     ctrl_msgs_len = MSGS_MAX;
-    DBG("Requesting %lli channel\n", MSGS_MAX);
+    //DBG("Requesting %lli channel\n", MSGS_MAX);
     camio_error_t err = camio_ctrl_chan_req(controller, ctrl_msgs, &ctrl_msgs_len);
 
     if(err){
-        DBG("Could not request channels with error %lli\n", err);
+        ERR("Could not request channels with error %lli\n", err);
         return err;
     }
-    DBG("Successfully issued %lli channel requests\n", ctrl_msgs_len);
+    //DBG("Successfully issued %lli channel requests\n", ctrl_msgs_len);
 
     return CAMIO_ENOERROR;
 }

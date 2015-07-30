@@ -13,8 +13,8 @@
 //#include <src/drivers/memfileio/mfio_device.h>
 //#include <src/drivers/stdio/stdio_device.h>
 #include <src/drivers/bring/bring_device.h>
+#include <deps/chaste/utils/debug.h>
 
-#include "camio_debug.h"
 #include "camio_init_all.h"
 
 // This is a dummy file to be filled in later with a compiler generated one. The aim is to have a configuration file that
