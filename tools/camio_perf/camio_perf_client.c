@@ -451,7 +451,7 @@ int camio_perf_clinet(ch_cstr client_channel_uri, ch_word* stop)
     DBG("Staring main loop\n");
     camio_muxable_t* muxable     = NULL;
 
-    while(!*stop){
+    while(!*stop && camio_mux_count(mux)){
 
         //Set up the start of sampling once we have a connection to a channel
         if(started && time_start_ns == -1){

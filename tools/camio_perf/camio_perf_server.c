@@ -418,7 +418,7 @@ int camio_perf_server(ch_cstr client_channel_uri, ch_word* stop)
     camio_muxable_t* muxable     = NULL;
 
 
-    while(!*stop){
+    while(!*stop && camio_mux_count(mux)){
 
         if(started && time_start_ns == -1){
             gettimeofday(&now, NULL);
