@@ -84,9 +84,9 @@ static inline ch_word get_head_seq(camio_buffer_t* buffers, ch_word idx)
     const ch_word slot_mem_sz  = buffers[idx].__internal.__mem_len;
     volatile char* hdr_mem     = slot_mem + slot_mem_sz;
     volatile bring_slot_header_t*  hdr = (volatile bring_slot_header_t*) hdr_mem;
-    __sync_synchronize();
+    //__sync_synchronize();
     volatile ch_word result = ~0;
-    __sync_synchronize();
+    //__sync_synchronize();
     result = *(volatile ch_word*)(&hdr->seq_no);
     __sync_synchronize();
 
@@ -100,11 +100,11 @@ static inline ch_word get_head_size(camio_buffer_t* buffers, ch_word idx)
     const ch_word slot_mem_sz  = buffers[idx].__internal.__mem_len;
     volatile char* hdr_mem     = slot_mem + slot_mem_sz;
     volatile bring_slot_header_t*  hdr = (volatile bring_slot_header_t*) hdr_mem;
-    __sync_synchronize();
+    //__sync_synchronize();
     volatile ch_word result = ~0;
-    __sync_synchronize();
+    //__sync_synchronize();
     result = *(volatile ch_word*)(&hdr->data_size);
-    __sync_synchronize();
+    //__sync_synchronize();
 
     return result;
 }
@@ -119,9 +119,9 @@ static inline void set_head(camio_buffer_t* buffers, ch_word idx, ch_word seq_no
     const ch_word slot_mem_sz  = buffers[idx].__internal.__mem_len;
     volatile char* hdr_mem     = slot_mem + slot_mem_sz;
     volatile bring_slot_header_t*  hdr = (volatile bring_slot_header_t*) hdr_mem;
-    __sync_synchronize();
+    //__sync_synchronize();
     *(volatile ch_word*)(&hdr->data_size) = data_size;
-    __sync_synchronize();
+    //__sync_synchronize();
     *(volatile ch_word*)(&hdr->seq_no) = seq_no;
     __sync_synchronize();
 

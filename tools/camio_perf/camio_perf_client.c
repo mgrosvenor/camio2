@@ -101,7 +101,7 @@ static camio_error_t on_new_wr_datas(camio_muxable_t* muxable, camio_error_t err
         return err;
     }
 
-    data_msgs_len = MSGS_MAX;
+    data_msgs_len = MIN(MSGS_MAX,options.batching);
     err = camio_chan_wr_data_res(muxable->parent.channel, data_msgs, &data_msgs_len );
     if(err){
         return err;
@@ -259,7 +259,7 @@ static camio_error_t on_new_wr_buffs(camio_muxable_t* muxable, camio_error_t err
         return err;
     }
 
-    data_msgs_len = MSGS_MAX;
+    data_msgs_len = MIN(MSGS_MAX,options.batching);
     err = camio_chan_wr_buff_res(muxable->parent.channel, data_msgs, &data_msgs_len);
     if(err){
         ERR("Could not get a writing buffers\n");
@@ -283,8 +283,8 @@ static camio_error_t get_new_buffers(camio_channel_t* channel)
         data_msgs[i].id = i;
     }
 
-    data_msgs_len = MSGS_MAX;
-    DBG("Requesting %lli wirte_buffs\n", MSGS_MAX);
+    data_msgs_len = MIN(MSGS_MAX,options.batching);
+    DBG("Requesting %lli wirte_buffs\n", data_msgs_len);
     camio_error_t err = camio_chan_wr_buff_req( channel, data_msgs, &data_msgs_len);
     if(err){
         DBG("Could not request buffers with error %lli\n", err);
@@ -388,12 +388,12 @@ static camio_error_t on_new_channels(camio_muxable_t* muxable, camio_error_t err
 static camio_error_t get_new_channels()
 {
     //Initialize a batch of messages
-    for(int i = 0; i < MSGS_MAX; i++){
+    for(int i = 0; i < MIN(MSGS_MAX,options.batching); i++){
         ctrl_msgs[i].type = CAMIO_MSG_TYPE_CHAN_REQ;
         ctrl_msgs[i].id = i;
     }
 
-    ctrl_msgs_len = MSGS_MAX;
+    ctrl_msgs_len = MIN(MSGS_MAX,options.batching);
     //DBG("Requesting %lli wirte_buffs\n", MSGS_MAX);
     camio_error_t err = camio_ctrl_chan_req(controller, ctrl_msgs, &ctrl_msgs_len);
 
@@ -487,11 +487,6 @@ int camio_perf_clinet(ch_cstr client_channel_uri, ch_word* stop)
         camio_mux_select(mux,NULL,&muxable);
 
     }
-
-//    if(wr_buffer){
-//        camio_write_release(tmp_channel,&wr_buffer);
-//    }
-
 
     return 0;
 

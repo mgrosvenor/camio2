@@ -122,7 +122,7 @@ static camio_error_t on_new_rd_datas(camio_muxable_t* muxable, camio_error_t err
         return err;
     }
 
-    data_msgs_len = MSGS_MAX;
+    data_msgs_len = MIN(MSGS_MAX,options.batching);
     err = camio_chan_rd_data_res(muxable->parent.channel, data_msgs, &data_msgs_len );
     if(err){
         return err;
@@ -220,7 +220,7 @@ static camio_error_t on_new_rd_buffs(camio_muxable_t* muxable, camio_error_t err
         return err;
     }
 
-    data_msgs_len = MSGS_MAX;
+    data_msgs_len = MIN(MSGS_MAX,options.batching);
     err = camio_chan_rd_buff_res(muxable->parent.channel, data_msgs, &data_msgs_len);
     if(err){
         ERR("Could not get a writing buffers\n");
@@ -269,7 +269,7 @@ static camio_error_t get_new_buffers(camio_channel_t* channel)
 {
 
     //Initialize a batch of messages to request some write buffers
-    for(int i = 0; i < MSGS_MAX; i++){
+    for(int i = 0; i < MIN(MSGS_MAX,options.batching); i++){
         data_msgs[i].type = CAMIO_MSG_TYPE_READ_BUFF_REQ;
         data_msgs[i].id = i;
         camio_rd_buff_req_t* req = &data_msgs[i].rd_buff_req;
@@ -278,8 +278,8 @@ static camio_error_t get_new_buffers(camio_channel_t* channel)
         req->read_size_hint  = CAMIO_READ_REQ_SIZE_ANY;
     }
 
-    data_msgs_len = MSGS_MAX;
-    DBG("Requesting %lli read_buffs\n", MSGS_MAX);
+    data_msgs_len = MIN(MSGS_MAX,options.batching);
+    DBG("Requesting %lli read_buffs\n", data_msgs_len);
     camio_error_t err = camio_chan_rd_buff_req( channel, data_msgs, &data_msgs_len);
     if(err){
         DBG("Could not request buffers with error %lli\n", err);
@@ -305,7 +305,7 @@ static camio_error_t on_new_channels(camio_muxable_t* muxable, camio_error_t err
         return err;
     }
 
-    ctrl_msgs_len = MSGS_MAX;
+    ctrl_msgs_len = MIN(MSGS_MAX,options.batching);
     err = camio_ctrl_chan_res(muxable->parent.controller, ctrl_msgs, &ctrl_msgs_len );
     if(err){
         return err;
@@ -364,12 +364,12 @@ static camio_error_t get_new_channels()
 {
     //DBG("Trying to get some new channels\n");
     //Initialize a batch of messages
-    for(int i = 0; i < MSGS_MAX; i++){
+    for(int i = 0; i < MIN(MSGS_MAX,options.batching); i++){
         ctrl_msgs[i].type = CAMIO_MSG_TYPE_CHAN_REQ;
         ctrl_msgs[i].id = i;
     }
 
-    ctrl_msgs_len = MSGS_MAX;
+    ctrl_msgs_len = MIN(MSGS_MAX,options.batching);
     //DBG("Requesting %lli channel\n", MSGS_MAX);
     camio_error_t err = camio_ctrl_chan_req(controller, ctrl_msgs, &ctrl_msgs_len);
 
