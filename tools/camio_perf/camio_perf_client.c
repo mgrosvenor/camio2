@@ -139,7 +139,7 @@ static camio_error_t on_new_wr_datas(camio_muxable_t* muxable, camio_error_t err
         intv_bytes +=  res->written;
         intv_samples++;
 
-        if(res->status != CAMIO_EBUFFRELEASED){
+        if(res->status == CAMIO_EBUFFRELEASED){
             DBG("Buffer at index [%lli] cannot be resused has been auto-released.\n", i);
             data_msgs[i].type = CAMIO_MSG_TYPE_IGNORE;
             continue;

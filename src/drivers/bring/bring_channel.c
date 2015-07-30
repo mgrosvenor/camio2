@@ -225,8 +225,8 @@ static camio_error_t bring_read_buffer_ready(camio_muxable_t* this)
         res->buffer->valid                = true;
         res->buffer->__internal.__in_use  = true;
 
-        //DBG("Got new data size = %lli acq_index=%lli buffers_count=%lli result msg=%p msg_typ=%i\n",
-        //        data_size, priv->rd_acq_index, priv->rd_buffers_count, msg, msg->type);
+        DBG("Got new data size = %lli acq_index=%lli buffers_count=%lli result msg=%p msg_typ=%i\n",
+                data_size, priv->rd_acq_index, priv->rd_buffers_count, msg, msg->type);
 
         //And increment everything to look for the next one
         priv->rd_sync_counter++;
@@ -451,7 +451,7 @@ static camio_error_t bring_read_data_result( camio_channel_t* this, camio_msg_t*
 
     const ch_word count = MIN(*vec_len_io, priv->rd_req_queue->in_use);
     *vec_len_io = count;
-    for(ch_word i = 0; i < count; i++){
+    for(ch_word i = 0; i < count; i++, cbuff_pop_front(priv->rd_req_queue)){
         camio_msg_t* msg = cbuff_peek_front(priv->rd_req_queue);
         //Sanity check the message first
         if(msg->type == CAMIO_MSG_TYPE_IGNORE){
@@ -465,8 +465,6 @@ static camio_error_t bring_read_data_result( camio_channel_t* this, camio_msg_t*
 
         res_vec[i] = *msg;
         camio_rd_data_res_t* res = &res_vec[i].rd_data_res;
-        cbuff_unuse_front(priv->rd_req_queue);
-        cbuff_pop_front(priv->rd_req_queue);
 
         if(res->status == CAMIO_ENOERROR){
             DBG("Returning read result data_start=%p, data_size=%lli\n", res->buffer->data_start, res->buffer->data_len );
@@ -581,7 +579,7 @@ camio_error_t bring_write_buffer_result(camio_channel_t* this, camio_msg_t* res_
 
     const ch_word count = MIN(*vec_len_io, priv->wr_buff_queue->in_use);
     *vec_len_io = count;
-    for(ch_word i = 0; i < count; i++){
+    for(ch_word i = 0; i < count; i++, cbuff_pop_front(priv->wr_buff_queue)){
         camio_msg_t* msg = cbuff_peek_front(priv->wr_buff_queue);
         //Sanity check the message first
         if(msg->type == CAMIO_MSG_TYPE_IGNORE){
@@ -595,8 +593,7 @@ camio_error_t bring_write_buffer_result(camio_channel_t* this, camio_msg_t* res_
 
         res_vec[i] = *msg;
         const camio_wr_data_res_t* res = &res_vec[i].wr_data_res;
-        cbuff_unuse_front(priv->wr_buff_queue);
-        cbuff_pop_front(priv->wr_buff_queue);
+
 
         if(res->status == CAMIO_ENOERROR){
             DBG("Returning write buffer data_start=%p, data_size=%lli\n", res->buffer->data_start, res->buffer->data_len );
@@ -681,10 +678,10 @@ static camio_error_t bring_write_data_request(camio_channel_t* this, camio_msg_t
         camio_buffer_t* buff = req->buffer;
         *vec_len_io = i;
 
-        //DBG("Trying to process write data request of size %lli with data start=%p index=%lli\n",
-        //        req->buffer->data_len, req->buffer->data_start, req->buffer->__internal.__buffer_id);
+        DBG("Trying to process write data request of size %lli with data start=%p index=%lli\n",
+                req->buffer->data_len, req->buffer->data_start, req->buffer->__internal.__buffer_id);
 
-        msg = cbuff_push_back(priv->wr_req_queue,req);
+        msg = cbuff_push_back(priv->wr_req_queue,msg);
         if(unlikely(!msg)){
             ERR("Could not push item on to queue??");
             return CAMIO_EINVALID; //Exit now, this is unrecoverable
@@ -761,9 +758,6 @@ static camio_error_t bring_write_data_ready(camio_muxable_t* this)
             continue;
         }
 
-
-
-        //DBG("Checking if buffer at index=%lli is ready\n", buff_idx);
         camio_wr_data_res_t* res = &msg->wr_data_res;
         if(res->status){
             //An error was detected, so there's no point in going on with this request.
@@ -825,7 +819,7 @@ static camio_error_t bring_write_data_result(camio_channel_t* this, camio_msg_t*
 
     const ch_word count = MIN(*vec_len_io, priv->wr_req_queue->in_use);
     *vec_len_io = count;
-    for(ch_word i = 0; i < count; i++){
+    for(ch_word i = 0; i < count; i++, cbuff_pop_front(priv->wr_req_queue)){
         camio_msg_t* msg = cbuff_peek_front(priv->wr_req_queue);
 
         //Sanity check the message first
@@ -841,8 +835,6 @@ static camio_error_t bring_write_data_result(camio_channel_t* this, camio_msg_t*
         res_vec[i] = *msg;
         const camio_rd_data_res_t* res = &res_vec[i].rd_data_res;
 
-        cbuff_unuse_front(priv->wr_req_queue);
-        cbuff_pop_front(priv->wr_req_queue);
 
         if(res->status == CAMIO_ENOERROR){
             DBG("Returning write result data_start=%p, data_size=%lli\n", res->buffer->data_start, res->buffer->data_len );
