@@ -70,11 +70,11 @@ static camio_error_t delim_channel_result(camio_controller_t* this, camio_msg_t*
 
     DBG("Getting result from base controller\n");
     camio_error_t err = camio_ctrl_chan_res(priv->base,res_vec,vec_len_io);
-    if(err){
+    if(unlikely(err)){
         DBG("Base controller returned error=%i\n", err);
         return err;
     }
-    if(0 == *vec_len_io){
+    if(unlikely(0 == *vec_len_io)){
         DGB("WTF? Base controller returned no new channels and no error\n");
         return CAMIO_EINVALID; //TODO XXX -- better error code
     }
@@ -84,17 +84,17 @@ static camio_error_t delim_channel_result(camio_controller_t* this, camio_msg_t*
     ch_word channels = 0;
     for(ch_word i = 0; i < *vec_len_io; i++){
         //Do a bunch of sanity checking -- should probably compile this stuff out for high speed runtime
-        if(res_vec[i].type == CAMIO_MSG_TYPE_IGNORE){
+        if(unlikely(res_vec[i].type == CAMIO_MSG_TYPE_IGNORE)){
             DBG("Ignoring message at index %lli\n", i);
             continue;
         }
-        if(res_vec[i].type != CAMIO_MSG_TYPE_CHAN_RES){
+        if(unlikely(res_vec[i].type != CAMIO_MSG_TYPE_CHAN_RES)){
             DBG("Expected a channel response message (%i) at index %lli but got %i\n",
                     CAMIO_MSG_TYPE_CHAN_RES, i, res_vec[i].type);
             continue;
         }
         camio_chan_res_t res = &res_vec[i].ch_res;
-        if(!res.channel){
+        if(unlikely(!res.channel)){
             DBG("Expected a channel response, but got NULL and no error?\n");
             res->status = CAMIO_EINVALID;
             continue;
@@ -103,7 +103,7 @@ static camio_error_t delim_channel_result(camio_controller_t* this, camio_msg_t*
         //OK. We can be pretty sure that we have a valid channel from the base controller. Try to make a delimiter for it.
         DBG("Making new delimiter channel at index %lli\n", i);
         camio_channel_t* delim_channel = NEW_CHANNEL(delim);
-        if(!delim_channel){
+        if(unlikely(!delim_channel)){
             ERR("No memory for new delimiter\n"); //EEk! Ok, bug out
             camio_channel_destroy(res->channel);
             res->status = CAMIO_ENOMEM;
@@ -113,7 +113,7 @@ static camio_error_t delim_channel_result(camio_controller_t* this, camio_msg_t*
         //Nice, we have memory and a delimiter channel. Set everything up for it
         DBG("Done Constructing delimiter with delimfn=%p\n", priv->params->delim_fn);
         err = delim_channel_construct(delim_channel,this,res->channel, priv->params->delim_fn);
-        if(err){
+        if(unlieky(err)){
             DBG("Unexpected error construction delimiter\n");
             res->status = err;
             continue;
@@ -163,13 +163,13 @@ static camio_error_t delim_construct(camio_controller_t* this, void** params, ch
         &priv->base_params_size,
         &priv->base_id
     );
-    if(err){
+    if(unlikely(err)){
         DBG("Uh ohh, got %lli error trying to make base controller parameters\n",err);
         return err;
     }
 
     err = camio_device_constr(priv->base_id,&priv->base_params,priv->base_params_size,&priv->base);
-    if(err){
+    if(unlikely(err)){
         DBG("Uh ohh, got %lli error trying to construct base controller\n",err);
         return err;
     }

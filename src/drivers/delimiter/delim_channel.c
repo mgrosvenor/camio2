@@ -36,6 +36,9 @@ typedef struct delim_channel_priv_s {
     camio_buffer_t rd_result_buff;
 
     //The base variables are used to gather data from the underlying channel
+    ch_cbuff_t* rd_buff_q;      //queue for inbound read buffer requests
+    ch_cbuff_t* rd_data_q;      //queue for inbound read data requests
+
 //    camio_buffer_t* rd_base_buff;
 //    camio_rd_req_t* rd_base_req_vec;
 //    ch_word rd_base_req_vec_len;
@@ -51,8 +54,23 @@ typedef struct delim_channel_priv_s {
 
 
 /**************************************************************************************************************************
- * READ FUNCTIONS
+ * READ FUNCTIONS - READ BUFFER REQUEST
  **************************************************************************************************************************/
+static camio_error_t delim_read_buffer_request(camio_channel_t* this, camio_msg_t* req_vec, ch_word* vec_len_io )
+{
+    DBG("Doing delim read buffer request...!\n");
+    delim_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this);
+
+    if(unlikely(NULL == cbuff_push_back_carray(priv->rd_buff_q, req_vec, vec_len_io))){
+        ERR("Could not push any items on to queue.");
+        return CAMIO_EINVALID;
+    }
+
+    DBG("delim read buffer request done - %lli requests added\n", *vec_len_io);
+    return CAMIO_ENOERROR;
+}
+
+
 static void delim_read_close(camio_channel_t* this){
     delim_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this);
     if(!priv->is_rd_closed){
@@ -434,7 +452,7 @@ static camio_error_t delim_read_release(camio_channel_t* this, camio_rd_buffer_t
     }
     DBG("Failed to delimit, will have to move memory\n");
 
-    //Nope. No success with the delimiter. Looks like we have to move stuff arround. Move waht we have right back to the
+    //Nope. No success with the delimiter. Looks like we have to move stuff around. Move waht we have right back to the
     //beginning of the working buffer. First make sure that the buffer is big enough
     camio_error_t err = grow_working_buff(priv);
     if (err){
@@ -462,76 +480,64 @@ reset_and_exit:
     return CAMIO_ENOERROR;
 }
 
+/**************************************************************************************************************************
+ * READ FUNCTIONS - READ DATA REQUESTS
+ **************************************************************************************************************************/
 
+static camio_error_t delim_read_data_request(camio_channel_t* this, camio_msg_t* req_vec, ch_word* vec_len_io )
+{
+    DBG("Doing delim read request...!\n");
+    delim_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this);
+
+    if(unlikely(NULL == cbuff_push_back_carray(priv->rd_data_q, req_vec,vec_len_io))){
+        ERR("Could not push any items on to queue.");
+        return CAMIO_EINVALID;
+    }
+
+    DBG("delim read data request done - %lli requests added\n", *vec_len_io);
+    return CAMIO_ENOERROR;
+}
 
 
 /**************************************************************************************************************************
- * WRITE FUNCTIONS
+ * WRITE FUNCTIONS -- These just all pass through to the underlying
  **************************************************************************************************************************/
-static camio_error_t delim_write_ready(camio_muxable_t* this)
+
+static camio_error_t delim_write_buffer_request(camio_channel_t* this, camio_msg_t* req_vec, ch_word* vec_len_io)
 {
-    //DBG("Doing write ready\n");
-    //Basic sanity checks -- TODO DELIM: Should these be made into (compile time optional?) asserts for runtime performance?
-    if( NULL == this){
-        ERR("This is null???\n"); //WTF?
-        return CAMIO_EINVALID;
-    }
-
-    if( this->mode != CAMIO_MUX_MODE_WRITE){
-        ERR("Wrong kind of muxable!\n"); //WTF??
-        return CAMIO_EINVALID;
-    }
-
-
-    //OK now the fun begins
-    delim_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this->parent.channel);
-
-    return camio_write_ready(priv->base);
-
-}
-
-static camio_error_t delim_write_acquire(camio_channel_t* this, camio_wr_buffer_t** buffer_o)
-{
-    DBG("Doing write acquire\n");
-
-    //Basic sanity checks -- TODO DELIM: Should these be made into (compile time optional?) asserts for runtime performance?
-    if( NULL == this){
-        ERR("This null???\n"); //WTF?
-        return CAMIO_EINVALID;
-    }
     delim_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this);
-
-    return camio_write_acquire(priv->base,buffer_o);
+    return camio_chan_wr_buff_req(priv->base,req_vec,vec_len_io);
 }
 
-
-static camio_error_t delim_write_request(camio_channel_t* this, camio_wr_req_t* req_vec, ch_word req_vec_len)
+static camio_error_t delim_write_buffer_ready(camio_muxable_t* this)
 {
-    //Basic sanity checks -- TODO DELIM: Should these be made into (compile time optional?) asserts for runtime performance?
-    if( NULL == this){
-        ERR("This is null???\n"); //WTF?
-        return CAMIO_EINVALID;
-    }
     delim_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this);
-    return camio_write_request(priv->base,req_vec,req_vec_len);
+    return camio_chan_wr_buff_ready(priv->base);
 }
 
-
-static camio_error_t delim_write_release(camio_channel_t* this, camio_wr_buffer_t** buffer_chain)
+static inline camio_error_t delim_write_buffer_result(camio_channel_t* this, camio_msg_t* res_vec, ch_word* vec_len_io)
 {
-    DBG("Doing delimiter write release\n");
-    //Basic sanity checks -- TODO DELIM: Should these be made into (compile time optional?) asserts for runtime performance?
-    if( NULL == this){
-        ERR("This null???\n"); //WTF?
-        return CAMIO_EINVALID;
-    }
     delim_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this);
-    return camio_write_release(priv->base,buffer_chain);
+    return camio_chan_wr_buff_res(priv->base,res_vec,vec_len_io);
 }
 
+static camio_error_t delim_write_data_request(camio_channel_t* this, camio_msg_t* req_vec, ch_word* vec_len_io)
+{
+    delim_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this);
+    return camio_chan_wr_data_req(priv->base,req_vec,vec_len_io);
+}
 
+static camio_error_t delim_write_data_ready(camio_muxable_t* this)
+{
+    delim_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this);
+    return camio_chan_wr_data_ready(priv->base);
+}
 
-
+static inline camio_error_t delim_write_data_result(camio_channel_t* this, camio_msg_t* res_vec, ch_word* vec_len_io)
+{
+    delim_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this);
+    return camio_chan_wr_data_res(priv->base,res_vec,vec_len_io);
+}
 
 /**************************************************************************************************************************
  * SETUP/CLEANUP FUNCTIONS
