@@ -112,7 +112,7 @@ static camio_error_t delim_channel_result(camio_controller_t* this, camio_msg_t*
 
         //Nice, we have memory and a delimiter channel. Set everything up for it
         DBG("Done Constructing delimiter with delimfn=%p\n", priv->params->delim_fn);
-        err = delim_channel_construct(delim_channel,this,res->channel, priv->params->delim_fn);
+        err = delim_channel_construct(delim_channel,this,res->channel, priv->params->delim_fn, priv->params->rd_buffs);
         if(unlieky(err)){
             DBG("Unexpected error construction delimiter\n");
             res->status = err;
@@ -145,10 +145,15 @@ static camio_error_t delim_construct(camio_controller_t* this, void** params, ch
         DBG("Bad parameters structure passed\n");
         return CAMIO_EINVALID; //TODO DELIM : Need better error values
     }
-    delim_params_t* delim_params = (delim_params_t*)(*params);
 
+    //Sanity check the paramters
+    delim_params_t* delim_params = (delim_params_t*)(*params);
     if(delim_params->delim_fn == NULL){
         DBG("Delimiter function is not populated. Cannot continue!\n");
+        return CAMIO_EINVALID; //TODO XXX -- better errors
+    }
+    if(delim_params->rd_buffs <= 0){
+        DBG("Read buffers count must be > 0 Cannot continue!\n");
         return CAMIO_EINVALID; //TODO XXX -- better errors
     }
 
@@ -174,7 +179,6 @@ static camio_error_t delim_construct(camio_controller_t* this, void** params, ch
         return err;
     }
 
-
     this->muxable.fd = priv->base->muxable.fd; //Pass this out, but retain the ready function.
                                                //Smells a bit bad, but is probably ok.
 
@@ -187,9 +191,7 @@ static void delim_destroy(camio_controller_t* this)
 {
     DBG("Destroying delim controller...\n");
     delim_controller_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
-
     if(priv->base){ camio_controller_destroy(priv->base); }
-
     if(priv->params) { free(priv->params); }
     free(this);
     DBG("Done destroying delim controller structure\n");

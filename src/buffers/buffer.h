@@ -30,7 +30,6 @@ typedef enum camio_buffer_timestamp_e {
 //TODO XXX: Hide this from consumers by putting the definition in another file
 typedef struct camio_buffer_internal_s {
     ch_bool __in_use;                   //Is the buffer in use? If not, it can be reserved by someone
-    ch_bool __read_only;                //For read buffers to protect against copying. Not bullet proof, but no harm
     ch_word __pool_id;                 //Undefined if there is no data
     ch_word __buffer_id;               //Undefined if there is no data
 

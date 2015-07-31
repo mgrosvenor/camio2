@@ -20,7 +20,8 @@ camio_error_t delim_channel_construct(
     camio_channel_t* this,
     camio_controller_t* controller,
     camio_channel_t* base_channel,
-    ch_word (*delim_fn)(char* buffer, ch_word len)
+    ch_word (*delim_fn)(char* buffer, ch_word len),
+    ch_word rd_buffs_count
 );
 
 #endif /* SRC_DRIVERS_DELIM_DELIM_CHANNEL_H_ */

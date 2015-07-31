@@ -23,6 +23,7 @@
 typedef struct {
     char* base_uri; //URI for the base channel that this will be delimiting
     ch_word (*delim_fn)(char* buffer, ch_word len); //Delimiting function
+    ch_word rd_buffs;
 } delim_params_t;
 
 void delim_init();
