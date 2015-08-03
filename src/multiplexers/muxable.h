@@ -6,7 +6,7 @@
  *  Created:   Aug 17, 2014
  *  File name: muxable.h
  *  Description:
- *  Every channel and controller implements a "muxable" interface. This interface allows the channel or controller to be put
+ *  Every channel and device implements a "muxable" interface. This interface allows the channel or device to be put
  *  into a "muxor object" for runtime nonblocking multiplexing of devices
  */
 
@@ -21,7 +21,7 @@ typedef enum {
     CAMIO_MUX_MODE_READ_BUFF,    //Selector will fire when muxable is ready to give a new buffer
     CAMIO_MUX_MODE_WRITE_BUFF,   //Selector will fire when muxable is ready to give a new buffer
     CAMIO_MUX_MODE_WRITE_DATA,   //Selector will fire when muxable is ready to write
-    CAMIO_MUX_MODE_CONNECT,      //Selector will fire when muxable is ready to connect
+    CAMIO_MUX_MODE_CONNECT,      //Selector will fire when muxable is ready to devect
 } camio_mux_mode_e;
 
 /**
@@ -58,11 +58,11 @@ typedef struct camio_muxable_s {
     camio_mux_mode_e mode;
 
     /**
-     * Gives access back to the channel or controller (figure out which by looking at the mux_mode above
+     * Gives access back to the channel or device (figure out which by looking at the mux_mode above
      */
     union{
         camio_channel_t*    channel;
-        camio_controller_t* controller;
+        camio_device_t* device;
     } parent;
 
     //Let users keep a pointer to some local state, this is ignored by CamIO

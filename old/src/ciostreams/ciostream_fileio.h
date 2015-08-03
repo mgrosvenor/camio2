@@ -9,7 +9,7 @@
 #include "ciochannel.h"
 #include "../types/types.h"
 
-int new_cioconn_fileio( uri* uri_parsed , struct cioconn_s** cioconn_o, void** global_data );
+int new_ciodev_fileio( uri* uri_parsed , struct ciodev_s** ciodev_o, void** global_data );
 
 
 #endif /* CIOCHANNEL_FILEIO_H_ */

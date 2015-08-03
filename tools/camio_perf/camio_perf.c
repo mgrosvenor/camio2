@@ -32,7 +32,7 @@ int main(int argc, char** argv)
     #endif
 
     DBG("Starting camio perf!\n");
-    ch_opt_addsi(CH_OPTION_OPTIONAL, 'c', "client","name or that the client should connect to", &options.client, NULL);
+    ch_opt_addsi(CH_OPTION_OPTIONAL, 'c', "client","name or that the client should devect to", &options.client, NULL);
     ch_opt_addsi(CH_OPTION_OPTIONAL, 's', "server","put camio_perf in server mode", &options.server, NULL);
     ch_opt_addii(CH_OPTION_OPTIONAL, 'l', "len","max length of read/write buffer. This may be smaller\n", &options.len, 8 * 1024);
     ch_opt_addii(CH_OPTION_OPTIONAL, 'b', "batching","Amount of batching to apply. This will affect the latency vs. throughput\n", &options.batching, 8);

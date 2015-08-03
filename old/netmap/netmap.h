@@ -442,7 +442,7 @@ struct netmap_if {
  *		as in vale-ctl -h ...
  *
  *	NETMAP_BDG_DETACH	and nr_name = vale*:ifname
- *		disconnects a previously attached NIC.
+ *		disdevects a previously attached NIC.
  *		Used by vale-ctl -d ...
  *
  *	NETMAP_BDG_LIST

@@ -12,7 +12,7 @@
 #define SRC_DRIVERS_BRING_BRING_CHANNEL_H_
 
 #include <src/devices/channel.h>
-#include <src/devices/controller.h>
+#include <src/devices/device.h>
 #include <src/types/len_string.h>
 
 NEW_CHANNEL_DECLARE(bring);
@@ -63,7 +63,7 @@ typedef struct {
 
 camio_error_t bring_channel_construct(
     camio_channel_t* this,
-    camio_controller_t* controller,
+    camio_device_t* device,
     volatile bring_header_t* bring_head,
     bring_params_t* params,
     int fd

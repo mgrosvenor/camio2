@@ -52,7 +52,7 @@ struct ciostrm_s {
 
     /**
      * This function tries to do a non-blocking read for new data from the CamIO Stream called “this” and return slot info
-     * pointer called “slot”. If the channel is empty, (e.g. end of file) or closed (e.g. disconnected) it is valid to return
+     * pointer called “slot”. If the channel is empty, (e.g. end of file) or closed (e.g. disdevected) it is valid to return
      * 0 bytes.
      * Return values:
      * - ENOERROR:  Completed successfully, sloto contains a valid structure.
@@ -103,7 +103,7 @@ struct ciostrm_s {
     int (*release)(ciostrm* this, cioslot* slot_i);
 
     /**
-     * Free resources associated with this channel, but not with its controller. 
+     * Free resources associated with this channel, but not with its device. 
      */
     void (*destroy)(ciostrm* this);
 
@@ -126,7 +126,7 @@ struct ciostrm_s {
 
 };
 
-struct cioconn_s {
+struct ciodev_s {
     /**
      * Return the the selectable structure for adding into a selector
      */
@@ -134,8 +134,8 @@ struct cioconn_s {
 
 
     /**
-     * Non-blocking attempt to connect the underlying channel to it’s data source. If successful, the CamIO channel can be read
-     *  and/or written to. In many cases, the connect operation will return immediately, with a valid channel once only.
+     * Non-blocking attempt to devect the underlying channel to it’s data source. If successful, the CamIO channel can be read
+     *  and/or written to. In many cases, the devect operation will return immediately, with a valid channel once only.
      *  However, this is not guaranteed. Some channels may return multiple valid connection and some channels may take some
      *  time before they return successfully. Streams can be placed into selectors to facilitate the blocking behaviour
      *  necessary to wait for these events to happen by listening for the  on connection signal.
@@ -144,12 +144,12 @@ struct cioconn_s {
      *  - ETRYAGAIN: The channel has nothing new to report at this time. No connection has yet happened.
      *  - ECHECKERROR: The channel creation has failed. 
      */
-    int (*connect)( cioconn* this, ciostrm* ciostrm_o );
+    int (*devect)( ciodev* this, ciostrm* ciostrm_o );
 
     /**
-     * Free resources associated with this controller, but not with any of the channels it has created. 
+     * Free resources associated with this device, but not with any of the channels it has created. 
      */
-    void (*destroy)(cioconn* this);
+    void (*destroy)(ciodev* this);
 
 
     /**
@@ -160,8 +160,8 @@ struct cioconn_s {
 
 
 /**
- * Create a new CamIO controller with with given the URI and properties request. Return a pointer to connection object in 
- * cioconn_o. Cioconn_o is only valid id ENOERROR is returned. 
+ * Create a new CamIO device with with given the URI and properties request. Return a pointer to connection object in 
+ * ciodev_o. Ciodev_o is only valid id ENOERROR is returned. 
  * Returns:
  * - ENOERROR:  All good. Nothing to see here.
  * - EBADURI:   The URI supplied has a syntax error or is poorly formatted
@@ -169,12 +169,12 @@ struct cioconn_s {
  * - EBADOPT:   The URI options have an error or are unsupported
  * - EBADPROP:  The channel supplied in URI did not match the properties requested.
  */
-int new_cioconn( char* uri , ciostrm_req* properties, struct cioconn_s** cioconn_o );
+int new_ciodev( char* uri , ciostrm_req* properties, struct ciodev_s** ciodev_o );
 
 
 /**
- * This is a convenience method. Create a new CamIO controller and call connect(), blocking with the given selector and 
- * timeout until it succeeds or timesout. Free the controller by calling destroy() on it. Return a CamIO channel if 
+ * This is a convenience method. Create a new CamIO device and call devect(), blocking with the given selector and 
+ * timeout until it succeeds or timesout. Free the device by calling destroy() on it. Return a CamIO channel if 
  * successful. Returns only the first successful connection for channels that support many (e.g. TCP, Netnamp etc). 
  * Returns:
  * - ENOERROR:  All good. Nothing to see here.

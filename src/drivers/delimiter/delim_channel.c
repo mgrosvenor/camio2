@@ -11,7 +11,7 @@
 
 
 #include <src/devices/channel.h>
-#include <src/devices/controller.h>
+#include <src/devices/device.h>
 #include <src/buffers/buffer_malloc_linear.h>
 #include <deps/chaste/utils/util.h>
 #include <src/api/api.h>
@@ -45,18 +45,27 @@ typedef struct delim_channel_priv_s {
     ch_word rd_buffs_count;     //Number of result buffers and request queue slots
     ch_cbq_t* rd_buff_q;        //queue for inbound read buffer requests
     ch_cbq_t* rd_data_q;      //queue for inbound read data requests
-    camio_buffer_t* rd_buffs;   //All buffers for the read side, basically pointers to the working buffer
+    camio_buffer_t* rd_buffs;   //All buffers for the read side, basically pointers to the results
     ch_word rd_acq_index;       //Current index for acquiring new read buffers
     ch_word rd_rel_index;       //Current index for releasing new read buffers
 
-    camio_msg_t* base_msgs;
-    ch_word base_msgs_len;
-    ch_word base_msgs_max;
 
-    delim_states_e state; //We use a state machine to make progress through reading and working on the underlying channel
-    ch_word resuse_buffers;
+    ch_word base_msgs_max;           //Maximum size of the following queues
+    camio_msg_t* base_req_buff_msgs; //A message queue for requesting buffers
+    camio_msg_t* base_res_buff_msgs; //A message queue for getting buffer responses
+    camio_msg_t* base_req_data_msgs; //A message queue for requesting datas
+    camio_msg_t* base_res_data_msgs; //A message queue for getting data responses
+    ch_word base_req_buff_msgs_len;
+    ch_word base_res_buff_msgs_len;
+    ch_word base_req_data_msgs_len;
+    ch_word base_res_data_msgs_len;
+
+
+    camio_mux_t* mux; //A local mux to handle the base stream
     ch_word unused_rd_buff_resps;
-    ch_word readable_buffs;
+    ch_word resuse_buffers;
+    ch_word unused_rd_data_resps;
+
 
     //The base variables are used to gather data from the underlying channel
 //    camio_buffer_t* rd_base_buff;
@@ -81,9 +90,221 @@ static void delim_read_close(camio_channel_t* this){
     if(!priv->is_rd_closed){
         free(priv->rd_working_buff.__internal.__mem_start);
         reset_buffer(&priv->rd_working_buff);
-        //reset_buffer(&priv->rd_result_buff);
         priv->is_rd_closed = true;
     }
+}
+
+
+static camio_error_t on_read_datas(camio_muxable_t* muxable, camio_error_t err, void* usr_state, ch_word id)
+{
+    delim_channel_priv_t* priv = CHANNEL_GET_PRIVATE(usr_state);
+    DBG("Read data available\n");
+
+    //Woah, wait one second, no point in asking for  data buffers if we already have some hanging around!
+    //This assumes that the multiplexer is level-triggered, so we'll keep coming back here until this problem goes away.
+    if(priv->unused_rd_data_resps){
+        DBG("Ignoring data ready because there are %lli unused datas\n", priv->unused_rd_data_resps);
+        return CAMIO_ETRYAGAIN;
+    }
+
+    if(unlikely(err)){
+        DBG("Unexpected error %lli\n", err);
+        return err;
+    }
+
+    //Retrieve the data responses
+    priv->base_res_buff_msgs_len = priv->base_msgs_max;
+    err = camio_chan_rd_data_res(muxable->parent.channel, priv->base_res_data_msgs, &priv->base_res_data_msgs_len );
+    if(unlikely(err)){
+        return err;
+    }
+    if(priv->base_res_data_msgs_len == 0){
+        DBG("Huh? Data is ready, but got no new read completions?\n");
+        return CAMIO_EINVALID;
+    }
+
+    DBG("Received %lli/%lli data responses\n", priv->base_req_data_msgs_len, priv->unused_rd_buff_resps);
+    return CAMIO_ENOERROR;
+}
+
+
+static camio_error_t get_datas(camio_channel_t* this)
+{
+    delim_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this);
+
+    //Issue all buffer data requests -- This assumes that someone else has set them up! Check that assumption now.
+    if(unlikely(priv->unused_rd_buff_resps <= 0)){
+        DBG("Error! you've asked to get data, but not queue up any data requests!\n");
+        exit(255);
+        return CAMIO_EINVALID;
+    }
+
+    ch_word start_offset = priv->base_msgs_max - priv->unused_rd_buff_resps;
+    camio_error_t err = camio_chan_rd_data_req(
+        priv->base,
+        priv->base_req_data_msgs + start_offset,
+        &priv->base_req_data_msgs_len
+    );
+    if(unlikely(err)){
+        ERR("Could not request read data\n");
+        return err;
+    }
+
+    //Account for the number of responses that we managed to enqueue
+    priv->unused_rd_buff_resps -= priv->base_req_data_msgs_len;
+    DBG("Successfully issued %lli/%lli data requests\n", priv->base_req_data_msgs_len, priv->unused_rd_buff_resps);
+    return CAMIO_ENOERROR;
+}
+
+
+static camio_error_t get_reuse_datas(camio_channel_t* this){
+    delim_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this);
+
+    //Hun? We don't have any reuse buffers!
+    if(unlikely(priv->resuse_buffers <= 0)){
+        DBG("Error! you've asked to get data, but not queue up any data requests!\n");
+        exit(255);
+        return CAMIO_EINVALID;
+    }
+
+    if(unlikely(priv->unused_rd_buff_resps >0 )){
+        DBG("Error! you've asked to get data, but there are outstanding buffers to be used!\n");
+        exit(255);
+        return CAMIO_EINVALID;
+    }
+
+    //Now process the buffer responses and turn them into data requests
+    //Just aliasing these to make the code make more sense
+    priv->unused_rd_buff_resps = 0; //This should be true anyway, just leaving here for clarity!
+    for(ch_word i = 0; i < priv->base_res_data_msgs_len; i++){
+        //Sanity check the base response
+        if(unlikely(priv->base_res_data_msgs[i].type == CAMIO_MSG_TYPE_IGNORE)){
+            DBG("Ignoring read buffer at index %lli\n", i);
+            continue;
+        }
+        if(unlikely(priv->base_res_data_msgs[i].type != CAMIO_MSG_TYPE_READ_BUFF_RES)){
+            ERR("Expected to get read buffer response message (%li), but got %i instead.\n",
+                    CAMIO_MSG_TYPE_READ_BUFF_RES, priv->base_res_data_msgs[i].type);
+            continue;
+        }
+
+        camio_rd_buff_res_t* res = priv->base_res_data_msgs[i].rd_buff_res;
+        if(res->status){
+            ERR("Error %i getting buffer with id=%lli\n", res->status, priv->base_res_data_msgs[i].id);
+            priv->base_res_data_msgs[i].type = CAMIO_MSG_TYPE_IGNORE;
+            continue;
+        }
+
+        //Convert buffer responses into a data requests
+        priv->base_req_data_msgs[i].type = CAMIO_MSG_TYPE_READ_DATA_REQ;
+        camio_rd_data_req_t* req = &priv->base_req_data_msgs[i].rd_data_req;
+        req->dst_offset_hint = CAMIO_READ_REQ_DST_OFFSET_NONE;
+        req->src_offset_hint = CAMIO_READ_REQ_SRC_OFFSET_NONE;
+        req->read_size_hint  = CAMIO_READ_REQ_SIZE_ANY;
+        priv->unused_rd_buff_resps++; //Account for the number of actual buffers that we've received
+    }
+
+    //OK, now that we have a pile of buffer requests, maybe we should issue them!
+    priv->base_req_data_msgs_len = priv->unused_rd_buff_resps;
+    return get_datas(this);
+
+}
+
+
+
+//When the base channel has some buffers for us to use, we'll wake up here!
+static camio_error_t on_read_buffs(camio_muxable_t* muxable, camio_error_t err, void* usr_state, ch_word id)
+{
+    delim_channel_priv_t* priv = CHANNEL_GET_PRIVATE(usr_state);
+    DBG("Handling new buffers to read into\n");
+    if(unlikely(err)){
+        DBG("Unexpected error %lli\n", err);
+        return err;
+    }
+
+    //Woah, wait one second, no point in asking for more data buffers if we already have some hanging around!
+    //This assumes that the multiplexer is level-triggered, so we'll keep coming back here until this problem goes away.
+    if(eqlikely(priv->unused_rd_buff_resps)){
+        DBG("Ignoring buffer ready because there are %lli unused responses\n", priv->unused_rd_buff_resps);
+        return get_datas(usr_state); //But try to use them up
+    }
+    if(eqlikely(priv->resuse_buffers)){
+        DBG("Ignoring buffer ready because there are %lli reusable buffers\n", priv->resuse_buffers);
+        return get_reuse_datas(usr_state); //But try to use them up
+    }
+
+
+    //Get all of the buffer request responses here.
+    priv->base_res_buff_msgs_len = priv->base_msgs_max;
+    err = camio_chan_rd_buff_res(muxable->parent.channel, priv->base_res_buff_msgs, &priv->base_res_buff_msgs_len);
+    if(unlikely(err)){
+        ERR("Could not get reading buffers even though they are ready? err=%i\n", err);
+        return err;
+    }
+
+    //Now process the buffer responses and turn them into data requests
+    priv->unused_rd_buff_resps = 0; //This should be true anyway, just leaving here for clarity!
+    for(ch_word i = 0; i < priv->base_res_buff_msgs_len; i++){
+        //Sanity check the base response
+        if(unlikely(priv->base_res_buff_msgs[i].type == CAMIO_MSG_TYPE_IGNORE)){
+            DBG("Ignoring read buffer at index %lli\n", i);
+            continue;
+        }
+        if(unlikely(priv->base_res_buff_msgs[i].type != CAMIO_MSG_TYPE_READ_BUFF_RES)){
+            ERR("Expected to get read buffer response message (%li), but got %i instead. Ignoring\n",
+                    CAMIO_MSG_TYPE_READ_BUFF_RES, priv->base_res_buff_msgs[i].type);
+            continue;
+        }
+
+        camio_rd_buff_res_t* res = priv->base_res_buff_msgs[i].rd_buff_res;
+        if(unlikely(res->status)){
+            ERR("Error %i getting buffer with id=%lli. Ignoring\n", res->status, priv->base_res_buff_msgs[i].id);
+            continue;
+        }
+
+        //Copy buffer responses into a data requests
+        priv->base_req_data_msgs[i].type = CAMIO_MSG_TYPE_READ_DATA_REQ;
+        camio_rd_data_req_t* req = &priv->base_req_data_msgs[i].rd_data_req;
+        req->buffer              = res->buffer;
+        req->dst_offset_hint     = CAMIO_READ_REQ_DST_OFFSET_NONE;
+        req->src_offset_hint     = CAMIO_READ_REQ_SRC_OFFSET_NONE;
+        req->read_size_hint      = CAMIO_READ_REQ_SIZE_ANY;
+
+        priv->unused_rd_buff_resps++; //Account for the number of actual buffers that we've received
+    }
+
+    //OK, now that we have a pile of buffer requests, maybe we should issue them!
+    priv->base_req_data_msgs_len = priv->unused_rd_buff_resps;
+    return get_datas(usr_state);
+}
+
+
+//We need some more data, try to get some
+static camio_error_t get_new_buffers(camio_channel_t* this)
+{
+    delim_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this);
+
+    //Initialize a full batch of messages to request some write buffers
+    for(int i = 0; i < priv->base_msgs_max; i++){
+        priv->base_req_buff_msgs[i].type = CAMIO_MSG_TYPE_READ_BUFF_REQ;
+        priv->base_req_buff_msgs[i].id = i;
+        camio_rd_buff_req_t* req = &priv->base_req_buff_msgs[i].rd_buff_req;
+        req->dst_offset_hint = CAMIO_READ_REQ_DST_OFFSET_NONE;
+        req->src_offset_hint = CAMIO_READ_REQ_SRC_OFFSET_NONE;
+        req->read_size_hint  = CAMIO_READ_REQ_SIZE_ANY;
+    }
+
+    priv->base_req_buff_msgs_len = priv->base_msgs_max;
+    DBG("Requesting %lli read_buffs\n", priv->base_req_buff_msgs_len);
+    camio_error_t err = camio_chan_rd_buff_req( priv->base, priv->base_req_buff_msgs, &priv->base_req_buff_msgs_len);
+    if(err){
+        DBG("Could not request buffers with error %lli\n", err);
+        return err;
+    }
+
+    //It doesn't matter if not all of these succeed (so long as some do).
+    DBG("Successfully issued %lli/%lli buffer requests\n", priv->base_req_buff_msgs_len, priv->base_msgs_max);
+    return CAMIO_ENOERROR;
 }
 
 
@@ -92,26 +313,60 @@ static camio_error_t delim_read_buffer_request(camio_channel_t* this, camio_msg_
     DBG("Doing delim read buffer request...!\n");
     delim_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this);
 
+    camio_error_t err = CAMIO_ENOERROR;
+    //Firstly, push any new requests into our local queue
     if(unlikely(NULL == cbuff_push_back_carray(priv->rd_buff_q, req_vec, vec_len_io))){
         ERR("Could not push any items on to queue.");
-        return CAMIO_EINVALID;
+        err = CAMIO_ETRYAGAIN;
     }
 
-    DBG("delim read buffer request done - %lli requests added\n", *vec_len_io);
-    return CAMIO_ENOERROR;
+    //Secondly use this an an excuse to stimulate our base stream
+    //Do we have need some buffers to get data into??
+    if(priv->resuse_buffers == 0 && priv->unused_rd_buff_resps == 0 ){
+        camio_error_t err = get_new_buffers(this); //Nope? OK, get some more buffers to put responses into
+        if(err && err != CAMIO_ETRYAGAIN){
+            DBG("Unexpected error %i\n", err);
+            return err;
+        }
+    }
+
+    //If we have some buffers, maybe we should get some data into them
+    if(priv->unused_rd_buff_resps){
+        camio_error_t err = get_datas(this);
+        if(err && err != CAMIO_ETRYAGAIN){
+            DBG("Unexpected error %i\n", err);
+            return err;
+        }
+    }
+
+    //Or if we have some reusable buffers, we can use those
+    if(priv->resuse_buffers){
+        camio_error_t err = get_reuse_datas(this);
+        if(err && err != CAMIO_ETRYAGAIN){
+            DBG("Unexpected error %i\n", err);
+            return err;
+        }
+    }
+
+    if(!err){ DBG("Bring read buffer request done - %lli requests added\n", *vec_len_io); }
+    return err;
 }
 
 
 
 
-static inline camio_error_t grow_working_buff(delim_channel_priv_t* priv) {
-    if(!priv->rd_base_buff){
+
+
+
+
+static inline camio_error_t grow_working_buff(delim_channel_priv_t* priv, ch_word size_needed) {
+    if(!size_needed){
         return CAMIO_ENOERROR; //No need to grow buffer because no new space is needed
     }
 
 
     //     ( The amount of free space in the buffer)                                     <  (Extra space needed         )
-    while ((priv->rd_working_buff.__internal.__mem_len - priv->rd_working_buff.data_len) < (priv->rd_base_buff->data_len)) {
+    while ((priv->rd_working_buff.__internal.__mem_len - priv->rd_working_buff.data_len) < (size_needed)) {
         ERR("Growing working buffer from %lu to %lu\n", priv->rd_working_buff.__internal.__mem_len,
                 priv->rd_working_buff.__internal.__mem_len * 2);
         priv->rd_working_buff.__internal.__mem_len *= 2;
@@ -128,115 +383,10 @@ static inline camio_error_t grow_working_buff(delim_channel_priv_t* priv) {
     return CAMIO_ENOERROR;
 }
 
-static camio_error_t req_read_data(camio_channel_t* this)
-{
-    DBG("Requesting ready data\n");
-    delim_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this);
-    camio_error_t err = CAMIO_ENOERROR;
-
-    //So, we either have or need to get some more buffer responses. Figure out which
-    if(eqlikely(priv->resuse_buffers)){ //We can reuse buffers!
-        DBG("There are %lli reusable, buffer responses we're going to try and use!\n", priv->resuse_buffers);
-        priv->base_msgs_len = priv->resuse_buffers;
-    }
-    else if(eqlikely(priv->unused_rd_buff_resps)){ //We have some left over buffer responses
-        DBG("There are %lli unused, buffer responses we're going to try and use!\n", priv->unused_rd_buff_resps);
-        priv->base_msgs_len = priv->unused_rd_buff_resps;
-    }
-    else{ //We need some more buffers
-        DBG("Waiting to see if there are some new read buffers ready\n");
-        //Try to see if the underlying is ready, if not, come back later
-        err = camio_chan_rd_buff_ready(priv->base);
-        if(likely(err)){//Try again sucker! - expect this to happen a lot
-            return err;
-        }
-        DBG("There are new read buffers ready\n");
-
-        //The underlying is ready with some buffers, grab them
-        priv->base_msgs_len = priv->base_msgs_max;
-        DBG("Getting at most %lli read_buffs\n", priv->base_msgs_len);
-        err = camio_chan_rd_buff_res(priv->base,priv->base_msgs,&priv->base_msgs_len);
-        if(unlikely(err)){
-            DBG("Don't know what to do next!\n");
-            priv->state = DELIM_STATE_WORK_BUFF; //Not sure what the right thing to do here is? Just reset??
-            return err;
-        }
-        DBG("There are new %lli read buffers available\n", priv->base_msgs_len);
-    }
-
-    //OK! We have now have some buffers, let's request the data to fill them
-    ch_word rd_buffs = priv->base_msgs_len;
-    err = camio_chan_rd_data_req(priv->base,priv->base_msgs + priv->unused_rd_buff_resps, &priv->base_msgs_len);
-    if(err){
-        DBG("Don't know what to do next!\n");
-        priv->state = DELIM_STATE_WORK_BUFF; //Not sure what the right thing to do here is? Just reset??
-        return err;
-    }
-
-    //Did all of the requests make it in?? If not, we will have some left over unused_rd_buffer responses
-    priv->unused_rd_buff_resps = priv->base_msgs_len - rd_buffs;
-    priv->readable_buffs = priv->base_msgs_len;
-    DBG("Have now issued requested %lli data requests from %lli buffers\n", priv->base_msgs_len, rd_buffs);
-    return err;
-}
-
-
-static camio_error_t get_new_buffers(camio_channel_t* this)
-{
-    //We need some more data, try to get some, but only do so if we don't have some outstanding requests or buffers
-    delim_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this);
-
-    if(eqlikely(priv->unused_rd_buff_resps || priv->resuse_buffers)){
-        DBG("We don't need more buffers\n");
-        return CAMIO_ENOERROR;
-    }
-
-    //Initialize a batch of messages to request some write buffers
-    for(int i = 0; i < priv->base_msgs_max; i++){
-        priv->base_msgs[i].type = CAMIO_MSG_TYPE_READ_BUFF_REQ;
-        priv->base_msgs[i].id = i;
-        camio_rd_buff_req_t* req = &priv->base_msgs[i].rd_buff_req;
-        req->dst_offset_hint = CAMIO_READ_REQ_DST_OFFSET_NONE;
-        req->src_offset_hint = CAMIO_READ_REQ_SRC_OFFSET_NONE;
-        req->read_size_hint  = CAMIO_READ_REQ_SIZE_ANY;
-    }
-
-    priv->base_msgs_len = priv->base_msgs_max;
-    DBG("Requesting %lli read_buffs\n", priv->base_msgs_len);
-    camio_error_t err = camio_chan_rd_buff_req( priv->base, priv->base_msgs, &priv->base_msgs_len);
-    if(err){
-        DBG("Could not request buffers with error %lli\n", err);
-        return err;
-    }
-    DBG("Successfully issued %lli buffer requests\n", priv->base_msgs_len);
-    return CAMIO_ENOERROR;
-}
 
 
 
-static camio_error_t delim_read_peek_basic(camio_channel_t* this, camio_buffer_t* result)
-{
-    DBG("Doing read peek\n");
-    delim_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this);
 
-    //First, try the easy approach, if there is data in the working buffer, try the delimiter function to see...
-    if(priv->rd_working_buff.data_len > 0){
-        const ch_word delimit_size = priv->delim_fn(priv->rd_working_buff.data_start, priv->rd_working_buff.data_len);
-        if(delimit_size > priv->rd_working_buff.data_len){
-            ERR("your delimiter is buggy, you cannot return more data  (%lli) than we gave you (%lli)!\n",
-                    delimit_size, priv->rd_working_buff.data_len);
-            return CAMIO_ETOOMANY;
-        }
-
-        if(delimit_size > 0){
-            //OK! Looks like we have a good delimit!
-            buffer_slice(result, &priv->rd_working_buff,priv->rd_working_buff.data_start, delimit_size );
-            DBG("Yay! Delimiter first time success on workig buffer with data of size %lli!\n", delimit_size);
-            return CAMIO_ENOERROR;
-        }
-    }
-    return CAMIO_ETRYAGAIN;
-}
 
 
 
@@ -247,51 +397,42 @@ static camio_error_t delim_read_peek( camio_channel_t* this, camio_buffer_t* res
     delim_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this);
 
 
-    camio_error_t err = CAMIO_ENOERROR;
-    switch(priv->state){
-        case DELIM_STATE_WORK_BUFF:{ //The working buffer is not empty
-            DBG("There is data in the working buffer, we're doing to try to delimit it\n");
-            err = delim_read_peek_basic(this,result);
-            if(eqlikely(err != CAMIO_ETRYAGAIN)){ return err; }
-            priv->state = DELIM_STATE_WB_NEED_MORE;
+    ch_word reusable_buffs = 0; //See how many buffers we can potentially reuse
+    //OK! Finally do some real work! We have buffers, and we are ready to play!
+    camio_msg_t* data_msgs = priv->base_res_data_msgs;
+    for(ch_word i = 0; i < priv->base_res_data_msgs_len; i++){
+        if(unlikely(data_msgs[i].type == CAMIO_MSG_TYPE_IGNORE)){
+            DBG("Ignoring message at index %lli\n", i);
+            continue;
         }
-        // no break; -- fall through is intentional
-        case DELIM_STATE_WB_NEED_MORE:{ //The working buffer needs more data
-            err = get_new_buffers(this);
-            if(unlikely(err)){ return err; }
-            priv->state = DELIM_STATE_RDY_RD_BUFFS;
+
+        if(unlikely(data_msgs[i].type != CAMIO_MSG_TYPE_READ_DATA_RES)){
+            ERR("Expected to get read data response message (%lli), but got %i instead. Ignoring\n",
+                    CAMIO_MSG_TYPE_READ_DATA_RES, data_msgs[i].type);
+            continue;
         }
-        // no break; -- fall through is intentional
-        case DELIM_STATE_RDY_RD_BUFFS:{
-            DBG("Checking for read buffers\n");
-            err = req_read_data(this);
-            if(likely(err)){ return err; } //Expect this to happy a lot thanks to the ready function
-            priv->state = DELIM_STATE_RDY_RD_DATAS;
+
+        camio_rd_buff_res_t* res = &data_msgs[i].rd_buff_res;
+        if(unlikely(res->status && res->status != CAMIO_ECANNOTREUSE)){
+            ERR("Error %i getting buffer with id=%lli. Ignoring.\n", res->status, data_msgs[i].id);
+            continue;
         }
-        // no break; -- fall through is intentional
-        case DELIM_STATE_RDY_RD_DATAS:{
-            //Try to see if the underlying is ready, if not, come back later
-            err = camio_chan_rd_data_ready(priv->base);
-            if(likely(err)) { return err; } //Try again sucker! - expect this to happen a lot
 
-            DBG("There are new read datas available\n");
-            //The underlying says there is some new data for us! Yay!
-            if(priv->resuse_buffers)
-            priv->base_msgs_len = priv->base_msgs_max;
-            err = camio_chan_rd_data_res(priv->base,priv->base_msgs,&priv->base_msgs_len);
-            if(err){
-                DBG("Don't know what to do next!\n");
-                priv->state = DELIM_STATE_WORK_BUFF; //Not sure what the right thing to do here is? Just reset??
-                return err;
-            }
-
-            DBG("There are new %lli read datas available\n", priv->base_msgs_len);
-
-
-            priv->state = DELIM_STATE_RDY_RD_BUFFS;
-            break;
+        camio_buffer_t* buffer = res->buffer;
+        DBG("Received %i bytes\n", buffer->data_len);
+        if(buffer->data_len <= 0){
+            ERR("Stream has ended! Closing down\n");
+            delim_read_close(usr_state);
+            return CAMIO_ENOERROR;
         }
+
+        //At this point, it looks like we have a valid buffer! Woot!
+        priv->unused_rd_data_resps++;
+
+        if
     }
+
+
 
 
 
@@ -341,11 +482,10 @@ static camio_error_t delim_read_peek( camio_channel_t* this, camio_buffer_t* res
     // ---- Now the real work begins. We have new data. So can we delimit it?
 
     //We have real data and the working buffer is empty, try a fast path. Maybe we won't need to copy into the working buffer
+    //If the working buffer is empty, then, we can try to delimit this buffer in place.
     if(priv->rd_working_buff.data_len == 0){
         DBG("Trying empty working buffer fast path...\n");
-        DBG("Priv is %p\n", priv);
-        DBG("priv=%p Dlimiter fn=%p\n", priv, priv->delim_fn);
-        const ch_word delimit_size = priv->delim_fn(priv->rd_base_buff->data_start, priv->rd_base_buff->data_len);
+        const ch_word delimit_size = priv->delim_fn(res->buffer->data_start, res->buffer->data_len);
         DBG("size=%lli\n", delimit_size);
         if(delimit_size > 0) { //Success! There is a valid packet in the read buffer alone.
             DBG("Fast path match from delimiter of size %lli!\n", delimit_size);
@@ -354,6 +494,7 @@ static camio_error_t delim_read_peek( camio_channel_t* this, camio_buffer_t* res
         }
         DBG("Datagram fast path fail. Try slow path...\n");
     }
+
 
     //Just check that this is assumption true. If it's not, the following code will break!
     if(priv->rd_working_buff.data_start != priv->rd_working_buff.__internal.__mem_start){
@@ -389,10 +530,45 @@ static camio_error_t delim_read_peek( camio_channel_t* this, camio_buffer_t* res
 }
 
 
+static camio_error_t delim_read_basic(camio_channel_t* this, camio_buffer_t* result)
+{
+    DBG("Doing read peek\n");
+    delim_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this);
+
+    //First, try the easy approach, if there is data in the working buffer, try the delimiter function to see...
+    if(priv->rd_working_buff.data_len > 0){
+        const ch_word delimit_size = priv->delim_fn(priv->rd_working_buff.data_start, priv->rd_working_buff.data_len);
+        if(delimit_size > priv->rd_working_buff.data_len){
+            ERR("your delimiter is buggy, you cannot return more data  (%lli) than we gave you (%lli)!\n",
+                    delimit_size, priv->rd_working_buff.data_len);
+            return CAMIO_ETOOMANY;
+        }
+
+        if(delimit_size > 0){
+            //OK! Looks like we have a good delimit!
+            buffer_slice(result, &priv->rd_working_buff,priv->rd_working_buff.data_start, delimit_size );
+            DBG("Yay! Delimiter first time success on workig buffer with data of size %lli!\n", delimit_size);
+            return CAMIO_ENOERROR;
+        }
+    }
+    return CAMIO_ETRYAGAIN;
+}
+
+
+
 static camio_error_t delim_read_buffer_ready(camio_muxable_t* this)
 {
     DBG("Checking if delimiter is ready\n");
     delim_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this);
+
+    struct time_value timeout = {0}; //Makes the mux non-blocking
+    camio_error_t err = camio_mux_select(priv->mux,&timeout,NULL);
+    if(err && err != CAMIO_ETRYAGAIN){
+        return err;
+    }
+
+    delim_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this->parent.channel);
+    //DBG("Doing read buffer ready\n");
 
     //Try to fill as many read requests as we can
     camio_msg_t* msg = cbuff_use_front(priv->rd_buff_q);
@@ -402,8 +578,7 @@ static camio_error_t delim_read_buffer_ready(camio_muxable_t* this)
             continue; //We don't care about this message
         }
         if(unlikely(msg->type != CAMIO_MSG_TYPE_READ_BUFF_REQ)){
-            ERR("Expected a read buffer request message (%i) but got %i instead.\n",
-                    CAMIO_MSG_TYPE_READ_BUFF_REQ, msg->type);
+            ERR("Expected a read buffer request message (%i) but got %i instead.\n",CAMIO_MSG_TYPE_READ_BUFF_REQ, msg->type);
             continue;
         }
 
@@ -411,49 +586,96 @@ static camio_error_t delim_read_buffer_ready(camio_muxable_t* this)
         camio_rd_buff_req_t* req = &msg->rd_buff_req;
         camio_rd_buff_res_t* res = &msg->rd_buff_res;
         if(unlikely(req->dst_offset_hint != CAMIO_READ_REQ_DST_OFFSET_NONE)){
-            ERR("Could not process request %lli, DST_OFFSET must be NONE\n");
+            ERR("Could not enqueue request %lli, DST_OFFSET must be NONE\n");
             msg->type = CAMIO_MSG_TYPE_READ_BUFF_RES;
             res->status = CAMIO_EINVALID; //TODO better error code here!
             continue;
         }
         if(unlikely(req->src_offset_hint != CAMIO_READ_REQ_SRC_OFFSET_NONE)){
-            ERR("Could not process request %lli, SRC_OFFSET must be NONE\n");
+            ERR("Could not enqueue request %lli, SRC_OFFSET must be NONE\n");
             msg->type = CAMIO_MSG_TYPE_READ_BUFF_RES;
             res->status = CAMIO_EINVALID; //TODO better error code here!
             continue;
         }
 
-        //OK, see if we can get a new result
-        camio_buffer_t* result = priv->rd_buffs[priv->rd_acq_index];
-        camio_error_t err = delim_read_peek(this->parent.channel, result);
-        if(err){
-            DBG("Delimiter reports that there is nothing new to consume\n");
-            break;
-        }
 
-        //WOOT! New data ready to send to user
-        msg->type = CAMIO_MSG_TYPE_READ_BUFF_RES;
-        res->status = CAMIO_ECANNOTREUSE; //TDOD XXX: Actually this might be possible depending on the base channel
-        res->buffer = result;
 
-        priv->rd_acq_index++;   //Move to the next index in buffer acquisition
-        if(unlikely(priv->rd_acq_index >= priv->rd_buffs_count)){ //But loop around
-            priv->rd_acq_index = 0;
+        //Request seems ok, let's see if we can fulfill it
+        //There are no buffers from the underlying
+        if(!priv->unused_rd_data_resps){
+            get_new_buffers(this);
+            return CAMIO_ETRYAGAIN;
         }
 
     }
 
-    if(likely(msg != NULL)){
-        cbuff_unuse_front(priv->rd_buff_q);
-    }
 
-    if(unlikely(priv->rd_buff_q->in_use >= priv->rd_buffs_count)){
-        DBG("Cannot try to produce any more results until you release some buffers\n");
-        return CAMIO_ENOBUFFS;
-    }
-    if(likely(priv->rd_buff_q->in_use == 0)){
-        return CAMIO_ETRYAGAIN;
-    }
+
+
+
+
+
+
+//    //Try to fill as many read requests as we can
+//    camio_msg_t* msg = cbuff_use_front(priv->rd_buff_q);
+//    for(; msg != NULL; msg = cbuff_use_front(priv->rd_buff_q)){
+//        //Sanity check the message first
+//        if(unlikely(msg->type == CAMIO_MSG_TYPE_IGNORE)){
+//            continue; //We don't care about this message
+//        }
+//        if(unlikely(msg->type != CAMIO_MSG_TYPE_READ_BUFF_REQ)){
+//            ERR("Expected a read buffer request message (%i) but got %i instead.\n",
+//                    CAMIO_MSG_TYPE_READ_BUFF_REQ, msg->type);
+//            continue;
+//        }
+//
+//        //Extract the request pointer and check it as well.
+//        camio_rd_buff_req_t* req = &msg->rd_buff_req;
+//        camio_rd_buff_res_t* res = &msg->rd_buff_res;
+//        if(unlikely(req->dst_offset_hint != CAMIO_READ_REQ_DST_OFFSET_NONE)){
+//            ERR("Could not process request %lli, DST_OFFSET must be NONE\n");
+//            msg->type = CAMIO_MSG_TYPE_READ_BUFF_RES;
+//            res->status = CAMIO_EINVALID; //TODO better error code here!
+//            continue;
+//        }
+//        if(unlikely(req->src_offset_hint != CAMIO_READ_REQ_SRC_OFFSET_NONE)){
+//            ERR("Could not process request %lli, SRC_OFFSET must be NONE\n");
+//            msg->type = CAMIO_MSG_TYPE_READ_BUFF_RES;
+//            res->status = CAMIO_EINVALID; //TODO better error code here!
+//            continue;
+//        }
+//
+//        //OK, see if we can get a new result
+//        camio_buffer_t* result = priv->rd_buffs[priv->rd_acq_index];
+//        camio_error_t err = delim_read_peek(this->parent.channel, result);
+//        if(err){
+//            DBG("Delimiter reports that there is nothing new to consume\n");
+//            break;
+//        }
+//
+//        //WOOT! New data ready to send to user
+//        msg->type = CAMIO_MSG_TYPE_READ_BUFF_RES;
+//        res->status = CAMIO_ECANNOTREUSE; //TDOD XXX: Actually this might be possible depending on the base channel
+//        res->buffer = result;
+//
+//        priv->rd_acq_index++;   //Move to the next index in buffer acquisition
+//        if(unlikely(priv->rd_acq_index >= priv->rd_buffs_count)){ //But loop around
+//            priv->rd_acq_index = 0;
+//        }
+//
+//    }
+//
+//    if(likely(msg != NULL)){
+//        cbuff_unuse_front(priv->rd_buff_q);
+//    }
+//
+//    if(unlikely(priv->rd_buff_q->in_use >= priv->rd_buffs_count)){
+//        DBG("Cannot try to produce any more results until you release some buffers\n");
+//        return CAMIO_ENOBUFFS;
+//    }
+//    if(likely(priv->rd_buff_q->in_use == 0)){
+//        return CAMIO_ETRYAGAIN;
+//    }
 
     //DBG("There are %lli new buffers to read into\n", priv->rd_buff_q->in_use);
     return CAMIO_ENOERROR;
@@ -840,13 +1062,13 @@ static void delim_destroy(camio_channel_t* this)
 #define DELIM_BUFFER_DEFAULT_SIZE (64 * 1024) //64KB
 camio_error_t delim_channel_construct(
     camio_channel_t* this,
-    camio_controller_t* controller,
+    camio_device_t* device,
     camio_channel_t* base_channel,
     ch_word(*delim_fn)(char* buffer, ch_word len),
     ch_word rd_buffs_count
 )
 {
-    (void)controller; //Nothing to do with this
+    (void)device; //Nothing to do with this
 
     delim_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this);
 
@@ -894,11 +1116,37 @@ camio_error_t delim_channel_construct(
     //TODO XXX - This should be populated as parameter, but not sure how to do it well. Don't want to as the user a question
     //they don't understand how to answer.
     priv->base_msgs_max = BASE_MSGS_MAX;
-    priv->base_msgs = (camio_msg_t*)calloc(priv->base_msgs_max, sizeof(camio_msg_t));
-    if(!priv->base_msgs){
-        DBG("Could not allocate memory for base messages!\n");
+    priv->base_req_buff_msgs = (camio_msg_t*)calloc(priv->base_msgs_max, sizeof(camio_msg_t));
+    if(!priv->base_req_buff_msgs){
+        DBG("Could not allocate memory for base request buffer messages!\n");
         return CAMIO_ENOMEM;
     }
+    priv->base_req_data_msgs = (camio_msg_t*)calloc(priv->base_msgs_max, sizeof(camio_msg_t));
+    if(!priv->base_req_data_msgs){
+        DBG("Could not allocate memory for base request data messages!\n");
+        return CAMIO_ENOMEM;
+    }
+    priv->base_res_buff_msgs = (camio_msg_t*)calloc(priv->base_msgs_max, sizeof(camio_msg_t));
+    if(!priv->base_res_buff_msgs){
+        DBG("Could not allocate memory for base response buffer messages!\n");
+        return CAMIO_ENOMEM;
+    }
+    priv->base_res_data_msgs = (camio_msg_t*)calloc(priv->base_msgs_max, sizeof(camio_msg_t));
+    if(!priv->base_res_data_msgs){
+        DBG("Could not allocate memory for base response data messages!\n");
+        return CAMIO_ENOMEM;
+    }
+
+
+
+    camio_error_t err = camio_mux_new(CAMIO_MUX_HINT_PERFORMANCE,&priv->mux);
+    if(err){
+        DBG("Could not create an underlying multiplexer!\n");
+        return err;
+    }
+
+    camio_mux_insert(priv->mux, priv->base->rd_buff_muxable, on_read_buffs, this, 0);
+    camio_mux_insert(priv->mux, priv->base->rd_data_muxable, on_read_datas, this, 0);
 
     DBG("Done constructing delim channel\n");
     return CAMIO_ENOERROR;

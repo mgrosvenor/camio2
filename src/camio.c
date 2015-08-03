@@ -57,7 +57,7 @@ camio_error_t register_new_device(
     ch_ccstr scheme,
     ch_word scheme_len,
     ch_word param_struct_hier_offset,
-    camio_construct_f construct,
+    camio_new_dev_f new,
     ch_word param_struct_size,
     CH_VECTOR(CAMIO_TRANSPORT_PARAMS_VEC)* params,
     ch_word global_store_size
@@ -83,7 +83,7 @@ camio_error_t register_new_device(
             .param_struct_hier_offset   = param_struct_hier_offset,
             .param_struct_size          = param_struct_size,
             .params                     = params,
-            .construct                  = construct,
+            .new_dev                    = new,
             .global_store_size          = global_store_size,
             .global_store               = NULL
         };
@@ -341,7 +341,7 @@ exit_uri:
 
 
 
-camio_error_t camio_device_constr(ch_word id, void** params, ch_word params_size, camio_controller_t** controller_o)
+camio_error_t camio_device_new(ch_word id, void** params, ch_word params_size, camio_device_t** device_o)
 {
     CH_VECTOR(CAMIO_TRANSPORT_STATE_VEC)* trans_state = __camio_state_container.trans_state;
     camio_device_state_t* state = trans_state->off(trans_state,id);
@@ -350,7 +350,7 @@ camio_error_t camio_device_constr(ch_word id, void** params, ch_word params_size
         return CAMIO_EINDEXNOTFOUND;
     }
 
-    return state->construct(params,params_size,controller_o);
+    return state->new_dev(params,params_size,device_o);
 }
 
 
@@ -387,7 +387,7 @@ camio_error_t camio_device_get_global(ch_ccstr scheme, void** global_store)
     camio_device_state_t state = {
         .scheme             = scheme,
         .scheme_len         = strlen(scheme),
-        .construct          = NULL,
+        .new_dev            = NULL,
         .global_store_size  = 0,
         .global_store       = NULL
     };

@@ -6,7 +6,7 @@
  *  Created:    Jun 14, 2015
  *  File name:  mux.h
  *  Description:
- *  Every channel and controller implements a "mux" interface. This interface allows the channel or controller to be put
+ *  Every channel and device implements a "mux" interface. This interface allows the channel or device to be put
  *  into a "mux object" for runtime nonblocking multiplexing of devices
  */
 #ifndef MUX_H_

@@ -13,7 +13,7 @@
 
 #include <src/types/len_string.h>
 
-#include "delim_controller.h"
+#include "delim_device.h"
 
 //No global state
 //typedef struct delim_global_s{

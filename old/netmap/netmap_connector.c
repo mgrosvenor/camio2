@@ -4,13 +4,13 @@
  * See LICENSE.txt for full details. 
  * 
  *  Created:   Aug 15, 2014
- *  File name: netmap_controller.c
+ *  File name: netmap_device.c
  *  Description:
  *  <INSERT DESCRIPTION HERE> 
  */
 
 
-#include "netmap_controller.h"
+#include "netmap_device.h"
 #include "netmap_channel.h"
 #include "../../camio.h"
 #include "../../camio_debug.h"
@@ -38,13 +38,13 @@ typedef struct netmap_priv_s {
 
 
 
-static camio_error_t netmap_construct(camio_controller_t* this, ch_cstr dev, ch_cstr path, ch_bool sw_ring, ch_bool hw_ring,
+static camio_error_t netmap_construct(camio_device_t* this, ch_cstr dev, ch_cstr path, ch_bool sw_ring, ch_bool hw_ring,
         ch_word ring_id)
 {
 
-    netmap_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
+    netmap_priv_t* priv = DEVICE_GET_PRIVATE(this);
 
-    //Not much to do here. The controller doesn't have much internal state that it needs.
+    //Not much to do here. The device doesn't have much internal state that it needs.
 
     //TODO Should think about making a copy here since these strings could go away between now and when we want to use them
     priv->dev       = dev;
@@ -60,18 +60,18 @@ static camio_error_t netmap_construct(camio_controller_t* this, ch_cstr dev, ch_
 
 
 
-static void netmap_destroy(camio_controller_t* this)
+static void netmap_destroy(camio_device_t* this)
 {
-    netmap_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
+    netmap_priv_t* priv = DEVICE_GET_PRIVATE(this);
     (void)priv;
 }
 
 
 
 
-static camio_error_t netmap_construct_str(camio_controller_t* this, camio_uri_t* uri)
+static camio_error_t netmap_construct_str(camio_device_t* this, camio_uri_t* uri)
 {
-    netmap_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
+    netmap_priv_t* priv = DEVICE_GET_PRIVATE(this);
     (void)priv;
     (void)uri;
 
@@ -89,9 +89,9 @@ static camio_error_t netmap_construct_str(camio_controller_t* this, camio_uri_t*
 
 
 
-static camio_error_t netmap_construct_bin(camio_controller_t* this, va_list args)
+static camio_error_t netmap_construct_bin(camio_device_t* this, va_list args)
 {
-    netmap_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
+    netmap_priv_t* priv = DEVICE_GET_PRIVATE(this);
     (void)priv;
     (void)args;
 
@@ -110,9 +110,9 @@ static camio_error_t netmap_construct_bin(camio_controller_t* this, va_list args
 
 
 
-static camio_error_t netmap_connect(camio_controller_t* this, camio_channel_t** channel_o )
+static camio_error_t netmap_devect(camio_device_t* this, camio_channel_t** channel_o )
 {
-    netmap_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
+    netmap_priv_t* priv = DEVICE_GET_PRIVATE(this);
 
     int netmap_fd = -1;
     struct nmreq req;
@@ -237,5 +237,5 @@ static camio_error_t netmap_connect(camio_controller_t* this, camio_channel_t** 
 
 
 
-NEW_CONNECTOR_DEFINE(netmap, netmap_priv_t)
+NEW_DEVICE_DEFINE(netmap, netmap_priv_t)
 

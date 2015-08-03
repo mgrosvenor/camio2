@@ -11,7 +11,7 @@
 
 #include <stddef.h>
 
-#include <src/drivers/udp/udp_controller.h>
+#include <src/drivers/udp/udp_device.h>
 #include <src/drivers/udp/udp_device.h>
 #include "../../camio.h"
 #include "../../camio_debug.h"
@@ -20,17 +20,17 @@
 static const char* const scheme = "udp";
 
 
-static camio_error_t construct(void** params, ch_word params_size, camio_controller_t** controller_o)
+static camio_error_t construct(void** params, ch_word params_size, camio_device_t** device_o)
 {
-    camio_controller_t* conn = NEW_CONNECTOR(udp);
-    if(!conn){
-        *controller_o = NULL;
+    camio_device_t* dev = NEW_DEVICE(udp);
+    if(!dev){
+        *device_o = NULL;
         return CAMIO_ENOMEM;
     }
 
-    *controller_o = conn;
+    *device_o = dev;
 
-    return conn->vtable.construct(conn,params, params_size);
+    return dev->vtable.construct(dev,params, params_size);
 }
 
 

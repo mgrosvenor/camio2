@@ -4,17 +4,17 @@
  * See LICENSE.txt for full details. 
  * 
  *  Created:   PPP ZZZZ
- *  File name: ttt_controller.h
+ *  File name: ttt_device.h
  *  Description:
  *  <INSERT DESCRIPTION HERE> 
  */
 
-#include <src/devices/controller.h>
+#include <src/devices/device.h>
 #include <src/camio.h>
 #include <src/camio_debug.h>
 
 #include "ttt_device.h"
-#include "ttt_controller.h"
+#include "ttt_device.h"
 #include "ttt_channel.h"
 
 
@@ -24,41 +24,41 @@
  **************************************************************************************************************************/
 typedef struct ttt_priv_s {
     ch_word temp;
-} ttt_controller_priv_t;
+} ttt_device_priv_t;
 
 
 /**************************************************************************************************************************
  * Connect functions
  **************************************************************************************************************************/
 
-//Try to see if connecting is possible.
-static camio_error_t ttt_connect_peek(camio_controller_t* this)
+//Try to see if devecting is possible.
+static camio_error_t ttt_devect_peek(camio_device_t* this)
 {
-    DBG("Doing TTT connect peek\n");
+    DBG("Doing TTT devect peek\n");
 
     return CAMIO_ETRYAGAIN;
     return CAMIO_ECHECKERRORNO;
     return CAMIO_ENOERROR;
 }
 
-static camio_error_t ttt_controller_ready(camio_muxable_t* this)
+static camio_error_t ttt_device_ready(camio_muxable_t* this)
 {
-    DBG("Checking if TTT is ready to connect...\n");
-    ttt_controller_priv_t* priv = CONNECTOR_GET_PRIVATE(this->parent.controller);
+    DBG("Checking if TTT is ready to devect...\n");
+    ttt_device_priv_t* priv = DEVICE_GET_PRIVATE(this->parent.device);
 
 
     return CAMIO_ENOTREADY;
     return CAMIO_EREADY;
 }
 
-static camio_error_t ttt_connect(camio_controller_t* this, camio_channel_t** channel_o )
+static camio_error_t ttt_devect(camio_device_t* this, camio_channel_t** channel_o )
 {
-    ttt_controller_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
-    camio_error_t err = ttt_controller_ready(&this->muxable);
+    ttt_device_priv_t* priv = DEVICE_GET_PRIVATE(this);
+    camio_error_t err = ttt_device_ready(&this->muxable);
     if(err != CAMIO_EREADY){
         return err;
     }
-    DBG("Done connecting, now constructing TTT channel...\n");
+    DBG("Done devecting, now constructing TTT channel...\n");
 
     camio_channel_t* channel = NEW_CHANNEL(ttt);
     if(!channel){
@@ -83,10 +83,10 @@ static camio_error_t ttt_connect(camio_controller_t* this, camio_channel_t** cha
  * Setup and teardown
  **************************************************************************************************************************/
 
-static camio_error_t ttt_construct(camio_controller_t* this, void** params, ch_word params_size)
+static camio_error_t ttt_construct(camio_device_t* this, void** params, ch_word params_size)
 {
 
-    ttt_controller_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
+    ttt_device_priv_t* priv = DEVICE_GET_PRIVATE(this);
     //Basic sanity check that the params is the right one.
     if(params_size != sizeof(ttt_params_t)){
         DBG("Bad parameters structure passed\n");
@@ -98,23 +98,23 @@ static camio_error_t ttt_construct(camio_controller_t* this, void** params, ch_w
 
     //Populate the muxable structure
     this->muxable.mode              = CAMIO_MUX_MODE_CONNECT;
-    this->muxable.parent.controller  = this;
-    this->muxable.vtable.ready      = ttt_controller_ready;
+    this->muxable.parent.device  = this;
+    this->muxable.vtable.ready      = ttt_device_ready;
     this->muxable.fd                = -1;
 
     return CAMIO_ENOERROR;
 }
 
 
-static void ttt_destroy(camio_controller_t* this)
+static void ttt_destroy(camio_device_t* this)
 {
-    DBG("Destorying ttt controller\n");
-    ttt_controller_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
+    DBG("Destorying ttt device\n");
+    ttt_device_priv_t* priv = DEVICE_GET_PRIVATE(this);
 
     if(priv->params) { free(priv->params); }
     DBG("Freed params\n");
     free(this);
-    DBG("Freed controller structure\n");
+    DBG("Freed device structure\n");
 }
 
-NEW_CONNECTOR_DEFINE(ttt, ttt_controller_priv_t)
+NEW_DEVICE_DEFINE(ttt, ttt_device_priv_t)

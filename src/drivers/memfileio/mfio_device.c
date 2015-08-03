@@ -15,23 +15,23 @@
 #include <src/camio_debug.h>
 #include <src/types/device_params_vec.h>
 
-#include "mfio_controller.h"
+#include "mfio_device.h"
 #include "mfio_device.h"
 
 static const char* const scheme = "mfio";
 
 
-static camio_error_t construct(void** params, ch_word params_size, camio_controller_t** controller_o)
+static camio_error_t construct(void** params, ch_word params_size, camio_device_t** device_o)
 {
-    camio_controller_t* conn = NEW_CONNECTOR(mfio);
-    if(!conn){
-        *controller_o = NULL;
+    camio_device_t* dev = NEW_DEVICE(mfio);
+    if(!dev){
+        *device_o = NULL;
         return CAMIO_ENOMEM;
     }
 
-    *controller_o = conn;
+    *device_o = dev;
 
-    return conn->vtable.construct(conn,params, params_size);
+    return dev->vtable.construct(dev,params, params_size);
 }
 
 

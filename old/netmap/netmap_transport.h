@@ -12,7 +12,7 @@
 #ifndef NETMAP_TRANSPORT_H_
 #define NETMAP_TRANSPORT_H_
 
-#include <src/drivers/netmap/netmap_controller.h>
+#include <src/drivers/netmap/netmap_device.h>
 
 
 typedef struct netmap_global_s{

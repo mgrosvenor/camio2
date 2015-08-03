@@ -114,7 +114,7 @@ camio_error_t spin_select(camio_mux_t* this, struct timeval* timeout, camio_muxa
             //populated and increment the idx to make sure that next time we look at the next device first. This gives some
             //degree of "fairness".
 
-            *muxable_o  = muxable;
+            if(muxable) {  *muxable_o  = muxable; }
             priv->idx   = priv->idx >= muxables->count - 1 ? 0 : priv->idx + 1;
 
 

@@ -4,7 +4,7 @@
  * See LICENSE.txt for full details. 
  * 
  *  Created:   03 Jul 2015
- *  File name: fio_controller.h
+ *  File name: fio_device.h
  *  Description:
  *  <INSERT DESCRIPTION HERE> 
  */
@@ -18,12 +18,12 @@
 #include <memory.h>
 #include <sys/stat.h>
 
-#include <src/devices/controller.h>
+#include <src/devices/device.h>
 #include <src/camio.h>
 #include <src/camio_debug.h>
 
 #include "fio_device.h"
-#include "fio_controller.h"
+#include "fio_device.h"
 #include "fio_channel.h"
 
 
@@ -32,14 +32,14 @@
  * Connect functions
  **************************************************************************************************************************/
 
-//Try to see if connecting is possible. With UDP, it is always possible.
-static camio_error_t fio_connect_peek(camio_controller_t* this)
+//Try to see if devecting is possible. With UDP, it is always possible.
+static camio_error_t fio_devect_peek(camio_device_t* this)
 {
-    DBG("Doing connect peek\n");
-    fio_controller_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
+    DBG("Doing devect peek\n");
+    fio_device_priv_t* priv = DEVICE_GET_PRIVATE(this);
 
     if(priv->base_rd_fd > -1 && priv->base_wr_fd > -1){
-        return CAMIO_ENOERROR; //Ready to go, please call connect!
+        return CAMIO_ENOERROR; //Ready to go, please call devect!
     }
 
 
@@ -53,7 +53,7 @@ static camio_error_t fio_connect_peek(camio_controller_t* this)
         return CAMIO_ENOERROR;
     }
 
-    //Open up the file and get it ready to connect
+    //Open up the file and get it ready to devect
     //This is the mode that the user has requested
     int mode = O_RDWR;
         mode = priv->params->rd_only ? O_RDONLY : mode;
@@ -94,18 +94,18 @@ static camio_error_t fio_connect_peek(camio_controller_t* this)
 
 }
 
-camio_error_t fio_controller_ready(camio_muxable_t* this)
+camio_error_t fio_device_ready(camio_muxable_t* this)
 {
-    fio_controller_priv_t* priv = CONNECTOR_GET_PRIVATE(this->parent.controller);
-    if(priv->is_connected){
-        return CAMIO_ENOMORE; // We're already connected!
+    fio_device_priv_t* priv = DEVICE_GET_PRIVATE(this->parent.device);
+    if(priv->is_devected){
+        return CAMIO_ENOMORE; // We're already devected!
     }
 
     if(this->fd > -1){
         return CAMIO_EREADY;
     }
 
-    camio_error_t err = fio_connect_peek(this->parent.controller);
+    camio_error_t err = fio_devect_peek(this->parent.device);
     if(err != CAMIO_ENOERROR){
         return err;
     }
@@ -113,20 +113,20 @@ camio_error_t fio_controller_ready(camio_muxable_t* this)
     return CAMIO_EREADY;
 }
 
-camio_error_t fio_connect(camio_controller_t* this, camio_channel_t** channel_o )
+camio_error_t fio_devect(camio_device_t* this, camio_channel_t** channel_o )
 {
-    fio_controller_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
-    camio_error_t err = fio_connect_peek(this);
+    fio_device_priv_t* priv = DEVICE_GET_PRIVATE(this);
+    camio_error_t err = fio_devect_peek(this);
     if(err != CAMIO_ENOERROR){
         return err;
     }
 
-    if(priv->is_connected){
-        ERR("Already connected! Why are you calling this twice?\n");
-        return CAMIO_EALLREADYCONNECTED; // We're already connected!
+    if(priv->is_devected){
+        ERR("Already devected! Why are you calling this twice?\n");
+        return CAMIO_EALLREADYCONNECTED; // We're already devected!
     }
 
-    //DBG("Done connecting, now constructing UDP channel...\n");
+    //DBG("Done devecting, now constructing UDP channel...\n");
     camio_channel_t* channel = NEW_CHANNEL(fio);
     if(!channel){
         *channel_o = NULL;
@@ -139,7 +139,7 @@ camio_error_t fio_connect(camio_controller_t* this, camio_channel_t** channel_o 
        return err;
     }
 
-    priv->is_connected = true;
+    priv->is_devected = true;
     return CAMIO_ENOERROR;
 }
 
@@ -149,10 +149,10 @@ camio_error_t fio_connect(camio_controller_t* this, camio_channel_t** channel_o 
  * Setup and teardown
  **************************************************************************************************************************/
 
-camio_error_t fio_construct(camio_controller_t* this, void** params, ch_word params_size)
+camio_error_t fio_construct(camio_device_t* this, void** params, ch_word params_size)
 {
 
-    fio_controller_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
+    fio_device_priv_t* priv = DEVICE_GET_PRIVATE(this);
     //Basic sanity check that the params is the right one.
     if(params_size != sizeof(fio_params_t)){
         DBG("Bad parameters structure passed\n");
@@ -185,7 +185,7 @@ camio_error_t fio_construct(camio_controller_t* this, void** params, ch_word par
         return CAMIO_EINVALID;
     }
 
-    //If the user has passed in a file descriptor, let's use that, otherwise we'll use the file name later in connect
+    //If the user has passed in a file descriptor, let's use that, otherwise we'll use the file name later in devect
     priv->base_rd_fd = -1;
     priv->base_wr_fd = -1;
     if(fio_params->rd_fd > -1){
@@ -205,23 +205,23 @@ camio_error_t fio_construct(camio_controller_t* this, void** params, ch_word par
 
     //Populate the rest of the muxable structure
     this->muxable.mode              = CAMIO_MUX_MODE_CONNECT;
-    this->muxable.parent.controller  = this;
-    this->muxable.vtable.ready      = fio_controller_ready;
+    this->muxable.parent.device  = this;
+    this->muxable.vtable.ready      = fio_device_ready;
     this->muxable.fd                = -1;
 
     return CAMIO_ENOERROR;
 }
 
 
-void fio_destroy(camio_controller_t* this)
+void fio_destroy(camio_device_t* this)
 {
-    DBG("Destorying fio controller\n");
-    fio_controller_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
+    DBG("Destorying fio device\n");
+    fio_device_priv_t* priv = DEVICE_GET_PRIVATE(this);
 
     if(priv->params) { free(priv->params); }
     DBG("Freed params\n");
     free(this);
-    DBG("Freed controller structure\n");
+    DBG("Freed device structure\n");
 }
 
-NEW_CONNECTOR_DEFINE(fio, fio_controller_priv_t)
+NEW_DEVICE_DEFINE(fio, fio_device_priv_t)

@@ -80,8 +80,8 @@ typedef struct camio_buffer_s {
 
 
 /**
- * Some macros to make life easier BUFFER_GET_PRIVATE helps us grab the private members out of the public controller_t and
- * CONNECTOR_DECLARE help to make a custom allocator for each channel
+ * Some macros to make life easier BUFFER_GET_PRIVATE helps us grab the private members out of the public device_t and
+ * DEVICE_DECLARE help to make a custom allocator for each channel
  */
 #define BUFFER_GET_PRIVATE(THIS) ( (void*)((THIS) + 1))
 

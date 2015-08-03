@@ -20,7 +20,7 @@ typedef struct {
     int flags;
     int mode;
     int fd;
-} conn_private;
+} dev_private;
 
 typedef struct {
 	int fd;
@@ -30,7 +30,7 @@ typedef struct {
 
 /**
  * This function tries to do a non-blocking read for new data from the CamIO Stream called “this” and return slot info
- * pointer called “slot”. If the channel is empty, (e.g. end of file) or closed (e.g. disconnected) it is EEMPTU is
+ * pointer called “slot”. If the channel is empty, (e.g. end of file) or closed (e.g. disdevected) it is EEMPTU is
  * returned
  * Return values:
  * - ENOERROR:  Completed successfully, sloto contains a valid structure.
@@ -123,7 +123,7 @@ static int strm_release(ciostrm* this, cioslot* slot_i)
 
 
 /**
- * Free resources associated with this channel, but not with its controller.
+ * Free resources associated with this channel, but not with its device.
  * Connectors should be free'd separately
  */
 static void strm_destroy(ciostrm* this)
@@ -150,11 +150,11 @@ static int strm_ready(cioselable* this)
 
 
 //Make a new fileio channel
-static int new_ciostrm_fileio( conn_private* conn_priv, ciostrm** ciostrm_o)
+static int new_ciostrm_fileio( dev_private* dev_priv, ciostrm** ciostrm_o)
 {
     int result = CIO_ENOERROR;
 
-    //Make a new controller
+    //Make a new device
     ciostrm* channel = calloc(1,sizeof(ciostrm));
     if(!channel){
         return CIO_ENOMEM;
@@ -175,7 +175,7 @@ static int new_ciostrm_fileio( conn_private* conn_priv, ciostrm** ciostrm_o)
 
     //Populate it
     strm_private* priv   = channel->__priv;
-    priv->fd			 = conn_priv->fd; //Link back so we can recover from the selectable
+    priv->fd			 = dev_priv->fd; //Link back so we can recover from the selectable
     int ret = new_malloc_buffer(8,4096,&priv->buff); //TODO XXX: These are nasty constants, should be fixed
     if(ret){
     	return ret;
@@ -207,9 +207,9 @@ static int new_ciostrm_fileio( conn_private* conn_priv, ciostrm** ciostrm_o)
 
 
 
-static int conn_connect( cioconn* this, ciostrm** ciostrm_o )
+static int dev_devect( ciodev* this, ciostrm** ciostrm_o )
 {
-    conn_private* priv = (conn_private*)this->__priv;
+    dev_private* priv = (dev_private*)this->__priv;
     priv->fd = open(priv->filename,priv->flags | O_NONBLOCK);
     if(priv->fd < 0){
     	return errno;
@@ -220,13 +220,13 @@ static int conn_connect( cioconn* this, ciostrm** ciostrm_o )
 
 
 
-static void conn_destroy(cioconn* this)
+static void dev_destroy(ciodev* this)
 {
     if(!this){
         return;
     }
 
-    conn_private* priv = (conn_private*)this->__priv;
+    dev_private* priv = (dev_private*)this->__priv;
     if(priv){
         free(priv);
     }
@@ -235,10 +235,10 @@ static void conn_destroy(cioconn* this)
 }
 
 
-static int conn_ready(cioselable* this)
+static int dev_ready(cioselable* this)
 {
-	//Connector is ready until it is connected
-	conn_private* priv = (conn_private*) this->__priv;
+	//Connector is ready until it is devected
+	dev_private* priv = (dev_private*) this->__priv;
 	if(priv->fd < 0){
 		return 1;
 	}
@@ -247,29 +247,29 @@ static int conn_ready(cioselable* this)
 }
 
 
-//Make a new fileio controller
-int new_cioconn_fileio( uri* uri_parsed , struct cioconn_s** cioconn_o, void** global_data )
+//Make a new fileio device
+int new_ciodev_fileio( uri* uri_parsed , struct ciodev_s** ciodev_o, void** global_data )
 {
     int result = CIO_ENOERROR;
 
-    //Make a new controller
-    cioconn* controller = calloc(0,sizeof(cioconn));
-    if(!controller){
+    //Make a new device
+    ciodev* device = calloc(0,sizeof(ciodev));
+    if(!device){
         return CIO_ENOMEM;
     }
 
     //Populate it
-    controller->connect          = conn_connect;
-    controller->destroy          = conn_destroy;
+    device->devect          = dev_devect;
+    device->destroy          = dev_destroy;
 
     //Make a new private structure
-    controller->__priv = calloc(0,sizeof(conn_private));
-    if(!controller->__priv){
+    device->__priv = calloc(0,sizeof(dev_private));
+    if(!device->__priv){
         return CIO_ENOMEM;
     }
 
     //Populate it
-    conn_private* priv   = controller->__priv;
+    dev_private* priv   = device->__priv;
     priv->filename  = NULL;
     priv->flags     = 0;
     priv->mode      = 0;
@@ -325,12 +325,12 @@ int new_cioconn_fileio( uri* uri_parsed , struct cioconn_s** cioconn_o, void** g
     (void)global_data;
 
     //Set up the selector
-    controller->selectable.ready  = conn_ready;
-    controller->selectable.fd     = -1; //Can only use this in a spinner selector right now. TODO XXX: Fake this out.
-    controller->selectable.__priv = priv; //Close the loop
+    device->selectable.ready  = dev_ready;
+    device->selectable.fd     = -1; //Can only use this in a spinner selector right now. TODO XXX: Fake this out.
+    device->selectable.__priv = priv; //Close the loop
 
-    //Output the controller
-    *cioconn_o = controller;
+    //Output the device
+    *ciodev_o = device;
 
     //Done!
     return CIO_ENOERROR;

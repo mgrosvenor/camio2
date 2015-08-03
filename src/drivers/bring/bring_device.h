@@ -12,7 +12,7 @@
 #define SRC_DRIVERS_BRING_BRING_TRANSPORT_H_
 
 
-#include "bring_controller.h"
+#include "bring_device.h"
 #include "bring_channel.h"
 
 typedef struct bring_global_s{

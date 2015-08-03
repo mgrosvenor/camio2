@@ -68,24 +68,24 @@ int main(int argc, char** argv)
         return CAMIO_EINVALID; //TODO XXX put a better error here
     }
 
-    //Use the parameters structure to construct a new controller object
-    camio_controller_t* controller = NULL;
-    err = camio_device_constr(id,&params,params_size,&controller);
+    //Use the parameters structure to construct a new device object
+    camio_device_t* device = NULL;
+    err = camio_device_constr(id,&params,params_size,&device);
     if(err){
-        ERR("Could not construct controller\n");
+        ERR("Could not construct device\n");
         return CAMIO_EINVALID; //TODO XXX put a better error here
     }
 
     //Spin waiting for a connection. A little bit naughty.
-    while( (err = camio_controller_ready(controller)) == CAMIO_ENOTREADY ){}
+    while( (err = camio_device_ready(device)) == CAMIO_ENOTREADY ){}
     if(err != CAMIO_EREADY){
-        ERR("Unexpected error in controller\n");
+        ERR("Unexpected error in device\n");
         return CAMIO_EINVALID;
     }
 
     camio_channel_t* io_channel = NULL;
-    err = camio_connect(controller,&io_channel);
-    if(err){ ERR("Could not connect to channel\n"); return CAMIO_EINVALID; /*TODO XXX put a better error here*/ }
+    err = camio_devect(device,&io_channel);
+    if(err){ ERR("Could not devect to channel\n"); return CAMIO_EINVALID; /*TODO XXX put a better error here*/ }
 
     //Put the read channel into the mux
     camio_mux_insert(mux,&io_channel->rd_muxable,READ_CHANNEL);

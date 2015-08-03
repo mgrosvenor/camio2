@@ -23,7 +23,7 @@
 
 extern struct options_t options;
 static camio_mux_t* mux                 = NULL;
-static camio_controller_t* controller   = NULL;
+static camio_device_t* device   = NULL;
 #define MSGS_MAX 1024
 static camio_msg_t ctrl_msgs[MSGS_MAX]  = {{0}};
 static ch_word ctrl_msgs_len            = MSGS_MAX;
@@ -47,7 +47,7 @@ static camio_error_t get_new_buffers(camio_channel_t* channel);
 static camio_error_t on_new_rd_buffs(camio_muxable_t* muxable, camio_error_t err, void* usr_state, ch_word id);
 static camio_error_t get_new_channels();
 
-#define CONNECTOR_ID 0
+#define DEVICE_ID 0
 //static ch_word delimit(char* buffer, ch_word len)
 //{
 //    DBG("Deliminting %p len=%lli\n", buffer, len);
@@ -65,7 +65,7 @@ static camio_error_t get_new_channels();
 //}
 
 //delim_params_t delim_params;
-static camio_error_t connect_delim(ch_cstr server_channel_uri, camio_controller_t** controller) {
+static camio_error_t devect_delim(ch_cstr server_channel_uri, camio_device_t** device) {
 //
 //    //Find the ID of the delim channel
 //    ch_word id;
@@ -79,17 +79,17 @@ static camio_error_t connect_delim(ch_cstr server_channel_uri, camio_controller_
 //    ch_word params_size = sizeof(delim_params_t);
 //    void* params = &delim_params;
 //
-//    //Use the parameters structure to construct a new controller object
-//    err = camio_device_constr(id, &params, params_size, controller);
+//    //Use the parameters structure to construct a new device object
+//    err = camio_device_constr(id, &params, params_size, device);
 //    if (err) {
-//        DBG("Could not construct controller\n");
+//        DBG("Could not construct device\n");
 //        return err; //TODO XXX put a better error here
 //    }
 //
 //    //And we're done!
-//    DBG("Got controller\n");
+//    DBG("Got device\n");
 
-    camio_controller_new(server_channel_uri,controller);
+    camio_easy_device_new(server_channel_uri,device);
     return CAMIO_ENOERROR;
 }
 
@@ -293,7 +293,7 @@ static camio_error_t get_new_buffers(camio_channel_t* channel)
 
 static camio_error_t on_new_channels(camio_muxable_t* muxable, camio_error_t err, void* usr_state, ch_word id)
 {
-    //DBG("Handling got new connect\n");
+    //DBG("Handling got new devect\n");
 
     //Currently ignoring these values
     (void)usr_state;
@@ -306,7 +306,7 @@ static camio_error_t on_new_channels(camio_muxable_t* muxable, camio_error_t err
     }
 
     ctrl_msgs_len = MIN(MSGS_MAX,options.batching);
-    err = camio_ctrl_chan_res(muxable->parent.controller, ctrl_msgs, &ctrl_msgs_len );
+    err = camio_ctrl_chan_res(muxable->parent.device, ctrl_msgs, &ctrl_msgs_len );
     if(err){
         return err;
     }
@@ -320,12 +320,12 @@ static camio_error_t on_new_channels(camio_muxable_t* muxable, camio_error_t err
 
     for(ch_word i = 0; i < ctrl_msgs_len; i++){
         if(ctrl_msgs[i].type == CAMIO_MSG_TYPE_IGNORE){
-            ERR("Ignoring connect response message at index %lli\n", i);
+            ERR("Ignoring devect response message at index %lli\n", i);
             continue;
         }
 
         if(ctrl_msgs[i].type != CAMIO_MSG_TYPE_CHAN_RES){
-            ERR("Expected to get connect response message (%lli), but got %lli instead.\n",
+            ERR("Expected to get devect response message (%lli), but got %lli instead.\n",
                     CAMIO_MSG_TYPE_CHAN_RES, ctrl_msgs[i].type);
             ctrl_msgs[i].type = CAMIO_MSG_TYPE_IGNORE;
             continue;
@@ -333,21 +333,21 @@ static camio_error_t on_new_channels(camio_muxable_t* muxable, camio_error_t err
 
         camio_chan_res_t* res = &ctrl_msgs[i].ch_res;
         if(res->status == CAMIO_EALLREADYCONNECTED){
-            //DBG("No more connections on this controller\n", err);
+            //DBG("No more connections on this device\n", err);
             camio_mux_remove(mux,muxable);
-            return CAMIO_ENOERROR; //Bail out here. The controller is gone
+            return CAMIO_ENOERROR; //Bail out here. The device is gone
         }
 
         if(res->status){
-            ERR("Could not get channel. Removing broken controller with error=%lli\n", err);
+            ERR("Could not get channel. Removing broken device with error=%lli\n", err);
             camio_mux_remove(mux,muxable);
-            return CAMIO_ENOERROR; //Bail out here. The controller is gone
+            return CAMIO_ENOERROR; //Bail out here. The device is gone
         }
 
-        camio_mux_insert(mux,&res->channel->rd_data_muxable,on_new_rd_datas, NULL, CONNECTOR_ID + 1);
-        camio_mux_insert(mux,&res->channel->rd_buff_muxable,on_new_rd_buffs, NULL, CONNECTOR_ID + 2);
-        camio_mux_insert(mux,&res->channel->wr_data_muxable,on_new_wr_datas, NULL, CONNECTOR_ID + 3);
-        camio_mux_insert(mux,&res->channel->wr_buff_muxable,on_new_wr_buffs, NULL, CONNECTOR_ID + 4);
+        camio_mux_insert(mux,&res->channel->rd_data_muxable,on_new_rd_datas, NULL, DEVICE_ID + 1);
+        camio_mux_insert(mux,&res->channel->rd_buff_muxable,on_new_rd_buffs, NULL, DEVICE_ID + 2);
+        camio_mux_insert(mux,&res->channel->wr_data_muxable,on_new_wr_datas, NULL, DEVICE_ID + 3);
+        camio_mux_insert(mux,&res->channel->wr_buff_muxable,on_new_wr_buffs, NULL, DEVICE_ID + 4);
 
         //Get the stream started by asking for some new buffers to read into
         get_new_buffers(res->channel);
@@ -371,7 +371,7 @@ static camio_error_t get_new_channels()
 
     ctrl_msgs_len = MIN(MSGS_MAX,options.batching);
     //DBG("Requesting %lli channel\n", MSGS_MAX);
-    camio_error_t err = camio_ctrl_chan_req(controller, ctrl_msgs, &ctrl_msgs_len);
+    camio_error_t err = camio_ctrl_chan_req(device, ctrl_msgs, &ctrl_msgs_len);
 
     if(err){
         ERR("Could not request channels with error %lli\n", err);
@@ -391,16 +391,16 @@ int camio_perf_server(ch_cstr client_channel_uri, ch_word* stop)
     camio_error_t err = camio_mux_new(CAMIO_MUX_HINT_PERFORMANCE, &mux);
 
     //Construct a delimiter
-    err = connect_delim(client_channel_uri, &controller);
+    err = devect_delim(client_channel_uri, &device);
     if(err){
         DBG("Could not create delimiter!\n");
         return CAMIO_EINVALID;
     }
 
-    //Insert the controller into the mux
-    err = camio_mux_insert(mux,&controller->muxable, on_new_channels, NULL, CONNECTOR_ID);
+    //Insert the device into the mux
+    err = camio_mux_insert(mux,&device->muxable, on_new_channels, NULL, DEVICE_ID);
     if(err){
-        DBG("Could not insert controller into multiplexer\n");
+        DBG("Could not insert device into multiplexer\n");
         return CAMIO_EINVALID;
     }
 

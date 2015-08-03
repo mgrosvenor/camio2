@@ -10,8 +10,8 @@
 struct ciostrm_s;
 typedef struct ciostrm_s ciostrm;
 
-struct cioconn_s;
-typedef struct cioconn_s cioconn;
+struct ciodev_s;
+typedef struct ciodev_s ciodev;
 
 struct ciobuff_s;
 typedef struct ciobuff_s ciobuff;

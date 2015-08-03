@@ -12,11 +12,11 @@
 #define SRC_DRIVERS_TCP_TCP_CHANNEL_H_
 
 #include <src/devices/channel.h>
-#include <src/devices/controller.h>
+#include <src/devices/device.h>
 #include "tcp_device.h"
 
 NEW_CHANNEL_DECLARE(tcp);
 
-camio_error_t tcp_channel_construct(camio_channel_t* this, camio_controller_t* controller, tcp_params_t* params, int fd);
+camio_error_t tcp_channel_construct(camio_channel_t* this, camio_device_t* device, tcp_params_t* params, int fd);
 
 #endif /* SRC_DRIVERS_TCP_TCP_CHANNEL_H_ */

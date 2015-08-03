@@ -11,7 +11,7 @@
 #ifndef SRC_DRIVERS_TCP_TCP_TRANSPORT_H_
 #define SRC_DRIVERS_TCP_TCP_TRANSPORT_H_
 
-#include <src/drivers/tcp/tcp_controller.h>
+#include <src/drivers/tcp/tcp_device.h>
 #include <src/types/len_string.h>
 
 typedef struct tcp_global_s{

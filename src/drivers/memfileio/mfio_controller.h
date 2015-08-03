@@ -4,15 +4,15 @@
  * See LICENSE.txt for full details. 
  * 
  *  Created:   01 Jul 2015
- *  File name: mfio_controller.h
+ *  File name: mfio_device.h
  *  Description:
  *  <INSERT DESCRIPTION HERE> 
  */
-#ifndef SRC_DRIVERS_MFIO_MFIO_CONNECTOR_H_
-#define SRC_DRIVERS_MFIO_MFIO_CONNECTOR_H_
+#ifndef SRC_DRIVERS_MFIO_MFIO_DEVICE_H_
+#define SRC_DRIVERS_MFIO_MFIO_DEVICE_H_
 
-#include "../../devices/controller.h"
+#include "../../devices/device.h"
 
-NEW_CONNECTOR_DECLARE(mfio);
+NEW_DEVICE_DECLARE(mfio);
 
-#endif /* SRC_DRIVERS_MFIO_MFIO_CONNECTOR_H_ */
+#endif /* SRC_DRIVERS_MFIO_MFIO_DEVICE_H_ */

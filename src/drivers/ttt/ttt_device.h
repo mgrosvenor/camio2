@@ -13,7 +13,7 @@
 
 #include <src/types/len_string.h>
 
-#include "ttt_controller.h"
+#include "ttt_device.h"
 
 typedef struct ttt_global_s{
     ch_bool is_init;

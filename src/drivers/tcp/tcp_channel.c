@@ -11,7 +11,7 @@
 
 
 #include <src/devices/channel.h>
-#include <src/devices/controller.h>
+#include <src/devices/device.h>
 #include <src/buffers/buffer_malloc_linear.h>
 #include <deps/chaste/utils/util.h>
 
@@ -30,7 +30,7 @@
 #define CAMIO_TCP_BUFFER_COUNT (1)
 
 typedef struct tcp_channel_priv_s {
-    camio_controller_t controller;
+    camio_device_t device;
 
     ch_word rd_buff_sz;
     ch_word wr_buff_sz;
@@ -512,7 +512,7 @@ static void tcp_destroy(camio_channel_t* this)
 
 }
 
-camio_error_t tcp_channel_construct(camio_channel_t* this, camio_controller_t* controller, tcp_params_t* params, int fd)
+camio_error_t tcp_channel_construct(camio_channel_t* this, camio_device_t* device, tcp_params_t* params, int fd)
 {
     //Basic sanity checks -- TODO XXX: Should these be made into (compile time optional?) asserts for runtime performance?
     if( NULL == this){
@@ -521,7 +521,7 @@ camio_error_t tcp_channel_construct(camio_channel_t* this, camio_controller_t* c
     }
     tcp_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this);
 
-    priv->controller     = *controller; //Keep a copy of the controller state
+    priv->device     = *device; //Keep a copy of the device state
     priv->fd            = fd;
     priv->rd_buff_sz    = params->rd_buff_sz;
     priv->wr_buff_sz    = params->wr_buff_sz;

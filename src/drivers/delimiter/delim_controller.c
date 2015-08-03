@@ -4,16 +4,16 @@
  * See LICENSE.txt for full details. 
  * 
  *  Created:   26 Jun 2015
- *  File name: delim_controller.c
+ *  File name: delim_device.c
  *  Description:
  *  <INSERT DESCRIPTION HERE> 
  */
 
-#include <src/devices/controller.h>
+#include <src/devices/device.h>
 #include <deps/chaste/utils/debug.h>
 
 #include "delim_device.h"
-#include "delim_controller.h"
+#include "delim_device.h"
 #include "delim_channel.h"
 
 
@@ -25,12 +25,12 @@ typedef struct delim_priv_s {
     delim_params_t* params;
 
     //Properties of the base channel
-    camio_controller_t* base;
+    camio_device_t* base;
     void* base_params;
     ch_word base_params_size;
     ch_word base_id;
 
-} delim_controller_priv_t;
+} delim_device_priv_t;
 
 
 
@@ -38,12 +38,12 @@ typedef struct delim_priv_s {
 /**************************************************************************************************************************
  * Connect functions
  **************************************************************************************************************************/
-camio_error_t delim_channel_request( camio_controller_t* this, camio_msg_t* req_vec, ch_word* vec_len_io)
+camio_error_t delim_channel_request( camio_device_t* this, camio_msg_t* req_vec, ch_word* vec_len_io)
 {
     DBG("Doing delim channel request...!\n");
 
-    //Simply forward the request to the base controller.
-    delim_controller_priv_t* priv = CONTROLLER_GET_PRIVATE(this);
+    //Simply forward the request to the base device.
+    delim_device_priv_t* priv = DEVICE_GET_PRIVATE(this);
     const camio_error_t err = camio_ctrl_chan_req(priv->base,req_vec,vec_len_io);
 
     DBG("Delim channel request done - %lli requests added\n", *vec_len_io);
@@ -53,10 +53,10 @@ camio_error_t delim_channel_request( camio_controller_t* this, camio_msg_t* req_
 
 static camio_error_t delim_channel_ready(camio_muxable_t* this)
 {
-    delim_controller_priv_t* priv = CONNECTOR_GET_PRIVATE(this->parent.controller);
+    delim_device_priv_t* priv = DEVICE_GET_PRIVATE(this->parent.device);
     DBG("Doing channel ready\n");
 
-    //Simply forward the ready to the base controller.
+    //Simply forward the ready to the base device.
     const camio_error_t err = camio_ctrl_chan_ready(priv->base);
 
     return err;
@@ -64,21 +64,21 @@ static camio_error_t delim_channel_ready(camio_muxable_t* this)
 
 
 
-static camio_error_t delim_channel_result(camio_controller_t* this, camio_msg_t* res_vec, ch_word* vec_len_io )
+static camio_error_t delim_channel_result(camio_device_t* this, camio_msg_t* res_vec, ch_word* vec_len_io )
 {
-    delim_controller_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
+    delim_device_priv_t* priv = DEVICE_GET_PRIVATE(this);
 
-    DBG("Getting result from base controller\n");
+    DBG("Getting result from base device\n");
     camio_error_t err = camio_ctrl_chan_res(priv->base,res_vec,vec_len_io);
     if(unlikely(err)){
-        DBG("Base controller returned error=%i\n", err);
+        DBG("Base device returned error=%i\n", err);
         return err;
     }
     if(unlikely(0 == *vec_len_io)){
-        DGB("WTF? Base controller returned no new channels and no error\n");
+        DGB("WTF? Base device returned no new channels and no error\n");
         return CAMIO_EINVALID; //TODO XXX -- better error code
     }
-    DBG("Base controller returned %lli new channels\n", *vec_len_io);
+    DBG("Base device returned %lli new channels\n", *vec_len_io);
 
     //Iterate over the channels returned, and replace them with delimiter channels
     ch_word channels = 0;
@@ -100,7 +100,7 @@ static camio_error_t delim_channel_result(camio_controller_t* this, camio_msg_t*
             continue;
         }
 
-        //OK. We can be pretty sure that we have a valid channel from the base controller. Try to make a delimiter for it.
+        //OK. We can be pretty sure that we have a valid channel from the base device. Try to make a delimiter for it.
         DBG("Making new delimiter channel at index %lli\n", i);
         camio_channel_t* delim_channel = NEW_CHANNEL(delim);
         if(unlikely(!delim_channel)){
@@ -138,7 +138,7 @@ static camio_error_t delim_channel_result(camio_controller_t* this, camio_msg_t*
  * Setup and teardown
  **************************************************************************************************************************/
 
-static camio_error_t delim_construct(camio_controller_t* this, void** params, ch_word params_size)
+static camio_error_t delim_construct(camio_device_t* this, void** params, ch_word params_size)
 {
     //Basic sanity check that the params is the right one.
     if(params_size != sizeof(delim_params_t)){
@@ -158,10 +158,10 @@ static camio_error_t delim_construct(camio_controller_t* this, void** params, ch
     }
 
     //Populate the parameters
-    delim_controller_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
+    delim_device_priv_t* priv = DEVICE_GET_PRIVATE(this);
     priv->params = delim_params;
 
-    //OK try to construct the base channel controller...
+    //OK try to construct the base channel device...
     camio_error_t err = camio_device_params_new(
         priv->params->base_uri,
         &priv->base_params,
@@ -169,32 +169,32 @@ static camio_error_t delim_construct(camio_controller_t* this, void** params, ch
         &priv->base_id
     );
     if(unlikely(err)){
-        DBG("Uh ohh, got %lli error trying to make base controller parameters\n",err);
+        DBG("Uh ohh, got %lli error trying to make base device parameters\n",err);
         return err;
     }
 
     err = camio_device_constr(priv->base_id,&priv->base_params,priv->base_params_size,&priv->base);
     if(unlikely(err)){
-        DBG("Uh ohh, got %lli error trying to construct base controller\n",err);
+        DBG("Uh ohh, got %lli error trying to construct base device\n",err);
         return err;
     }
 
     this->muxable.fd = priv->base->muxable.fd; //Pass this out, but retain the ready function.
                                                //Smells a bit bad, but is probably ok.
 
-    DBG("Finished constructing delimiter controller and base controller\n");
+    DBG("Finished constructing delimiter device and base device\n");
     return CAMIO_ENOERROR;
 }
 
 
-static void delim_destroy(camio_controller_t* this)
+static void delim_destroy(camio_device_t* this)
 {
-    DBG("Destroying delim controller...\n");
-    delim_controller_priv_t* priv = CONNECTOR_GET_PRIVATE(this);
-    if(priv->base){ camio_controller_destroy(priv->base); }
+    DBG("Destroying delim device...\n");
+    delim_device_priv_t* priv = DEVICE_GET_PRIVATE(this);
+    if(priv->base){ camio_device_destroy(priv->base); }
     if(priv->params) { free(priv->params); }
     free(this);
-    DBG("Done destroying delim controller structure\n");
+    DBG("Done destroying delim device structure\n");
 }
 
-NEW_CONTROLLER_DEFINE(delim, delim_controller_priv_t)
+NEW_DEVICE_DEFINE(delim, delim_device_priv_t)

@@ -15,12 +15,12 @@
 #include <src/devices/channel.h>
 
 /**
- * A nice wrapper around device creation and connection. Creates a device and uses the controller to produce a channel.
- * Assumes that the controller will connect immidately.
+ * A nice wrapper around device creation and connection. Creates a device and uses the device to produce a channel.
+ * Assumes that the device will devect immidately.
  */
-camio_error_t camio_channel_new(char* uri, camio_channel_t** channel);
+camio_error_t camio_easy_channel_new(char* uri, camio_channel_t** channel);
 
-camio_error_t camio_controller_new(char* uri, camio_controller_t** controller_o);
+camio_error_t camio_easy_device_new(char* uri, camio_device_t** device_o);
 
 
 #endif /* API_EASY_H_ */

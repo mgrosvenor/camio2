@@ -13,7 +13,7 @@
 
 #include <src/types/len_string.h>
 
-#include "mfio_controller.h"
+#include "mfio_device.h"
 
 typedef struct mfio_global_s{
     ch_bool is_init;

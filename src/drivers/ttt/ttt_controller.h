@@ -4,15 +4,15 @@
  * See LICENSE.txt for full details. 
  * 
  *  Created:   PPP ZZZZ
- *  File name: ttt_controller.h
+ *  File name: ttt_device.h
  *  Description:
  *  <INSERT DESCRIPTION HERE> 
  */
-#ifndef SRC_DRIVERS_TTT_TTT_CONNECTOR_H_
-#define SRC_DRIVERS_TTT_TTT_CONNECTOR_H_
+#ifndef SRC_DRIVERS_TTT_TTT_DEVICE_H_
+#define SRC_DRIVERS_TTT_TTT_DEVICE_H_
 
-#include <src/devices/controller.h>
+#include <src/devices/device.h>
 
-NEW_CONNECTOR_DECLARE(ttt);
+NEW_DEVICE_DECLARE(ttt);
 
-#endif /* SRC_DRIVERS_TTT_TTT_CONNECTOR_H_ */
+#endif /* SRC_DRIVERS_TTT_TTT_DEVICE_H_ */

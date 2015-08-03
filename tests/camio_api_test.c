@@ -21,14 +21,14 @@ int main(int argc, char** argv)
     (void)argc; //We don't use these for the test ... yet
     (void)argv;
 
-    camio_controller_t* controller = NULL;
+    camio_device_t* device = NULL;
 
-    new_camio_device_bin("netm",NULL,&controller);
+    new_camio_device_bin("netm",NULL,&device);
 
-    DBG("Got new controller at address %p\n", controller);
+    DBG("Got new device at address %p\n", device);
 
     camio_channel_t* channel = NULL;
-    camio_connect(controller,&channel);
+    camio_devect(device,&channel);
 
     camio_rd_buffer_t* rd_buff = NULL;
     ch_word rd_buff_len = 0;
@@ -36,7 +36,7 @@ int main(int argc, char** argv)
 
     /*
     camio_channel_t* channel = NULL;
-    while(!camio_connect(controller,&channel)){
+    while(!camio_devect(device,&channel)){
         //Just spin waiting for a connection
     }
 

@@ -16,9 +16,9 @@ int main(int argc, char** argv)
     printf("Release Mode on!!\n");
     #endif
 
-    cioconn* con;
-    new_cioconn("file:/tmp/myfile?ro,trunc",NULL,&con);
-    con->connect(con);
+    ciodev* con;
+    new_ciodev("file:/tmp/myfile?ro,trunc",NULL,&con);
+    con->devect(con);
 
     return 0;
 }

@@ -10,7 +10,7 @@
  */
 
 #include <src/devices/channel.h>
-#include <src/devices/controller.h>
+#include <src/devices/device.h>
 #include <src/buffers/buffer_malloc_linear.h>
 #include <deps/chaste/utils/util.h>
 
@@ -28,7 +28,7 @@
  * PER CHANNEL STATE
  **************************************************************************************************************************/
 typedef struct mfio_channel_priv_s {
-    camio_controller_t controller;
+    camio_device_t device;
 
     //To manage read buffer/requests --TODO should harmonize the naming convention. read vs rd etc
     ch_bool is_rd_closed;
@@ -541,7 +541,7 @@ void init_buffer(camio_buffer_t* buff, ch_bool read_only, camio_channel_t* paren
 
 camio_error_t mfio_channel_construct(
     camio_channel_t* this,
-    camio_controller_t* controller,
+    camio_device_t* device,
     int base_fd,
     void* base_mem_start,
     ch_word base_mem_len
@@ -554,7 +554,7 @@ camio_error_t mfio_channel_construct(
     }
     mfio_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this);
 
-    priv->controller = *controller; //Keep a copy of the controller state
+    priv->device = *device; //Keep a copy of the device state
     //Set up the buffer states
     init_buffer(&priv->mmap_rd_buff,true,this, base_mem_start, base_mem_len);
     init_buffer(&priv->mmap_wr_buff,false,this, base_mem_start, base_mem_len);

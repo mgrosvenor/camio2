@@ -26,7 +26,7 @@
 #define DO_SANITY_CHECKS
 #endif
 
-#include <src/devices/controller.h>
+#include <src/devices/device.h>
 #include <src/devices/features.h>
 #include <src/devices/channel.h>
 #include <src/errors/camio_errors.h>
@@ -48,7 +48,7 @@
     }
 
 
-camio_error_t camio_ctrl_chan_req( camio_controller_t* this, camio_msg_t* req_vec, ch_word* vec_len_io)
+camio_error_t camio_ctrl_chan_req( camio_device_t* this, camio_msg_t* req_vec, ch_word* vec_len_io)
 {
     #ifdef DO_SANITY_CHECKS
         CHECK(NULL == this,"This is null???\n")
@@ -60,7 +60,7 @@ camio_error_t camio_ctrl_chan_req( camio_controller_t* this, camio_msg_t* req_ve
 }
 
 
-camio_error_t camio_ctrl_chan_ready( camio_controller_t* this )
+camio_error_t camio_ctrl_chan_ready( camio_device_t* this )
 {
     #ifdef DO_SANITY_CHECKS
         CHECK( NULL == this,"This is null???\n")
@@ -71,7 +71,7 @@ camio_error_t camio_ctrl_chan_ready( camio_controller_t* this )
 }
 
 
-camio_error_t camio_ctrl_chan_res( camio_controller_t* this, camio_msg_t* res_vec, ch_word* vec_len_io)
+camio_error_t camio_ctrl_chan_res( camio_device_t* this, camio_msg_t* res_vec, ch_word* vec_len_io)
 {
     #ifdef DO_SANITY_CHECKS //Only apply these checks in debug mode. Keep the speed when we need it?
         CHECK( NULL == this,"This is null???\n")
@@ -83,7 +83,7 @@ camio_error_t camio_ctrl_chan_res( camio_controller_t* this, camio_msg_t* res_ve
 }
 
 
-void camio_controller_destroy(camio_controller_t* this)
+void camio_device_destroy(camio_device_t* this)
 {
     #ifdef DO_SANITY_CHECKS
         CHECK_NR( NULL == this,"This is null???\n")

@@ -22,16 +22,16 @@ int main(int argc, char** argv)
 
     printf("Hello CamIO\n");
 
-    camio_controller_t* controller = NULL;
+    camio_device_t* device = NULL;
 
-    new_camio_device_str("udp:127.0.0.1?rp=3000?wp=4000",NULL,&controller);
+    new_camio_device_str("udp:127.0.0.1?rp=3000?wp=4000",NULL,&device);
 
-    printf("Got new controller at address %p\n", controller);
+    printf("Got new device at address %p\n", device);
 
     camio_channel_t* channel = NULL;
-    camio_connect(controller,&channel);
+    camio_devect(device,&channel);
 
-    while(!camio_connect(controller,&channel)){
+    while(!camio_devect(device,&channel)){
         //Just spin waiting for a connection
     }
 

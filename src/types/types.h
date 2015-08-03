@@ -31,13 +31,13 @@ typedef struct camio_channel_s camio_channel_t;
 struct camio_channel_s;
 typedef struct camio_channel_s camio_channel_t;
 
-//Forward declaration, the real definition is found in channels/controller.h
-struct camio_controller_s;
-typedef struct camio_controller_s camio_controller_t;
+//Forward declaration, the real definition is found in channels/device.h
+struct camio_device_s;
+typedef struct camio_device_s camio_device_t;
 
-//Forward declaration, the real definition is found in channels/controller.h
-struct camio_controller_interface_s;
-typedef struct camio_controller_interface_s camio_controller_interface_t;
+//Forward declaration, the real definition is found in channels/device.h
+struct camio_device_interface_s;
+typedef struct camio_device_interface_s camio_device_interface_t;
 
 //Forward declaration, the real definition is found in buffers/buffer.h
 struct camio_buffer_s;

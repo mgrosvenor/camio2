@@ -4,15 +4,15 @@
  * See LICENSE.txt for full details. 
  * 
  *  Created:   03 Jul 2015
- *  File name: stdio_controller.h
+ *  File name: stdio_device.h
  *  Description:
  *  <INSERT DESCRIPTION HERE> 
  */
-#ifndef SRC_DRIVERS_STDIO_STDIO_CONNECTOR_H_
-#define SRC_DRIVERS_STDIO_STDIO_CONNECTOR_H_
+#ifndef SRC_DRIVERS_STDIO_STDIO_DEVICE_H_
+#define SRC_DRIVERS_STDIO_STDIO_DEVICE_H_
 
-#include "../../devices/controller.h"
+#include "../../devices/device.h"
 
-NEW_CONNECTOR_DECLARE(stdio);
+NEW_DEVICE_DECLARE(stdio);
 
-#endif /* SRC_DRIVERS_STDIO_STDIO_CONNECTOR_H_ */
+#endif /* SRC_DRIVERS_STDIO_STDIO_DEVICE_H_ */

@@ -10,7 +10,7 @@
  */
 
 #include <src/devices/channel.h>
-#include <src/devices/controller.h>
+#include <src/devices/device.h>
 #include <src/buffers/buffer_malloc_linear.h>
 #include <deps/chaste/utils/util.h>
 
@@ -29,7 +29,7 @@
 #define CAMIO_TTT_BUFFER_COUNT (1)
 
 typedef struct ttt_channel_priv_s {
-    camio_controller_t controller;
+    camio_device_t device;
 
     //The actual underlying file descriptor that we're going to work with. Default is -1
     int fd;
@@ -469,7 +469,7 @@ static void ttt_destroy(camio_channel_t* this)
 
 }
 
-camio_error_t ttt_channel_construct(camio_channel_t* this, camio_controller_t* controller, int fd)
+camio_error_t ttt_channel_construct(camio_channel_t* this, camio_device_t* device, int fd)
 {
     //Basic sanity checks -- TODO XXX: Should these be made into (compile time optional?) asserts for runtime performance?
     if( NULL == this){
@@ -478,7 +478,7 @@ camio_error_t ttt_channel_construct(camio_channel_t* this, camio_controller_t* c
     }
     ttt_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this);
 
-    priv->controller = *controller; //Keep a copy of the controller state
+    priv->device = *device; //Keep a copy of the device state
     priv->fd = fd;
 
     //Make sure the file descriptors are in non-blocking mode

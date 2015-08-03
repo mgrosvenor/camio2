@@ -21,7 +21,7 @@
 #include <src/devices/features.h>
 #include <src/multiplexers/mux.h>
 #include <src/devices/channel.h>
-#include <src/devices/controller.h>
+#include <src/devices/device.h>
 
 
 /**************************************************************************************************************************
@@ -29,7 +29,7 @@
  **************************************************************************************************************************/
 /**
  *  CamIO Control, Channel Request
- *  Tell the controller that we would like to obtain a communication channel on this device. Some devices will support many
+ *  Tell the device that we would like to obtain a communication channel on this device. Some devices will support many
  *  channels. Some devices will support only one. The request is issued as a vector of request structures, with length
  *  vec_len_io. The device may have a limited number of request slots. The number of requests accepted into the queue is
  *  returned in vec_len_io.
@@ -38,7 +38,7 @@
  *  CAMIO_ETOOMANY - the request slots have run-out
  *  CAMIO_ENOMORE  - the device has run out of communication channels, no more requests will succeed.
  */
-camio_error_t camio_ctrl_chan_req( camio_controller_t* this, camio_msg_t* req_vec, ch_word* vec_len_io);
+camio_error_t camio_ctrl_chan_req( camio_device_t* this, camio_msg_t* req_vec, ch_word* vec_len_io);
 
 
 /**
@@ -49,7 +49,7 @@ camio_error_t camio_ctrl_chan_req( camio_controller_t* this, camio_msg_t* req_ve
  * CAMIO_NOERROR - there is a new channel request response waiting
  *
  */
-camio_error_t camio_ctrl_chan_ready( camio_controller_t* this );
+camio_error_t camio_ctrl_chan_ready( camio_device_t* this );
 
 
 /**
@@ -60,19 +60,19 @@ camio_error_t camio_ctrl_chan_ready( camio_controller_t* this );
  * Return values:
  * CAMIO_ENOERROR
  */
-camio_error_t camio_ctrl_chan_res( camio_controller_t* this, camio_msg_t* res_vec, ch_word* vec_len_io);
+camio_error_t camio_ctrl_chan_res( camio_device_t* this, camio_msg_t* res_vec, ch_word* vec_len_io);
 
 
 /**
  * Configure properties of the device
  */
-//camio_error_t camio_ctrl_config( camio_controller_t* this, void* params, size_t param_size);
+//camio_error_t camio_ctrl_config( camio_device_t* this, void* params, size_t param_size);
 
 
 /**
- * Free resources associated with this controller, but not with any of the channels it has created.
+ * Free resources associated with this device, but not with any of the channels it has created.
  */
-void camio_controller_destroy(camio_controller_t* this);
+void camio_device_destroy(camio_device_t* this);
 
 
 /**************************************************************************************************************************
@@ -86,7 +86,7 @@ void camio_controller_destroy(camio_controller_t* this);
  * - ENOERROR: All good, please continue.
  * - ENOREAD: This selectable does not support reading
  * - ENOWRITE: This selectable does not support writing
- * - ENOCONNECT: This selectable does not support connecting
+ * - ENOCONNECT: This selectable does not support devecting
  * - TODO XXX: More errors here
  */
 camio_error_t camio_mux_insert(camio_mux_t* this, camio_muxable_t* muxable, mux_callback_f callback, void* usr_state, ch_word id);
@@ -102,9 +102,9 @@ camio_error_t camio_mux_remove(camio_mux_t* this, camio_muxable_t* muxable);
 
 
 /**
- * Perform the select operation. Find if any of the supplied channels are ready for reading, writing or connecting. The first
+ * Perform the select operation. Find if any of the supplied channels are ready for reading, writing or devecting. The first
  * channel that matches one of these will fire. A camio_selector is trigger based. It has no memory. Once an event has been
- * delivered once, it will not be delivered again until there is a change in the state of the channel or controller.
+ * delivered once, it will not be delivered again until there is a change in the state of the channel or device.
  * Return values:
  * - ENOERROR: All good, please continue.
  * - TODO XXX: More errors here
@@ -190,7 +190,7 @@ camio_error_t camio_chan_rd_data_req( camio_channel_t* this, camio_msg_t* req_ve
 
 
 /**
- * Check if the channel is ready to read. A controller is ready if calling read will be non-blocking.
+ * Check if the channel is ready to read. A device is ready if calling read will be non-blocking.
  * Return values:
  * - ENOERROR - the channel is ready to be read
  * - ETRYAGAIN - the channel is not ready to be read, try again later
@@ -202,7 +202,7 @@ camio_error_t camio_chan_rd_data_ready( camio_channel_t* this);
 /**
  * This function returns a read buffer pointer called buffer_o. The read call may or may not block. You should use a
  * multiplexer to ensure that the channel is ready for reading. If the channel is empty, (e.g. end of file) or closed
- * (e.g. disconnected) it is valid to return an empty buffer with ENOERROR. If buffer_offset is non-zero.
+ * (e.g. disdevected) it is valid to return an empty buffer with ENOERROR. If buffer_offset is non-zero.
  * Return values:
  * - ENOERROR:  Completed successfully, buffer_o contains a valid structure.
  * - ETRYAGAIN: There was no data available at this time, but there might be some more later.
@@ -281,7 +281,7 @@ camio_error_t camio_chan_wr_buff_release(camio_channel_t* this, camio_buffer_t* 
 
 
 /**
- * Free resources associated with this channel, but not with its controller.
+ * Free resources associated with this channel, but not with its device.
  */
 void camio_channel_destroy(camio_channel_t* this);
 

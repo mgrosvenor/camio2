@@ -4,18 +4,18 @@
  * See LICENSE.txt for full details. 
  * 
  *  Created:   Aug 16, 2014
- *  File name: netmap_controller.h
+ *  File name: netmap_device.h
  *  Description:
  *  <INSERT DESCRIPTION HERE> 
  */
 
-#ifndef NETMAP_CONNECTOR_H_
-#define NETMAP_CONNECTOR_H_
+#ifndef NETMAP_DEVICE_H_
+#define NETMAP_DEVICE_H_
 
-#include <src/devices/controller.h>
+#include <src/devices/device.h>
 #include <stdarg.h>
 
-NEW_CONNECTOR_DECLARE(netmap);
+NEW_DEVICE_DECLARE(netmap);
 
 
-#endif /* NETMAP_CONNECTOR_H_ */
+#endif /* NETMAP_DEVICE_H_ */

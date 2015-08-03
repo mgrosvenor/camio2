@@ -9,38 +9,38 @@
  *  <INSERT DESCRIPTION HERE> 
  */
 
-#include <src/drivers/netmap/netmap_controller.h>
+#include <src/drivers/netmap/netmap_device.h>
 #include <src/drivers/netmap/netmap_device.h>
 #include "../../camio.h"
 #include "../../camio_debug.h"
 
 const char * const scheme = "netm";
 
-static camio_error_t construct_str(camio_uri_t* uri, camio_controller_t** controller_o)
+static camio_error_t construct_str(camio_uri_t* uri, camio_device_t** device_o)
 {
-    camio_controller_t* conn = NEW_CONNECTOR(netmap);
-    if(!conn){
-        *controller_o = NULL;
+    camio_device_t* dev = NEW_DEVICE(netmap);
+    if(!dev){
+        *device_o = NULL;
         return CAMIO_ENOMEM;
     }
 
-    *controller_o = conn;
-    DBG("Connector address=%p (%p)\n",conn, *controller_o);
+    *device_o = dev;
+    DBG("Connector address=%p (%p)\n",dev, *device_o);
 
-    return conn->vtable.construct_str(conn,uri);
+    return dev->vtable.construct_str(dev,uri);
 }
 
-static camio_error_t construct_bin(camio_controller_t** controller_o, va_list args)
+static camio_error_t construct_bin(camio_device_t** device_o, va_list args)
 {
-    camio_controller_t* conn = NEW_CONNECTOR(netmap);
-    if(!conn){
-        *controller_o = NULL;
+    camio_device_t* dev = NEW_DEVICE(netmap);
+    if(!dev){
+        *device_o = NULL;
         return CAMIO_ENOMEM;
     }
 
-    *controller_o = conn;
+    *device_o = dev;
 
-    return conn->vtable.construct_bin(conn,args);
+    return dev->vtable.construct_bin(dev,args);
 }
 
 

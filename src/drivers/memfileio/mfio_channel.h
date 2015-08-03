@@ -12,13 +12,13 @@
 #define SRC_DRIVERS_MFIO_MFIO_CHANNEL_H_
 
 #include <src/devices/channel.h>
-#include <src/devices/controller.h>
+#include <src/devices/device.h>
 
 NEW_CHANNEL_DECLARE(mfio);
 
 camio_error_t mfio_channel_construct(
     camio_channel_t* this,
-    camio_controller_t* controller,
+    camio_device_t* device,
     int base_fd,
     void* base_mem_start,
     ch_word base_mem_len

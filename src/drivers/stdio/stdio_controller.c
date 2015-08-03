@@ -4,41 +4,41 @@
  * See LICENSE.txt for full details. 
  * 
  *  Created:   03 Jul 2015
- *  File name: stdio_controller.h
+ *  File name: stdio_device.h
  *  Description:
  *  <INSERT DESCRIPTION HERE> 
  */
 
-#include <src/devices/controller.h>
+#include <src/devices/device.h>
 #include <src/camio.h>
 #include <src/camio_debug.h>
 
-#include <src/drivers/fileio/fio_controller.h>
+#include <src/drivers/fileio/fio_device.h>
 #include "stdio_device.h"
-#include "stdio_controller.h"
+#include "stdio_device.h"
 
 
 /**************************************************************************************************************************
  * Connect functions --proxy all of these functions and data through to fio. Doing this means there's no runtime cost
  **************************************************************************************************************************/
-typedef fio_controller_priv_t stdio_controller_priv_t;
+typedef fio_device_priv_t stdio_device_priv_t;
 
-extern camio_error_t fio_connect_peek(camio_controller_t* this);
-#define stdio_connect_peek fio_connect_peek
+extern camio_error_t fio_devect_peek(camio_device_t* this);
+#define stdio_devect_peek fio_devect_peek
 
-extern camio_error_t fio_connect_ready(camio_controller_t* this);
-#define stdio_connect_ready fio_connect_ready
+extern camio_error_t fio_devect_ready(camio_device_t* this);
+#define stdio_devect_ready fio_devect_ready
 
-extern camio_error_t fio_connect(camio_controller_t* this, camio_channel_t** channel_o );
-#define stdio_connect fio_connect
+extern camio_error_t fio_devect(camio_device_t* this, camio_channel_t** channel_o );
+#define stdio_devect fio_devect
 
 
 
 /**************************************************************************************************************************
  * Setup and teardown
  **************************************************************************************************************************/
-extern camio_error_t fio_construct(camio_controller_t* this, void** params, ch_word params_size);
-static camio_error_t stdio_construct(camio_controller_t* this, void** params, ch_word params_size)
+extern camio_error_t fio_construct(camio_device_t* this, void** params, ch_word params_size);
+static camio_error_t stdio_construct(camio_device_t* this, void** params, ch_word params_size)
 {
 
     //Basic sanity check that the params is the right one.
@@ -84,7 +84,7 @@ static camio_error_t stdio_construct(camio_controller_t* this, void** params, ch
 }
 
 
-extern void fio_destroy(camio_controller_t* this);
+extern void fio_destroy(camio_device_t* this);
 #define stdio_destroy fio_destroy
 
-NEW_CONNECTOR_DEFINE(stdio, stdio_controller_priv_t)
+NEW_DEVICE_DEFINE(stdio, stdio_device_priv_t)

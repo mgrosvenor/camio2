@@ -15,23 +15,23 @@
 #include <deps/chaste/utils/debug.h>
 #include <src/types/device_params_vec.h>
 
-#include "delim_controller.h"
+#include "delim_device.h"
 #include "delim_device.h"
 
 static const char* const scheme = "delim";
 
 
-static camio_error_t construct(void** params, ch_word params_size, camio_controller_t** controller_o)
+static camio_error_t construct(void** params, ch_word params_size, camio_device_t** device_o)
 {
-    camio_controller_t* conn = NEW_CONNECTOR(delim);
-    if(!conn){
-        *controller_o = NULL;
+    camio_device_t* dev = NEW_DEVICE(delim);
+    if(!dev){
+        *device_o = NULL;
         return CAMIO_ENOMEM;
     }
 
-    *controller_o = conn;
+    *device_o = dev;
 
-    return conn->vtable.construct(conn,params, params_size);
+    return dev->vtable.construct(dev,params, params_size);
 }
 
 

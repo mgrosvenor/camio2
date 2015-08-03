@@ -13,7 +13,7 @@
 
 #include <src/types/len_string.h>
 
-#include "stdio_controller.h"
+#include "stdio_device.h"
 #include <src/drivers/fileio/fio_device.h>
 
 typedef struct stdio_global_s{

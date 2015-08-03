@@ -11,7 +11,7 @@
 #ifndef SRC_DRIVERS_UDP_UDP_TRANSPORT_H_
 #define SRC_DRIVERS_UDP_UDP_TRANSPORT_H_
 
-#include <src/drivers/udp/udp_controller.h>
+#include <src/drivers/udp/udp_device.h>
 #include <src/types/len_string.h>
 
 typedef struct udp_global_s{

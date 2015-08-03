@@ -32,15 +32,15 @@ camio_error_t populate_mux( camio_mux_t* mux, CH_VECTOR(cstr)* uris, ch_word* mu
     DBG("populate mux count=%lli\n", uris->count);
     for (int i = 0; i < uris->count; i++) {
         ch_cstr* uri = uris->off(uris, i);
-        camio_controller_t* controller = NULL;
-        DBG("Adding controller with uri=%s\n", *uri);
-        camio_error_t err = camio_controller_new(*uri, &controller);
+        camio_device_t* device = NULL;
+        DBG("Adding device with uri=%s\n", *uri);
+        camio_error_t err = camio_device_new(*uri, &device);
         if (err) {
-            ERR("Could not created controller\n");
+            ERR("Could not created device\n");
             return CAMIO_EINVALID; //TODO should have a better undwind process here...
         }
 
-        camio_mux_insert(mux, &controller->muxable, *mux_id_o);
+        camio_mux_insert(mux, &device->muxable, *mux_id_o);
         mux_id_o++;
     }
 
@@ -105,20 +105,20 @@ int main(int argc, char** argv)
             continue;
         }
 
-        //Handle controllers that are ready to connect
+        //Handle devices that are ready to devect
         switch(muxable->mode){
             case CAMIO_MUX_MODE_CONNECT:{
                 DBG("Connect event\n");
                 camio_channel_t* channel;
-                if(err == CAMIO_ENOMORE){ //This controller is done, remove it
+                if(err == CAMIO_ENOMORE){ //This device is done, remove it
                     DBG("The connection is closed, removing it\n");
                     camio_mux_remove(rc_mux,muxable);
                     continue; //The connection is dead!
                 }
 
-                err = camio_connect(muxable->parent.controller,&channel);
+                err = camio_devect(muxable->parent.device,&channel);
                 if(err){
-                    ERR("Cannot connect to channel with id=%lli\n", which );
+                    ERR("Cannot devect to channel with id=%lli\n", which );
                     continue;
                 }
 
