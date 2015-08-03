@@ -86,7 +86,7 @@ void camio_device_destroy(camio_device_t* this);
  * - ENOERROR: All good, please continue.
  * - ENOREAD: This selectable does not support reading
  * - ENOWRITE: This selectable does not support writing
- * - ENOCONNECT: This selectable does not support devecting
+ * - ENOCONNECT: This selectable does not support connecting
  * - TODO XXX: More errors here
  */
 camio_error_t camio_mux_insert(camio_mux_t* this, camio_muxable_t* muxable, mux_callback_f callback, void* usr_state, ch_word id);
@@ -102,7 +102,7 @@ camio_error_t camio_mux_remove(camio_mux_t* this, camio_muxable_t* muxable);
 
 
 /**
- * Perform the select operation. Find if any of the supplied channels are ready for reading, writing or devecting. The first
+ * Perform the select operation. Find if any of the supplied channels are ready for reading, writing or connecting. The first
  * channel that matches one of these will fire. A camio_selector is trigger based. It has no memory. Once an event has been
  * delivered once, it will not be delivered again until there is a change in the state of the channel or device.
  * Return values:
@@ -202,7 +202,7 @@ camio_error_t camio_chan_rd_data_ready( camio_channel_t* this);
 /**
  * This function returns a read buffer pointer called buffer_o. The read call may or may not block. You should use a
  * multiplexer to ensure that the channel is ready for reading. If the channel is empty, (e.g. end of file) or closed
- * (e.g. disdevected) it is valid to return an empty buffer with ENOERROR. If buffer_offset is non-zero.
+ * (e.g. disconnected) it is valid to return an empty buffer with ENOERROR. If buffer_offset is non-zero.
  * Return values:
  * - ENOERROR:  Completed successfully, buffer_o contains a valid structure.
  * - ETRYAGAIN: There was no data available at this time, but there might be some more later.

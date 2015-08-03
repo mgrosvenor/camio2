@@ -21,7 +21,7 @@ typedef enum {
     CAMIO_MUX_MODE_READ_BUFF,    //Selector will fire when muxable is ready to give a new buffer
     CAMIO_MUX_MODE_WRITE_BUFF,   //Selector will fire when muxable is ready to give a new buffer
     CAMIO_MUX_MODE_WRITE_DATA,   //Selector will fire when muxable is ready to write
-    CAMIO_MUX_MODE_CONNECT,      //Selector will fire when muxable is ready to devect
+    CAMIO_MUX_MODE_CONNECT,      //Selector will fire when muxable is ready to connect
 } camio_mux_mode_e;
 
 /**

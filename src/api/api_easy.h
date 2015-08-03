@@ -16,7 +16,7 @@
 
 /**
  * A nice wrapper around device creation and connection. Creates a device and uses the device to produce a channel.
- * Assumes that the device will devect immidately.
+ * Assumes that the device will connect immidately.
  */
 camio_error_t camio_easy_channel_new(char* uri, camio_channel_t** channel);
 

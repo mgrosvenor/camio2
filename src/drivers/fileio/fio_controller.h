@@ -24,7 +24,7 @@ typedef struct fio_priv_s {
 
     fio_params_t* params;  //Parameters used when a connection happens
 
-    bool is_devected;          //Has devect be called?
+    bool is_connected;          //Has connect be called?
     int base_rd_fd;             //File descriptor for reading
     int base_wr_fd;             //File descriptor for writing
 

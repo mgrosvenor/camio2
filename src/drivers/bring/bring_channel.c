@@ -40,7 +40,7 @@ typedef struct bring_channel_priv_s {
     camio_device_t device;
     bring_params_t params;
     volatile bring_header_t* bring_head;
-    ch_bool devected;              //Is the channel currently running? Or has close been called?
+    ch_bool connected;              //Is the channel currently running? Or has close been called?
 
 
     //Read side variables
@@ -923,7 +923,7 @@ camio_error_t bring_channel_construct(
         priv->wr_buffs[i].__internal.__pool_id         = 0;
     }
 
-    if(!priv->params.server){ //Swap things around to devect both ends
+    if(!priv->params.server){ //Swap things around to connect both ends
         ch_word tmp_buffers_count    = priv->rd_buffs_count;
         camio_buffer_t* tmp_buffers  = priv->rd_buffs;
 

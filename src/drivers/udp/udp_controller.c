@@ -45,8 +45,8 @@ typedef struct udp_priv_s {
     int rd_fd;
     int wr_fd; //Hmmm. It's bad to have these duplicated here. These should be removed.
 
-    //Has devect be called?
-    bool is_devected;
+    //Has connect be called?
+    bool is_connected;
 
 } udp_device_priv_t;
 
@@ -57,7 +57,7 @@ typedef struct udp_priv_s {
  * Connect functions
  **************************************************************************************************************************/
 
-static camio_error_t resolve_bind_devect(char* address, char* prot, ch_bool do_bind, ch_bool do_devect,
+static camio_error_t resolve_bind_connect(char* address, char* prot, ch_bool do_bind, ch_bool do_connect,
         int* socket_fd_out)
 {
     struct addrinfo hints, *res, *res0;
@@ -81,9 +81,9 @@ static camio_error_t resolve_bind_devect(char* address, char* prot, ch_bool do_b
             continue;
         }
 
-        if(do_devect){
-            if (devect(s, res->ai_addr, res->ai_addrlen) < 0) {
-                cause = "devect";
+        if(do_connect){
+            if (connect(s, res->ai_addr, res->ai_addrlen) < 0) {
+                cause = "connect";
                 close(s);
                 s = -1;
                 continue;
@@ -92,7 +92,7 @@ static camio_error_t resolve_bind_devect(char* address, char* prot, ch_bool do_b
 
         if(do_bind){
             if (bind(s, res->ai_addr, res->ai_addrlen) < 0) {
-                cause = "devect";
+                cause = "connect";
                 close(s);
                 s = -1;
                 continue;
@@ -110,36 +110,36 @@ static camio_error_t resolve_bind_devect(char* address, char* prot, ch_bool do_b
     //If we get here, s is populated with something meaningful
     *socket_fd_out = s;
 
-    DBG("Done %s to address %s with protocol %s\n", do_bind ? "binding" : "devecting", address, prot);
+    DBG("Done %s to address %s with protocol %s\n", do_bind ? "binding" : "connecting", address, prot);
 
     return CAMIO_ENOERROR;
 }
 
-//Try to see if devecting is possible. With UDP, it is always possible.
-static camio_error_t udp_devect_peek(udp_device_priv_t* priv)
+//Try to see if connecting is possible. With UDP, it is always possible.
+static camio_error_t udp_connect_peek(udp_device_priv_t* priv)
 {
-    if(priv->is_devected){
-        return CAMIO_EALLREADYCONNECTED; // We're already devected!
+    if(priv->is_connected){
+        return CAMIO_EALLREADYCONNECTED; // We're already connected!
     }
 
     if(priv->rd_fd > -1 || priv->wr_fd > -1){
-        return CAMIO_ENOERROR; //Ready to go, please call devect!
+        return CAMIO_ENOERROR; //Ready to go, please call connect!
     }
 
     //Parse up the address and port/protocol
     if(priv->params->rd_address.str && priv->params->rd_protocol.str){
-        if(resolve_bind_devect(priv->params->rd_address.str,priv->params->rd_protocol.str,true,false, &priv->rd_fd)){
-            return CAMIO_EINVALID; //We cannot devect something went wrong. //TODO XXX better error code
+        if(resolve_bind_connect(priv->params->rd_address.str,priv->params->rd_protocol.str,true,false, &priv->rd_fd)){
+            return CAMIO_EINVALID; //We cannot connect something went wrong. //TODO XXX better error code
         }
     }
 
     if(priv->params->wr_address.str && priv->params->wr_protocol.str){
-        if(resolve_bind_devect(priv->params->wr_address.str,priv->params->wr_protocol.str,false, true, &priv->wr_fd)){
+        if(resolve_bind_connect(priv->params->wr_address.str,priv->params->wr_protocol.str,false, true, &priv->wr_fd)){
             if(priv->rd_fd){ //Tear down the whole world.
                 close(priv->rd_fd > -1);
                 priv->rd_fd = -1;
             }
-            return CAMIO_EINVALID; //We cannot devect something went wrong. //TODO XXX better error code
+            return CAMIO_EINVALID; //We cannot connect something went wrong. //TODO XXX better error code
         }
     }
 
@@ -153,7 +153,7 @@ static camio_error_t udp_device_ready(camio_muxable_t* this)
         return CAMIO_EREADY;
     }
 
-    camio_error_t err = udp_devect_peek(priv);
+    camio_error_t err = udp_connect_peek(priv);
     if(err != CAMIO_ENOERROR){
         return err;
     }
@@ -161,14 +161,14 @@ static camio_error_t udp_device_ready(camio_muxable_t* this)
     return CAMIO_EREADY;
 }
 
-static camio_error_t udp_devect(camio_device_t* this, camio_channel_t** channel_o )
+static camio_error_t udp_connect(camio_device_t* this, camio_channel_t** channel_o )
 {
     udp_device_priv_t* priv = DEVICE_GET_PRIVATE(this);
-    camio_error_t err = udp_devect_peek(priv);
+    camio_error_t err = udp_connect_peek(priv);
     if(err != CAMIO_ENOERROR){
         return err;
     }
-    //DBG("Done devecting, now constructing UDP channel...\n");
+    //DBG("Done connecting, now constructing UDP channel...\n");
 
     camio_channel_t* channel = NEW_CHANNEL(udp);
     if(!channel){
@@ -182,7 +182,7 @@ static camio_error_t udp_devect(camio_device_t* this, camio_channel_t** channel_
        return err;
     }
 
-    priv->is_devected = true;
+    priv->is_connected = true;
     return CAMIO_ENOERROR;
 }
 

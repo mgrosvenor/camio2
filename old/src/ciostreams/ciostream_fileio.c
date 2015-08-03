@@ -30,7 +30,7 @@ typedef struct {
 
 /**
  * This function tries to do a non-blocking read for new data from the CamIO Stream called “this” and return slot info
- * pointer called “slot”. If the channel is empty, (e.g. end of file) or closed (e.g. disdevected) it is EEMPTU is
+ * pointer called “slot”. If the channel is empty, (e.g. end of file) or closed (e.g. disconnected) it is EEMPTU is
  * returned
  * Return values:
  * - ENOERROR:  Completed successfully, sloto contains a valid structure.
@@ -207,7 +207,7 @@ static int new_ciostrm_fileio( dev_private* dev_priv, ciostrm** ciostrm_o)
 
 
 
-static int dev_devect( ciodev* this, ciostrm** ciostrm_o )
+static int dev_connect( ciodev* this, ciostrm** ciostrm_o )
 {
     dev_private* priv = (dev_private*)this->__priv;
     priv->fd = open(priv->filename,priv->flags | O_NONBLOCK);
@@ -237,7 +237,7 @@ static void dev_destroy(ciodev* this)
 
 static int dev_ready(cioselable* this)
 {
-	//Connector is ready until it is devected
+	//Connector is ready until it is connected
 	dev_private* priv = (dev_private*) this->__priv;
 	if(priv->fd < 0){
 		return 1;
@@ -259,7 +259,7 @@ int new_ciodev_fileio( uri* uri_parsed , struct ciodev_s** ciodev_o, void** glob
     }
 
     //Populate it
-    device->devect          = dev_devect;
+    device->connect          = dev_connect;
     device->destroy          = dev_destroy;
 
     //Make a new private structure

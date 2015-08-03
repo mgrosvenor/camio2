@@ -32,14 +32,14 @@
  * Connect functions
  **************************************************************************************************************************/
 
-//Try to see if devecting is possible. With UDP, it is always possible.
-static camio_error_t fio_devect_peek(camio_device_t* this)
+//Try to see if connecting is possible. With UDP, it is always possible.
+static camio_error_t fio_connect_peek(camio_device_t* this)
 {
-    DBG("Doing devect peek\n");
+    DBG("Doing connect peek\n");
     fio_device_priv_t* priv = DEVICE_GET_PRIVATE(this);
 
     if(priv->base_rd_fd > -1 && priv->base_wr_fd > -1){
-        return CAMIO_ENOERROR; //Ready to go, please call devect!
+        return CAMIO_ENOERROR; //Ready to go, please call connect!
     }
 
 
@@ -53,7 +53,7 @@ static camio_error_t fio_devect_peek(camio_device_t* this)
         return CAMIO_ENOERROR;
     }
 
-    //Open up the file and get it ready to devect
+    //Open up the file and get it ready to connect
     //This is the mode that the user has requested
     int mode = O_RDWR;
         mode = priv->params->rd_only ? O_RDONLY : mode;
@@ -97,15 +97,15 @@ static camio_error_t fio_devect_peek(camio_device_t* this)
 camio_error_t fio_device_ready(camio_muxable_t* this)
 {
     fio_device_priv_t* priv = DEVICE_GET_PRIVATE(this->parent.device);
-    if(priv->is_devected){
-        return CAMIO_ENOMORE; // We're already devected!
+    if(priv->is_connected){
+        return CAMIO_ENOMORE; // We're already connected!
     }
 
     if(this->fd > -1){
         return CAMIO_EREADY;
     }
 
-    camio_error_t err = fio_devect_peek(this->parent.device);
+    camio_error_t err = fio_connect_peek(this->parent.device);
     if(err != CAMIO_ENOERROR){
         return err;
     }
@@ -113,20 +113,20 @@ camio_error_t fio_device_ready(camio_muxable_t* this)
     return CAMIO_EREADY;
 }
 
-camio_error_t fio_devect(camio_device_t* this, camio_channel_t** channel_o )
+camio_error_t fio_connect(camio_device_t* this, camio_channel_t** channel_o )
 {
     fio_device_priv_t* priv = DEVICE_GET_PRIVATE(this);
-    camio_error_t err = fio_devect_peek(this);
+    camio_error_t err = fio_connect_peek(this);
     if(err != CAMIO_ENOERROR){
         return err;
     }
 
-    if(priv->is_devected){
-        ERR("Already devected! Why are you calling this twice?\n");
-        return CAMIO_EALLREADYCONNECTED; // We're already devected!
+    if(priv->is_connected){
+        ERR("Already connected! Why are you calling this twice?\n");
+        return CAMIO_EALLREADYCONNECTED; // We're already connected!
     }
 
-    //DBG("Done devecting, now constructing UDP channel...\n");
+    //DBG("Done connecting, now constructing UDP channel...\n");
     camio_channel_t* channel = NEW_CHANNEL(fio);
     if(!channel){
         *channel_o = NULL;
@@ -139,7 +139,7 @@ camio_error_t fio_devect(camio_device_t* this, camio_channel_t** channel_o )
        return err;
     }
 
-    priv->is_devected = true;
+    priv->is_connected = true;
     return CAMIO_ENOERROR;
 }
 
@@ -185,7 +185,7 @@ camio_error_t fio_construct(camio_device_t* this, void** params, ch_word params_
         return CAMIO_EINVALID;
     }
 
-    //If the user has passed in a file descriptor, let's use that, otherwise we'll use the file name later in devect
+    //If the user has passed in a file descriptor, let's use that, otherwise we'll use the file name later in connect
     priv->base_rd_fd = -1;
     priv->base_wr_fd = -1;
     if(fio_params->rd_fd > -1){

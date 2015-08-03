@@ -52,7 +52,7 @@ struct ciostrm_s {
 
     /**
      * This function tries to do a non-blocking read for new data from the CamIO Stream called “this” and return slot info
-     * pointer called “slot”. If the channel is empty, (e.g. end of file) or closed (e.g. disdevected) it is valid to return
+     * pointer called “slot”. If the channel is empty, (e.g. end of file) or closed (e.g. disconnected) it is valid to return
      * 0 bytes.
      * Return values:
      * - ENOERROR:  Completed successfully, sloto contains a valid structure.
@@ -134,8 +134,8 @@ struct ciodev_s {
 
 
     /**
-     * Non-blocking attempt to devect the underlying channel to it’s data source. If successful, the CamIO channel can be read
-     *  and/or written to. In many cases, the devect operation will return immediately, with a valid channel once only.
+     * Non-blocking attempt to connect the underlying channel to it’s data source. If successful, the CamIO channel can be read
+     *  and/or written to. In many cases, the connect operation will return immediately, with a valid channel once only.
      *  However, this is not guaranteed. Some channels may return multiple valid connection and some channels may take some
      *  time before they return successfully. Streams can be placed into selectors to facilitate the blocking behaviour
      *  necessary to wait for these events to happen by listening for the  on connection signal.
@@ -144,7 +144,7 @@ struct ciodev_s {
      *  - ETRYAGAIN: The channel has nothing new to report at this time. No connection has yet happened.
      *  - ECHECKERROR: The channel creation has failed. 
      */
-    int (*devect)( ciodev* this, ciostrm* ciostrm_o );
+    int (*connect)( ciodev* this, ciostrm* ciostrm_o );
 
     /**
      * Free resources associated with this device, but not with any of the channels it has created. 
@@ -173,7 +173,7 @@ int new_ciodev( char* uri , ciostrm_req* properties, struct ciodev_s** ciodev_o 
 
 
 /**
- * This is a convenience method. Create a new CamIO device and call devect(), blocking with the given selector and 
+ * This is a convenience method. Create a new CamIO device and call connect(), blocking with the given selector and 
  * timeout until it succeeds or timesout. Free the device by calling destroy() on it. Return a CamIO channel if 
  * successful. Returns only the first successful connection for channels that support many (e.g. TCP, Netnamp etc). 
  * Returns:

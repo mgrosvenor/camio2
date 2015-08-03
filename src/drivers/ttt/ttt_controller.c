@@ -31,10 +31,10 @@ typedef struct ttt_priv_s {
  * Connect functions
  **************************************************************************************************************************/
 
-//Try to see if devecting is possible.
-static camio_error_t ttt_devect_peek(camio_device_t* this)
+//Try to see if connecting is possible.
+static camio_error_t ttt_connect_peek(camio_device_t* this)
 {
-    DBG("Doing TTT devect peek\n");
+    DBG("Doing TTT connect peek\n");
 
     return CAMIO_ETRYAGAIN;
     return CAMIO_ECHECKERRORNO;
@@ -43,7 +43,7 @@ static camio_error_t ttt_devect_peek(camio_device_t* this)
 
 static camio_error_t ttt_device_ready(camio_muxable_t* this)
 {
-    DBG("Checking if TTT is ready to devect...\n");
+    DBG("Checking if TTT is ready to connect...\n");
     ttt_device_priv_t* priv = DEVICE_GET_PRIVATE(this->parent.device);
 
 
@@ -51,14 +51,14 @@ static camio_error_t ttt_device_ready(camio_muxable_t* this)
     return CAMIO_EREADY;
 }
 
-static camio_error_t ttt_devect(camio_device_t* this, camio_channel_t** channel_o )
+static camio_error_t ttt_connect(camio_device_t* this, camio_channel_t** channel_o )
 {
     ttt_device_priv_t* priv = DEVICE_GET_PRIVATE(this);
     camio_error_t err = ttt_device_ready(&this->muxable);
     if(err != CAMIO_EREADY){
         return err;
     }
-    DBG("Done devecting, now constructing TTT channel...\n");
+    DBG("Done connecting, now constructing TTT channel...\n");
 
     camio_channel_t* channel = NEW_CHANNEL(ttt);
     if(!channel){

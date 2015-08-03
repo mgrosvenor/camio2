@@ -18,7 +18,7 @@ int main(int argc, char** argv)
 
     ciodev* con;
     new_ciodev("file:/tmp/myfile?ro,trunc",NULL,&con);
-    con->devect(con);
+    con->connect(con);
 
     return 0;
 }

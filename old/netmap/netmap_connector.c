@@ -110,7 +110,7 @@ static camio_error_t netmap_construct_bin(camio_device_t* this, va_list args)
 
 
 
-static camio_error_t netmap_devect(camio_device_t* this, camio_channel_t** channel_o )
+static camio_error_t netmap_connect(camio_device_t* this, camio_channel_t** channel_o )
 {
     netmap_priv_t* priv = DEVICE_GET_PRIVATE(this);
 

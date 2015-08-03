@@ -29,9 +29,9 @@ int main(int argc, char** argv)
     printf("Got new device at address %p\n", device);
 
     camio_channel_t* channel = NULL;
-    camio_devect(device,&channel);
+    camio_connect(device,&channel);
 
-    while(!camio_devect(device,&channel)){
+    while(!camio_connect(device,&channel)){
         //Just spin waiting for a connection
     }
 

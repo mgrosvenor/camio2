@@ -34,7 +34,7 @@ typedef struct mfio_priv_s {
 
     mfio_params_t* params;  //Parameters used when a connection happens
 
-    bool is_devected;          //Has devect be called?
+    bool is_connected;          //Has connect be called?
     void* base_mem_start;             //Size and location of the mmaped region
     ch_word base_mem_len;         //
     int base_fd;                //File descriptor for the backing buffer
@@ -48,17 +48,17 @@ typedef struct mfio_priv_s {
  * Connect functions
  **************************************************************************************************************************/
 
-//Try to see if devecting is possible. With UDP, it is always possible.
-static camio_error_t mfio_devect_peek(camio_device_t* this)
+//Try to see if connecting is possible. With UDP, it is always possible.
+static camio_error_t mfio_connect_peek(camio_device_t* this)
 {
-    DBG("Doing devect peek\n");
+    DBG("Doing connect peek\n");
     mfio_device_priv_t* priv = DEVICE_GET_PRIVATE(this);
 
     if(priv->base_fd > -1 ){
-        return CAMIO_ENOERROR; //Ready to go, please call devect!
+        return CAMIO_ENOERROR; //Ready to go, please call connect!
     }
 
-    //Open up the file and get it ready to devect
+    //Open up the file and get it ready to connect
     priv->base_fd = open(priv->params->hierarchical.str, O_RDWR);
     if(priv->base_fd < 0){
         DBG("Could not open file \"%s\". Error=%s\n", priv->params->hierarchical.str, strerror(errno));
@@ -95,7 +95,7 @@ static camio_error_t mfio_device_ready(camio_muxable_t* this)
         return CAMIO_EREADY;
     }
 
-    camio_error_t err = mfio_devect_peek(this->parent.device);
+    camio_error_t err = mfio_connect_peek(this->parent.device);
     if(err != CAMIO_ENOERROR){
         return err;
     }
@@ -103,20 +103,20 @@ static camio_error_t mfio_device_ready(camio_muxable_t* this)
     return CAMIO_EREADY;
 }
 
-static camio_error_t mfio_devect(camio_device_t* this, camio_channel_t** channel_o )
+static camio_error_t mfio_connect(camio_device_t* this, camio_channel_t** channel_o )
 {
     mfio_device_priv_t* priv = DEVICE_GET_PRIVATE(this);
-    camio_error_t err = mfio_devect_peek(this);
+    camio_error_t err = mfio_connect_peek(this);
     if(err != CAMIO_ENOERROR){
         return err;
     }
 
-    if(priv->is_devected){
-        DBG("Already devected! Why are you calling this twice?\n");
-        return CAMIO_EALLREADYCONNECTED; // We're already devected!
+    if(priv->is_connected){
+        DBG("Already connected! Why are you calling this twice?\n");
+        return CAMIO_EALLREADYCONNECTED; // We're already connected!
     }
 
-    //DBG("Done devecting, now constructing UDP channel...\n");
+    //DBG("Done connecting, now constructing UDP channel...\n");
     camio_channel_t* channel = NEW_CHANNEL(mfio);
     if(!channel){
         *channel_o = NULL;
@@ -129,7 +129,7 @@ static camio_error_t mfio_devect(camio_device_t* this, camio_channel_t** channel
        return err;
     }
 
-    priv->is_devected = true;
+    priv->is_connected = true;
     return CAMIO_ENOERROR;
 }
 

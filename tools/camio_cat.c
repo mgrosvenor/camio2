@@ -105,7 +105,7 @@ int main(int argc, char** argv)
             continue;
         }
 
-        //Handle devices that are ready to devect
+        //Handle devices that are ready to connect
         switch(muxable->mode){
             case CAMIO_MUX_MODE_CONNECT:{
                 DBG("Connect event\n");
@@ -116,9 +116,9 @@ int main(int argc, char** argv)
                     continue; //The connection is dead!
                 }
 
-                err = camio_devect(muxable->parent.device,&channel);
+                err = camio_connect(muxable->parent.device,&channel);
                 if(err){
-                    ERR("Cannot devect to channel with id=%lli\n", which );
+                    ERR("Cannot connect to channel with id=%lli\n", which );
                     continue;
                 }
 

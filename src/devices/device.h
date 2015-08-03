@@ -72,12 +72,14 @@ typedef struct camio_device_s {
 #define DEVICE_GET_PRIVATE(THIS) ( (void*)(THIS + 1))
 
 #define NEW_DEVICE(name)\
-        new_##name##_device()
+        new_##name##_device
 
 #define NEW_DEVICE_DECLARE(NAME)\
-        camio_device_t* new_##NAME##_device()
+        camio_error_t new_##NAME##_device(void** params, ch_word params_size, camio_device_t** device_o)
 
 #define NEW_DEVICE_DEFINE(NAME, PRIVATE_TYPE) \
+    static const char* const scheme = #NAME;\
+    \
     static const camio_device_interface_t NAME##_device_interface = {\
             .construct         = NAME##_construct,\
             .channel_request   = NAME##_channel_request,\
@@ -88,14 +90,15 @@ typedef struct camio_device_s {
     NEW_DEVICE_DECLARE(NAME)\
     {\
         camio_device_t* result = (camio_device_t*)calloc(1,sizeof(camio_device_t) + sizeof(PRIVATE_TYPE));\
-        if(!result) return NULL;\
-        if(!result) return ((void *)0);\
+        if(!result) return CAMIO_ENOMEM;\
+        *device_o = result; \
         result->vtable                      = NAME##_device_interface;\
         result->muxable.mode                = CAMIO_MUX_MODE_CONNECT;\
         result->muxable.parent.device       = result;\
         result->muxable.vtable.ready        = NAME##_channel_ready;\
         result->muxable.fd                  = -1;\
-        return result;\
+        \
+        return result->vtable.construct(result,params, params_size);\
     }
 
 

@@ -28,7 +28,7 @@ int main(int argc, char** argv)
     DBG("Got new device at address %p\n", device);
 
     camio_channel_t* channel = NULL;
-    camio_devect(device,&channel);
+    camio_connect(device,&channel);
 
     camio_rd_buffer_t* rd_buff = NULL;
     ch_word rd_buff_len = 0;
@@ -36,7 +36,7 @@ int main(int argc, char** argv)
 
     /*
     camio_channel_t* channel = NULL;
-    while(!camio_devect(device,&channel)){
+    while(!camio_connect(device,&channel)){
         //Just spin waiting for a connection
     }
 

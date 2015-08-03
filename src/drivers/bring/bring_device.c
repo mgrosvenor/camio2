@@ -46,8 +46,6 @@
 #include "bring_device.h"
 
 
-static const char* const scheme = "bring";
-
 #define CAMIO_BRING_SLOT_COUNT_DEFAULT 1024
 #define CAMIO_BRING_SLOT_SIZE_DEFAULT (1024-sizeof(bring_slot_header_t))
 
@@ -61,7 +59,7 @@ typedef struct bring_priv_s {
 
     bring_params_t* params;     //Parameters used when a connection happens
 
-    bool is_devected;          //Has devect be called?
+    bool is_connected;          //Has connect be called?
     int bring_fd;               //File descriptor for the backing buffer
 
     ch_cbq_t* chan_req_queue; //Queue for channel requests
@@ -95,14 +93,14 @@ camio_error_t bring_channel_request( camio_device_t* this, camio_msg_t* req_vec,
 }
 
 
-static camio_error_t bring_devect_peek_server(camio_device_t* this)
+static camio_error_t bring_connect_peek_server(camio_device_t* this)
 {
 
     camio_error_t result = CAMIO_ENOERROR;
     bring_device_priv_t* priv = DEVICE_GET_PRIVATE(this);
-    //DBG("Doing devect peek server on %s\n", priv->bring_filen);
+    //DBG("Doing connect peek server on %s\n", priv->bring_filen);
 
-    if(priv->bring_fd > -1 ){ //Ready to go! Call devect!
+    if(priv->bring_fd > -1 ){ //Ready to go! Call connect!
         return CAMIO_ENOERROR;
     }
 
@@ -268,14 +266,14 @@ error_no_cleanup:
 
 }
 
-static camio_error_t bring_devect_peek_client(camio_device_t* this)
+static camio_error_t bring_connect_peek_client(camio_device_t* this)
 {
 
     camio_error_t result = CAMIO_ENOERROR;
     bring_device_priv_t* priv = DEVICE_GET_PRIVATE(this);
-    //DBG("Doing devect peek client on %s\n", priv->bring_filen);
+    //DBG("Doing connect peek client on %s\n", priv->bring_filen);
 
-    if(priv->bring_fd > -1 ){ //Ready to go! Call devect!
+    if(priv->bring_fd > -1 ){ //Ready to go! Call connect!
         return CAMIO_ENOERROR;
     }
 
@@ -348,7 +346,7 @@ static camio_error_t bring_devect_peek_client(camio_device_t* this)
         goto  error_unmap_file;
     }
 
-    //Remove the filename from the filesystem. Since the and reader are both still devected
+    //Remove the filename from the filesystem. Since the and reader are both still connected
     //to the file, the space will continue to be available until they both exit.
     if(unlink(priv->bring_filen) < 0){
         ERR("Could not remove bring file \"%s\". Error = \"%s\"", priv->bring_filen, strerror(errno));
@@ -395,15 +393,15 @@ error_no_cleanup:
 
 
 
-//Try to see if devecting is possible.
-static camio_error_t bring_devect_peek(camio_device_t* this)
+//Try to see if connecting is possible.
+static camio_error_t bring_connect_peek(camio_device_t* this)
 {
-    //DBG("Doing devect peek\n");
+    //DBG("Doing connect peek\n");
     camio_error_t result = CAMIO_ENOERROR;
     bring_device_priv_t* priv = DEVICE_GET_PRIVATE(this);
 
     if(priv->params->server){
-        result = bring_devect_peek_server(this);
+        result = bring_connect_peek_server(this);
         if(result != CAMIO_ENOERROR){
             return result;
         }
@@ -419,7 +417,7 @@ static camio_error_t bring_devect_peek(camio_device_t* this)
 
     }
     else{
-        result = bring_devect_peek_client(this);
+        result = bring_connect_peek_client(this);
     }
 
     return result;
@@ -438,18 +436,18 @@ static camio_error_t bring_channel_ready(camio_muxable_t* this)
         return CAMIO_ETRYAGAIN;
     }
 
-    return bring_devect_peek(this->parent.device);
+    return bring_connect_peek(this->parent.device);
 }
 
 static camio_error_t bring_channel_result(camio_device_t* this, camio_msg_t* res_vec, ch_word* vec_len_io )
 {
-    DBG("Getting bring devect result\n");
+    DBG("Getting bring connect result\n");
     bring_device_priv_t* priv = DEVICE_GET_PRIVATE(this);
 
     //Is there any data waiting? If not, try to get some
     if(unlikely(priv->chan_req_queue->count <= 0)){
         //DBG("No requests have been added, are you sure you called request first?\n");
-        camio_error_t err = bring_devect_peek(this);
+        camio_error_t err = bring_connect_peek(this);
         if(err){
             //DBG("There are no channels available to return. Did you use chan_ready()?\n");
             *vec_len_io = 0;
@@ -475,9 +473,9 @@ static camio_error_t bring_channel_result(camio_device_t* this, camio_msg_t* res
         res_vec[i].type = CAMIO_MSG_TYPE_CHAN_RES;
         camio_chan_res_t* res = &res_vec[i].ch_res;
 
-        if(priv->is_devected){
+        if(priv->is_connected){
             DBG("Only channel already supplied! No more channels available\n");
-            res->status = CAMIO_EALLREADYCONNECTED; // We're already devected!
+            res->status = CAMIO_EALLREADYCONNECTED; // We're already connected!
             //Error code is in the request, the result is returned successfully even though the result was not a success
             continue;
         }
@@ -497,7 +495,7 @@ static camio_error_t bring_channel_result(camio_device_t* this, camio_msg_t* res
             continue;
         }
 
-        priv->is_devected = true;
+        priv->is_connected = true;
         res->status = CAMIO_ENOERROR;
         DBG("Done successfully returning channel result\n");
     }
@@ -544,7 +542,7 @@ static camio_error_t bring_construct(camio_device_t* this, void** params, ch_wor
         return CAMIO_EINVALID;
     }
 
-    priv->chan_req_queue = ch_cbq_new(1,sizeof(void*)); //Only 1 request slot, since we can (currently) only devect once
+    priv->chan_req_queue = ch_cbq_new(1,sizeof(void*)); //Only 1 request slot, since we can (currently) only connect once
 
     priv->bring_fd = -1;
 
@@ -570,24 +568,7 @@ static void bring_destroy(camio_device_t* this)
     DBG("Freed device structure\n");
 }
 
-
 NEW_DEVICE_DEFINE(bring, bring_device_priv_t)
-
-
-
-static camio_error_t new(void** params, ch_word params_size, camio_device_t** device_o)
-{
-    camio_device_t* dev = NEW_DEVICE(bring);
-    if(!dev){
-        *device_o = NULL;
-        return CAMIO_ENOMEM;
-    }
-
-    *device_o = dev;
-
-    return dev->vtable.construct(dev,params, params_size);
-}
-
 
 void bring_init()
 {
@@ -605,6 +586,6 @@ void bring_init()
     add_param_optional(params,"expand",bring_params_t,expand, 1);
     const ch_word hier_offset = offsetof(bring_params_t,hierarchical);
 
-    register_new_device(scheme,strlen(scheme),hier_offset,new,sizeof(bring_params_t),params,0);
+    register_new_device(scheme,strlen(scheme),hier_offset,NEW_DEVICE(bring),sizeof(bring_params_t),params,0);
     DBG("Initializing bring...Done\n");
 }

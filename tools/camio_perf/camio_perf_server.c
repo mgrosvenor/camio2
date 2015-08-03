@@ -65,7 +65,7 @@ static camio_error_t get_new_channels();
 //}
 
 //delim_params_t delim_params;
-static camio_error_t devect_delim(ch_cstr server_channel_uri, camio_device_t** device) {
+static camio_error_t connect_delim(ch_cstr server_channel_uri, camio_device_t** device) {
 //
 //    //Find the ID of the delim channel
 //    ch_word id;
@@ -293,7 +293,7 @@ static camio_error_t get_new_buffers(camio_channel_t* channel)
 
 static camio_error_t on_new_channels(camio_muxable_t* muxable, camio_error_t err, void* usr_state, ch_word id)
 {
-    //DBG("Handling got new devect\n");
+    //DBG("Handling got new connect\n");
 
     //Currently ignoring these values
     (void)usr_state;
@@ -320,12 +320,12 @@ static camio_error_t on_new_channels(camio_muxable_t* muxable, camio_error_t err
 
     for(ch_word i = 0; i < ctrl_msgs_len; i++){
         if(ctrl_msgs[i].type == CAMIO_MSG_TYPE_IGNORE){
-            ERR("Ignoring devect response message at index %lli\n", i);
+            ERR("Ignoring connect response message at index %lli\n", i);
             continue;
         }
 
         if(ctrl_msgs[i].type != CAMIO_MSG_TYPE_CHAN_RES){
-            ERR("Expected to get devect response message (%lli), but got %lli instead.\n",
+            ERR("Expected to get connect response message (%lli), but got %lli instead.\n",
                     CAMIO_MSG_TYPE_CHAN_RES, ctrl_msgs[i].type);
             ctrl_msgs[i].type = CAMIO_MSG_TYPE_IGNORE;
             continue;
@@ -391,7 +391,7 @@ int camio_perf_server(ch_cstr client_channel_uri, ch_word* stop)
     camio_error_t err = camio_mux_new(CAMIO_MUX_HINT_PERFORMANCE, &mux);
 
     //Construct a delimiter
-    err = devect_delim(client_channel_uri, &device);
+    err = connect_delim(client_channel_uri, &device);
     if(err){
         DBG("Could not create delimiter!\n");
         return CAMIO_EINVALID;

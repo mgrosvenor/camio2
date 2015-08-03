@@ -84,8 +84,8 @@ int main(int argc, char** argv)
     }
 
     camio_channel_t* io_channel = NULL;
-    err = camio_devect(device,&io_channel);
-    if(err){ ERR("Could not devect to channel\n"); return CAMIO_EINVALID; /*TODO XXX put a better error here*/ }
+    err = camio_connect(device,&io_channel);
+    if(err){ ERR("Could not connect to channel\n"); return CAMIO_EINVALID; /*TODO XXX put a better error here*/ }
 
     //Put the read channel into the mux
     camio_mux_insert(mux,&io_channel->rd_muxable,READ_CHANNEL);

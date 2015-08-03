@@ -72,7 +72,7 @@ camio_error_t camio_device_params_new( ch_cstr uri, void** params_o, ch_word* pa
 
 /**
  * Construct a new CamIO device with the given ID, from the parameters structure as given. Return a device object for
- * devecting to underlying data channels.
+ * connecting to underlying data channels.
  */
 camio_error_t camio_device_new(ch_word id, void** params, ch_word params_size, camio_device_t** device_o);
 

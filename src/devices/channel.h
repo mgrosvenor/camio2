@@ -58,10 +58,9 @@ typedef struct camio_channel_s {
     camio_channel_interface_t vtable;
 
     /**
-     * Holds the meta-data structure describing the properties of this device.
+     * Return the features supported by this channel. Not valid until the device constructor has been called.
      */
-    camio_device_features_t features;
-
+    camio_channel_features_t features;
 
     /**
      * Holds the multiplexable structures for adding into a multiplexor

@@ -50,7 +50,7 @@ camio_error_t camio_easy_channel_new(char* uri, camio_channel_t** channel)
 //   }
 //
 //   camio_muxable_t* muxable = NULL;
-//   err = camio_mux_select(mux,&muxable); //Block waiting for device to devect
+//   err = camio_mux_select(mux,&muxable); //Block waiting for device to connect
 //   if(err){
 //       DBG("Could not select in multiplexer\n");
 //       return err;
@@ -72,7 +72,7 @@ camio_error_t camio_easy_channel_new(char* uri, camio_channel_t** channel)
 
    while( (err = camio_ctrl_chan_ready(device)) == CAMIO_ETRYAGAIN ){}
    if(err){
-       DBG("Could not devect to channel\n");
+       DBG("Could not connect to channel\n");
        return CAMIO_EINVALID; //TODO XXX put a better error here
    }
 

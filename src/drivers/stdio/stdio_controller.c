@@ -23,14 +23,14 @@
  **************************************************************************************************************************/
 typedef fio_device_priv_t stdio_device_priv_t;
 
-extern camio_error_t fio_devect_peek(camio_device_t* this);
-#define stdio_devect_peek fio_devect_peek
+extern camio_error_t fio_connect_peek(camio_device_t* this);
+#define stdio_connect_peek fio_connect_peek
 
-extern camio_error_t fio_devect_ready(camio_device_t* this);
-#define stdio_devect_ready fio_devect_ready
+extern camio_error_t fio_connect_ready(camio_device_t* this);
+#define stdio_connect_ready fio_connect_ready
 
-extern camio_error_t fio_devect(camio_device_t* this, camio_channel_t** channel_o );
-#define stdio_devect fio_devect
+extern camio_error_t fio_connect(camio_device_t* this, camio_channel_t** channel_o );
+#define stdio_connect fio_connect
 
 
 

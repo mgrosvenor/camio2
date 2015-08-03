@@ -46,10 +46,10 @@ typedef struct tcp_priv_s {
     len_string_t address;
     len_string_t protocol;
 
-    //Has devect be called?
+    //Has connect be called?
     int con_fd_tmp;
 
-    ch_bool devected_client;
+    ch_bool connected_client;
 
 
 } tcp_device_priv_t;
@@ -69,7 +69,7 @@ static char* tcp_error_strs[] = {
         "Bind error",
 };
 
-static camio_error_t resolve_bind_devect(char* address, char* prot, ch_bool do_bind, ch_bool do_devect,
+static camio_error_t resolve_bind_connect(char* address, char* prot, ch_bool do_bind, ch_bool do_connect,
         int* socket_fd_out)
 {
     struct addrinfo hints       = {0};
@@ -89,7 +89,7 @@ static camio_error_t resolve_bind_devect(char* address, char* prot, ch_bool do_b
         return CAMIO_EBADOPT;
     }
 
-    //Iterate over all results, see if we can devect or bind to any of them
+    //Iterate over all results, see if we can connect or bind to any of them
     ch_word soc_fd = -1;
     #define IP_STR_MAX (64)
     char str_to_ip[IP_STR_MAX] = {0};
@@ -103,9 +103,9 @@ static camio_error_t resolve_bind_devect(char* address, char* prot, ch_bool do_b
             continue;
         }
 
-        if(do_devect){
-            DBG("Doing TCP devect to (%s:%s) %s...\n",address, prot, str_to_ip);
-            if (devect(soc_fd, res->ai_addr, res->ai_addrlen) < 0) {
+        if(do_connect){
+            DBG("Doing TCP connect to (%s:%s) %s...\n",address, prot, str_to_ip);
+            if (connect(soc_fd, res->ai_addr, res->ai_addrlen) < 0) {
                 error = TCP_ERROR_CONNECT;
                 close(soc_fd);
                 soc_fd = -1;
@@ -128,7 +128,7 @@ static camio_error_t resolve_bind_devect(char* address, char* prot, ch_bool do_b
     }
     if (soc_fd < 0) {
         if(error == TCP_ERROR_CONNECT){
-            //Nothing to devect to, this is probably not fatal
+            //Nothing to connect to, this is probably not fatal
             return CAMIO_ENOTREADY;
         }
 
@@ -136,33 +136,33 @@ static camio_error_t resolve_bind_devect(char* address, char* prot, ch_bool do_b
         const char* error_str = tcp_error_strs[error];
         (void)error_str;
         ERR("Creating socket failed: %s\n", error_str);
-        return CAMIO_EINVALID; //OK. We were not ready to devect for some reason. TODO XXX better error code here
+        return CAMIO_EINVALID; //OK. We were not ready to connect for some reason. TODO XXX better error code here
     }
 
     //If we get here, soc_fd is populated with something meaningful! yay!
     *socket_fd_out = soc_fd;
 
-    DBG("Done %s to address %s with protocol %s\n", do_bind ? "binding" : "devecting", address, prot);
+    DBG("Done %s to address %s with protocol %s\n", do_bind ? "binding" : "connecting", address, prot);
 
     return CAMIO_ENOERROR;
 }
 
-//Try to see if devecting is possible. With TCP, it is always possible.
-static camio_error_t tcp_devect_peek(camio_device_t* this)
+//Try to see if connecting is possible. With TCP, it is always possible.
+static camio_error_t tcp_connect_peek(camio_device_t* this)
 {
 
-    DBG("Doing TCP devect peek\n");
+    DBG("Doing TCP connect peek\n");
     tcp_device_priv_t* priv = DEVICE_GET_PRIVATE(this);
     if(this->muxable.fd < 0){ //No socket yet
         const bool do_bind    = priv->params->listen;
-        const bool do_devect = !do_bind;
-        camio_error_t err = resolve_bind_devect(priv->address.str,priv->protocol.str,do_bind,do_devect, &this->muxable.fd);
+        const bool do_connect = !do_bind;
+        camio_error_t err = resolve_bind_connect(priv->address.str,priv->protocol.str,do_bind,do_connect, &this->muxable.fd);
         if(err == CAMIO_ENOTREADY){
-            DBG("TCP is not ready to devect, but it might be in the future\n");
+            DBG("TCP is not ready to connect, but it might be in the future\n");
             return CAMIO_ETRYAGAIN;
         }
         if(err != CAMIO_ENOERROR){
-            return err; //We cannot devect something went wrong. //TODO XXX better error code
+            return err; //We cannot connect something went wrong. //TODO XXX better error code
         }
 
         //We got a valid FD, set it to non-block
@@ -177,10 +177,10 @@ static camio_error_t tcp_devect_peek(camio_device_t* this)
            }
         }
     }
-    //OK, now that we've set up a non-blocking descriptor, we can go and accept or devect
+    //OK, now that we've set up a non-blocking descriptor, we can go and accept or connect
     if(!priv->params->listen){
         priv->con_fd_tmp = this->muxable.fd;
-        return CAMIO_ENOERROR; //We're devected off we go!
+        return CAMIO_ENOERROR; //We're connected off we go!
     }
 
     //Time to accept now incoming connections
@@ -205,41 +205,41 @@ static camio_error_t tcp_devect_peek(camio_device_t* this)
 
 static camio_error_t tcp_device_ready(camio_muxable_t* this)
 {
-    DBG("Checking if TCP is ready to devect...\n");
+    DBG("Checking if TCP is ready to connect...\n");
     tcp_device_priv_t* priv = DEVICE_GET_PRIVATE(this->parent.device);
 
-    if(priv->devected_client){
-        DBG("Already devected!\n");
+    if(priv->connected_client){
+        DBG("Already connected!\n");
         return CAMIO_EALLREADYCONNECTED;
     }
 
     if(priv->con_fd_tmp > -1){
-        ERR("Ready to devect, FD is > -1\n");
+        ERR("Ready to connect, FD is > -1\n");
         return CAMIO_EREADY;
     }
 
-    camio_error_t err = tcp_devect_peek(this->parent.device);
+    camio_error_t err = tcp_connect_peek(this->parent.device);
     if(err == CAMIO_ETRYAGAIN){
-        DBG("Not ready to devect, try again in a while\n");
+        DBG("Not ready to connect, try again in a while\n");
         return CAMIO_ENOTREADY;
     }
     if(err != CAMIO_ENOERROR){
-        DBG("Not ready to devect, Some other error (%i)\n", err);
+        DBG("Not ready to connect, Some other error (%i)\n", err);
         return err;
     }
 
-    DBG("Ready to devect, FD is now %i\n", priv->con_fd_tmp);
+    DBG("Ready to connect, FD is now %i\n", priv->con_fd_tmp);
     return CAMIO_EREADY;
 }
 
-static camio_error_t tcp_devect(camio_device_t* this, camio_channel_t** channel_o )
+static camio_error_t tcp_connect(camio_device_t* this, camio_channel_t** channel_o )
 {
     tcp_device_priv_t* priv = DEVICE_GET_PRIVATE(this);
     camio_error_t err = tcp_device_ready(&this->muxable);
     if(err != CAMIO_EREADY){
         return err;
     }
-    DBG("Done devecting, now constructing TCP channel...\n");
+    DBG("Done connecting, now constructing TCP channel...\n");
 
     camio_channel_t* channel = NEW_CHANNEL(tcp);
     if(!channel){
@@ -254,9 +254,9 @@ static camio_error_t tcp_devect(camio_device_t* this, camio_channel_t** channel_
     }
 
 
-    if(!priv->params->listen){ //Make sure we only devect once on a client
-        //DBG("Only devect once!\n");
-        priv->devected_client = true;
+    if(!priv->params->listen){ //Make sure we only connect once on a client
+        //DBG("Only connect once!\n");
+        priv->connected_client = true;
     }
     priv->con_fd_tmp = -1;
 
