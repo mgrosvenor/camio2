@@ -194,7 +194,7 @@ static camio_error_t bring_read_buffer_ready(camio_muxable_t* this)
         }
 
         if(unlikely( seq_no != priv->rd_sync_counter)){
-            DBG( "Ring synchronization error. This should not happen with a blocking ring %llu to %llu\n",
+            ERR( "Ring synchronization error. This should not happen with a blocking ring %llu to %llu\n",
                 seq_no,
                 priv->rd_sync_counter
             );
@@ -654,7 +654,7 @@ static camio_error_t bring_write_data_request(camio_channel_t* this, camio_msg_t
         camio_wr_data_req_t* req = &req_vec[i].wr_data_req;
         req_vec[i].type= CAMIO_MSG_TYPE_WRITE_DATA_RES;
         camio_buffer_t* buff = req->buffer;
-        *vec_len_io = i;
+        *vec_len_io = i+1;
 
 //        DBG("Trying to process write data request of size %lli with data start=%p index=%lli\n",
 //                req->buffer->data_len, req->buffer->data_start, req->buffer->__internal.__buffer_id);

@@ -166,6 +166,8 @@ static camio_error_t on_new_rd_datas(camio_muxable_t* muxable, camio_error_t err
 
         intv_bytes += buffer->data_len;
         camio_perf_packet_head_t* head = (camio_perf_packet_head_t*)buffer->data_start;
+        //hexdump(head,sizeof(*head) * 2);
+
         if(head->seq_number != seq_exp){
             ERR("Sequence number error, expected to find %lli but found %lli\n", seq_exp, head->seq_number);
             lost_count++;
