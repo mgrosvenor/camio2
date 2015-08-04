@@ -17,19 +17,35 @@
 #include "camio_perf_server.h"
 #include "options.h"
 
+#include <deps/chaste/perf/perf.h>
+
 USE_CAMIO;
 USE_CH_OPTIONS;
 USE_CH_LOGGER_DEFAULT;
 
 
 struct options_t options;
+static ch_word stop = 0;
 
+USE_CH_PERF(10 * 1000 * 1000);
+
+void term(int signum){
+    (void)signum;
+    const char* filename = options.client ? "camio_perf_client.perf" : "camio_perf_server.perf";
+    ch_perf_finish_(ch_perf_output_tofile,ch_perf_format_csv,filename);
+    stop = true;
+    exit(0);
+}
 
 int main(int argc, char** argv)
 {
     #ifdef NDEBUG
-    printf("NDEBUG defined\n");
+    printf("NDEBUG defined -- running in release mode\n");
     #endif
+
+    signal(SIGTERM, term);
+    signal(SIGINT, term);
+
 
     DBG("Starting camio perf!\n");
     ch_opt_addsi(CH_OPTION_OPTIONAL, 'c', "client","name or that the client should connect to", &options.client, NULL);
@@ -42,7 +58,7 @@ int main(int argc, char** argv)
         ch_log_fatal("Cannot be in both client and server mode at the same time, please choose one!\n");
     }
 
-    ch_word stop = 0;
+
     if(options.client){
         DBG("Starting camio perf client\n");
         camio_perf_clinet(options.client,&stop);

@@ -19,6 +19,7 @@
 #include <src/devices/messages.h>
 
 #include "options.h"
+#include <deps/chaste/perf/perf.h>
 extern struct options_t options;
 
 //This is a single threaded app for the moment, so we'll just have one mux
@@ -303,6 +304,7 @@ static camio_error_t on_new_wr_buffs(camio_muxable_t* muxable, camio_error_t err
 
 static camio_error_t get_new_buffers(camio_channel_t* channel, ch_word chan_id)
 {
+    ch_perf_event_start(1,0);
     DBG("Getting buffers on chan_id=%lli!\n", chan_id);
     //Initialize a batch of messages based on the current buffer state
     ch_word to_send = 0;
@@ -329,6 +331,7 @@ static camio_error_t get_new_buffers(camio_channel_t* channel, ch_word chan_id)
     if(eqlikely(to_send == 0)){
         //There's no work for us to do, exit now
         DBG("No work to do, exting now\n");
+        ch_perf_event_stop(1,0);
         return CAMIO_ENOERROR;
     }
 
@@ -337,6 +340,7 @@ static camio_error_t get_new_buffers(camio_channel_t* channel, ch_word chan_id)
     camio_error_t err = camio_chan_wr_buff_req( channel, data_msgs, &data_msgs_len);
     if(unlikely(err)){
         DBG("Could not request buffers with error %lli\n", err);
+        ch_perf_event_stop(1,1);
         return err;
     }
     DBG("Successfully issued %lli/%lli buffer requests\n", data_msgs_len, to_send);
@@ -347,6 +351,7 @@ static camio_error_t get_new_buffers(camio_channel_t* channel, ch_word chan_id)
         buff_states[buff_id] = data_msgs[i];
     }
 
+    ch_perf_event_stop(1,2);
     return CAMIO_ENOERROR;
 }
 
