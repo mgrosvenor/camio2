@@ -69,7 +69,7 @@ int main(int argc, char** argv)
     }
 
     //Use the parameters structure to construct a new device object
-    camio_device_t* device = NULL;
+    camio_dev_t* device = NULL;
     err = camio_device_constr(id,&params,params_size,&device);
     if(err){
         ERR("Could not construct device\n");

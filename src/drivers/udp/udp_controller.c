@@ -148,7 +148,7 @@ static camio_error_t udp_connect_peek(udp_device_priv_t* priv)
 
 static camio_error_t udp_device_ready(camio_muxable_t* this)
 {
-    udp_device_priv_t* priv = DEVICE_GET_PRIVATE(this->parent.device);
+    udp_device_priv_t* priv = DEVICE_GET_PRIVATE(this->parent.dev);
     if(priv->rd_fd > -1 || priv->wr_fd > -1){
         return CAMIO_EREADY;
     }
@@ -161,7 +161,7 @@ static camio_error_t udp_device_ready(camio_muxable_t* this)
     return CAMIO_EREADY;
 }
 
-static camio_error_t udp_connect(camio_device_t* this, camio_channel_t** channel_o )
+static camio_error_t udp_connect(camio_dev_t* this, camio_channel_t** channel_o )
 {
     udp_device_priv_t* priv = DEVICE_GET_PRIVATE(this);
     camio_error_t err = udp_connect_peek(priv);
@@ -194,7 +194,7 @@ static camio_error_t udp_connect(camio_device_t* this, camio_channel_t** channel
  * Setup and teardown
  **************************************************************************************************************************/
 
-static camio_error_t udp_construct(camio_device_t* this, void** params, ch_word params_size)
+static camio_error_t udp_construct(camio_dev_t* this, void** params, ch_word params_size)
 {
 
     udp_device_priv_t* priv = DEVICE_GET_PRIVATE(this);
@@ -279,7 +279,7 @@ static camio_error_t udp_construct(camio_device_t* this, void** params, ch_word 
 
     //Populate the muxable structure
     this->muxable.mode              = CAMIO_MUX_MODE_CONNECT;
-    this->muxable.parent.device  = this;
+    this->muxable.parent.dev  = this;
     this->muxable.vtable.ready      = udp_device_ready;
     this->muxable.fd                = -1;
 
@@ -291,7 +291,7 @@ static camio_error_t udp_construct(camio_device_t* this, void** params, ch_word 
 }
 
 
-static void udp_destroy(camio_device_t* this)
+static void udp_destroy(camio_dev_t* this)
 {
     DBG("Destorying udp device\n");
     udp_device_priv_t* priv = DEVICE_GET_PRIVATE(this);

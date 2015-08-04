@@ -29,7 +29,7 @@
 #define CAMIO_TTT_BUFFER_COUNT (1)
 
 typedef struct ttt_channel_priv_s {
-    camio_device_t device;
+    camio_dev_t device;
 
     //The actual underlying file descriptor that we're going to work with. Default is -1
     int fd;
@@ -469,7 +469,7 @@ static void ttt_destroy(camio_channel_t* this)
 
 }
 
-camio_error_t ttt_channel_construct(camio_channel_t* this, camio_device_t* device, int fd)
+camio_error_t ttt_channel_construct(camio_channel_t* this, camio_dev_t* device, int fd)
 {
     //Basic sanity checks -- TODO XXX: Should these be made into (compile time optional?) asserts for runtime performance?
     if( NULL == this){

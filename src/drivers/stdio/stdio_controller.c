@@ -23,13 +23,13 @@
  **************************************************************************************************************************/
 typedef fio_device_priv_t stdio_device_priv_t;
 
-extern camio_error_t fio_connect_peek(camio_device_t* this);
+extern camio_error_t fio_connect_peek(camio_dev_t* this);
 #define stdio_connect_peek fio_connect_peek
 
-extern camio_error_t fio_connect_ready(camio_device_t* this);
+extern camio_error_t fio_connect_ready(camio_dev_t* this);
 #define stdio_connect_ready fio_connect_ready
 
-extern camio_error_t fio_connect(camio_device_t* this, camio_channel_t** channel_o );
+extern camio_error_t fio_connect(camio_dev_t* this, camio_channel_t** channel_o );
 #define stdio_connect fio_connect
 
 
@@ -37,8 +37,8 @@ extern camio_error_t fio_connect(camio_device_t* this, camio_channel_t** channel
 /**************************************************************************************************************************
  * Setup and teardown
  **************************************************************************************************************************/
-extern camio_error_t fio_construct(camio_device_t* this, void** params, ch_word params_size);
-static camio_error_t stdio_construct(camio_device_t* this, void** params, ch_word params_size)
+extern camio_error_t fio_construct(camio_dev_t* this, void** params, ch_word params_size);
+static camio_error_t stdio_construct(camio_dev_t* this, void** params, ch_word params_size)
 {
 
     //Basic sanity check that the params is the right one.
@@ -84,7 +84,7 @@ static camio_error_t stdio_construct(camio_device_t* this, void** params, ch_wor
 }
 
 
-extern void fio_destroy(camio_device_t* this);
+extern void fio_destroy(camio_dev_t* this);
 #define stdio_destroy fio_destroy
 
 NEW_DEVICE_DEFINE(stdio, stdio_device_priv_t)

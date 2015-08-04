@@ -32,7 +32,7 @@ typedef struct ttt_priv_s {
  **************************************************************************************************************************/
 
 //Try to see if connecting is possible.
-static camio_error_t ttt_connect_peek(camio_device_t* this)
+static camio_error_t ttt_connect_peek(camio_dev_t* this)
 {
     DBG("Doing TTT connect peek\n");
 
@@ -44,14 +44,14 @@ static camio_error_t ttt_connect_peek(camio_device_t* this)
 static camio_error_t ttt_device_ready(camio_muxable_t* this)
 {
     DBG("Checking if TTT is ready to connect...\n");
-    ttt_device_priv_t* priv = DEVICE_GET_PRIVATE(this->parent.device);
+    ttt_device_priv_t* priv = DEVICE_GET_PRIVATE(this->parent.dev);
 
 
     return CAMIO_ENOTREADY;
     return CAMIO_EREADY;
 }
 
-static camio_error_t ttt_connect(camio_device_t* this, camio_channel_t** channel_o )
+static camio_error_t ttt_connect(camio_dev_t* this, camio_channel_t** channel_o )
 {
     ttt_device_priv_t* priv = DEVICE_GET_PRIVATE(this);
     camio_error_t err = ttt_device_ready(&this->muxable);
@@ -83,7 +83,7 @@ static camio_error_t ttt_connect(camio_device_t* this, camio_channel_t** channel
  * Setup and teardown
  **************************************************************************************************************************/
 
-static camio_error_t ttt_construct(camio_device_t* this, void** params, ch_word params_size)
+static camio_error_t ttt_construct(camio_dev_t* this, void** params, ch_word params_size)
 {
 
     ttt_device_priv_t* priv = DEVICE_GET_PRIVATE(this);
@@ -98,7 +98,7 @@ static camio_error_t ttt_construct(camio_device_t* this, void** params, ch_word 
 
     //Populate the muxable structure
     this->muxable.mode              = CAMIO_MUX_MODE_CONNECT;
-    this->muxable.parent.device  = this;
+    this->muxable.parent.dev  = this;
     this->muxable.vtable.ready      = ttt_device_ready;
     this->muxable.fd                = -1;
 
@@ -106,7 +106,7 @@ static camio_error_t ttt_construct(camio_device_t* this, void** params, ch_word 
 }
 
 
-static void ttt_destroy(camio_device_t* this)
+static void ttt_destroy(camio_dev_t* this)
 {
     DBG("Destorying ttt device\n");
     ttt_device_priv_t* priv = DEVICE_GET_PRIVATE(this);

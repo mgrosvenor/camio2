@@ -30,7 +30,7 @@
 #define CAMIO_TCP_BUFFER_COUNT (1)
 
 typedef struct tcp_channel_priv_s {
-    camio_device_t device;
+    camio_dev_t device;
 
     ch_word rd_buff_sz;
     ch_word wr_buff_sz;
@@ -512,7 +512,7 @@ static void tcp_destroy(camio_channel_t* this)
 
 }
 
-camio_error_t tcp_channel_construct(camio_channel_t* this, camio_device_t* device, tcp_params_t* params, int fd)
+camio_error_t tcp_channel_construct(camio_channel_t* this, camio_dev_t* device, tcp_params_t* params, int fd)
 {
     //Basic sanity checks -- TODO XXX: Should these be made into (compile time optional?) asserts for runtime performance?
     if( NULL == this){

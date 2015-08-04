@@ -23,7 +23,7 @@
 
 extern struct options_t options;
 static camio_mux_t* mux                 = NULL;
-static camio_device_t* device   = NULL;
+static camio_dev_t* device   = NULL;
 #define MSGS_MAX 1024
 static camio_msg_t ctrl_msgs[MSGS_MAX]  = {{0}};
 static ch_word ctrl_msgs_len            = MSGS_MAX;
@@ -65,7 +65,7 @@ static camio_error_t get_new_channels();
 //}
 
 //delim_params_t delim_params;
-static camio_error_t connect_delim(ch_cstr server_channel_uri, camio_device_t** device) {
+static camio_error_t connect_delim(ch_cstr server_channel_uri, camio_dev_t** device) {
 //
 //    //Find the ID of the delim channel
 //    ch_word id;
@@ -306,7 +306,7 @@ static camio_error_t on_new_channels(camio_muxable_t* muxable, camio_error_t err
     }
 
     ctrl_msgs_len = MIN(MSGS_MAX,options.batching);
-    err = camio_ctrl_chan_res(muxable->parent.device, ctrl_msgs, &ctrl_msgs_len );
+    err = camio_ctrl_chan_res(muxable->parent.dev, ctrl_msgs, &ctrl_msgs_len );
     if(err){
         return err;
     }

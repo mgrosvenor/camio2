@@ -69,7 +69,7 @@ typedef struct bring_priv_s {
 
     char* bring_filen;
 
-} bring_device_priv_t;
+} bring_dev_priv_t;
 
 
 
@@ -77,11 +77,11 @@ typedef struct bring_priv_s {
  * Connect functions
  **************************************************************************************************************************/
 
-camio_error_t bring_channel_request( camio_device_t* this, camio_msg_t* req_vec, ch_word* vec_len_io)
+camio_error_t bring_channel_request(camio_dev_t* this, camio_msg_t* req_vec, ch_word* vec_len_io)
 {
     //DBG("Doing bring channel request...!\n");
 
-    bring_device_priv_t* priv = DEVICE_GET_PRIVATE(this);
+    bring_dev_priv_t* priv = DEVICE_GET_PRIVATE(this);
 
     if(unlikely(NULL == cbq_push_back_carray(priv->chan_req_queue, req_vec,vec_len_io))){
         ERR("Could not push any items on to queue.");
@@ -93,11 +93,11 @@ camio_error_t bring_channel_request( camio_device_t* this, camio_msg_t* req_vec,
 }
 
 
-static camio_error_t bring_connect_peek_server(camio_device_t* this)
+static camio_error_t bring_connect_peek_server(camio_dev_t* this)
 {
 
     camio_error_t result = CAMIO_ENOERROR;
-    bring_device_priv_t* priv = DEVICE_GET_PRIVATE(this);
+    bring_dev_priv_t* priv = DEVICE_GET_PRIVATE(this);
     //DBG("Doing connect peek server on %s\n", priv->bring_filen);
 
     if(priv->bring_fd > -1 ){ //Ready to go! Call connect!
@@ -266,11 +266,11 @@ error_no_cleanup:
 
 }
 
-static camio_error_t bring_connect_peek_client(camio_device_t* this)
+static camio_error_t bring_connect_peek_client(camio_dev_t* this)
 {
 
     camio_error_t result = CAMIO_ENOERROR;
-    bring_device_priv_t* priv = DEVICE_GET_PRIVATE(this);
+    bring_dev_priv_t* priv = DEVICE_GET_PRIVATE(this);
     //DBG("Doing connect peek client on %s\n", priv->bring_filen);
 
     if(priv->bring_fd > -1 ){ //Ready to go! Call connect!
@@ -394,11 +394,11 @@ error_no_cleanup:
 
 
 //Try to see if connecting is possible.
-static camio_error_t bring_connect_peek(camio_device_t* this)
+static camio_error_t bring_connect_peek(camio_dev_t* this)
 {
     //DBG("Doing connect peek\n");
     camio_error_t result = CAMIO_ENOERROR;
-    bring_device_priv_t* priv = DEVICE_GET_PRIVATE(this);
+    bring_dev_priv_t* priv = DEVICE_GET_PRIVATE(this);
 
     if(priv->params->server){
         result = bring_connect_peek_server(this);
@@ -427,7 +427,7 @@ static camio_error_t bring_connect_peek(camio_device_t* this)
 
 static camio_error_t bring_channel_ready(camio_muxable_t* this)
 {
-    bring_device_priv_t* priv = DEVICE_GET_PRIVATE(this->parent.device);
+    bring_dev_priv_t* priv = DEVICE_GET_PRIVATE(this->parent.dev);
     //DBG("Doing channel ready\n");
 
     //DBG("req_queue count=%lli\n", priv->chan_req_queue->count);
@@ -436,13 +436,13 @@ static camio_error_t bring_channel_ready(camio_muxable_t* this)
         return CAMIO_ETRYAGAIN;
     }
 
-    return bring_connect_peek(this->parent.device);
+    return bring_connect_peek(this->parent.dev);
 }
 
-static camio_error_t bring_channel_result(camio_device_t* this, camio_msg_t* res_vec, ch_word* vec_len_io )
+static camio_error_t bring_channel_result(camio_dev_t* this, camio_msg_t* res_vec, ch_word* vec_len_io )
 {
     DBG("Getting bring connect result\n");
-    bring_device_priv_t* priv = DEVICE_GET_PRIVATE(this);
+    bring_dev_priv_t* priv = DEVICE_GET_PRIVATE(this);
 
     //Is there any data waiting? If not, try to get some
     if(unlikely(priv->chan_req_queue->count <= 0)){
@@ -511,10 +511,10 @@ static camio_error_t bring_channel_result(camio_device_t* this, camio_msg_t* res
  * Setup and teardown
  **************************************************************************************************************************/
 
-static camio_error_t bring_construct(camio_device_t* this, void** params, ch_word params_size)
+static camio_error_t bring_construct(camio_dev_t* this, void** params, ch_word params_size)
 {
 
-    bring_device_priv_t* priv = DEVICE_GET_PRIVATE(this);
+    bring_dev_priv_t* priv = DEVICE_GET_PRIVATE(this);
     //Basic sanity check that the params is the right one.
     if(params_size != sizeof(bring_params_t)){
         ERR("Bad parameters structure passed\n");
@@ -555,10 +555,10 @@ static camio_error_t bring_construct(camio_device_t* this, void** params, ch_wor
 }
 
 
-static void bring_destroy(camio_device_t* this)
+static void bring_destroy(camio_dev_t* this)
 {
     DBG("Destroying bring device\n");
-    bring_device_priv_t* priv = DEVICE_GET_PRIVATE(this);
+    bring_dev_priv_t* priv = DEVICE_GET_PRIVATE(this);
 
     if(priv->bring_filen)      { free(priv->bring_filen);       }
 
@@ -568,7 +568,7 @@ static void bring_destroy(camio_device_t* this)
     DBG("Freed device structure\n");
 }
 
-NEW_DEVICE_DEFINE(bring, bring_device_priv_t)
+NEW_DEVICE_DEFINE(bring, bring_dev_priv_t)
 
 void bring_init()
 {

@@ -38,7 +38,7 @@
  *  CAMIO_ETOOMANY - the request slots have run-out
  *  CAMIO_ENOMORE  - the device has run out of communication channels, no more requests will succeed.
  */
-camio_error_t camio_ctrl_chan_req( camio_device_t* this, camio_msg_t* req_vec, ch_word* vec_len_io);
+camio_error_t camio_ctrl_chan_req( camio_dev_t* this, camio_msg_t* req_vec, ch_word* vec_len_io);
 
 
 /**
@@ -49,7 +49,7 @@ camio_error_t camio_ctrl_chan_req( camio_device_t* this, camio_msg_t* req_vec, c
  * CAMIO_NOERROR - there is a new channel request response waiting
  *
  */
-camio_error_t camio_ctrl_chan_ready( camio_device_t* this );
+camio_error_t camio_ctrl_chan_ready( camio_dev_t* this );
 
 
 /**
@@ -60,19 +60,19 @@ camio_error_t camio_ctrl_chan_ready( camio_device_t* this );
  * Return values:
  * CAMIO_ENOERROR
  */
-camio_error_t camio_ctrl_chan_res( camio_device_t* this, camio_msg_t* res_vec, ch_word* vec_len_io);
+camio_error_t camio_ctrl_chan_res( camio_dev_t* this, camio_msg_t* res_vec, ch_word* vec_len_io);
 
 
 /**
  * Configure properties of the device
  */
-//camio_error_t camio_ctrl_config( camio_device_t* this, void* params, size_t param_size);
+//camio_error_t camio_ctrl_config( camio_dev_t* this, void* params, size_t param_size);
 
 
 /**
  * Free resources associated with this device, but not with any of the channels it has created.
  */
-void camio_device_destroy(camio_device_t* this);
+void camio_device_destroy(camio_dev_t* this);
 
 
 /**************************************************************************************************************************

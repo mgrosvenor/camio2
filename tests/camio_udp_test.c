@@ -22,7 +22,7 @@ int main(int argc, char** argv)
 
     printf("Hello CamIO\n");
 
-    camio_device_t* device = NULL;
+    camio_dev_t* device = NULL;
 
     new_camio_device_str("udp:127.0.0.1?rp=3000?wp=4000",NULL,&device);
 

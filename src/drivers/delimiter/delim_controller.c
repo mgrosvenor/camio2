@@ -25,7 +25,7 @@ typedef struct delim_priv_s {
     delim_params_t* params;
 
     //Properties of the base channel
-    camio_device_t* base;
+    camio_dev_t* base;
     void* base_params;
     ch_word base_params_size;
     ch_word base_id;
@@ -38,7 +38,7 @@ typedef struct delim_priv_s {
 /**************************************************************************************************************************
  * Connect functions
  **************************************************************************************************************************/
-camio_error_t delim_channel_request( camio_device_t* this, camio_msg_t* req_vec, ch_word* vec_len_io)
+camio_error_t delim_channel_request( camio_dev_t* this, camio_msg_t* req_vec, ch_word* vec_len_io)
 {
     DBG("Doing delim channel request...!\n");
 
@@ -53,7 +53,7 @@ camio_error_t delim_channel_request( camio_device_t* this, camio_msg_t* req_vec,
 
 static camio_error_t delim_channel_ready(camio_muxable_t* this)
 {
-    delim_device_priv_t* priv = DEVICE_GET_PRIVATE(this->parent.device);
+    delim_device_priv_t* priv = DEVICE_GET_PRIVATE(this->parent.dev);
     DBG("Doing channel ready\n");
 
     //Simply forward the ready to the base device.
@@ -64,7 +64,7 @@ static camio_error_t delim_channel_ready(camio_muxable_t* this)
 
 
 
-static camio_error_t delim_channel_result(camio_device_t* this, camio_msg_t* res_vec, ch_word* vec_len_io )
+static camio_error_t delim_channel_result(camio_dev_t* this, camio_msg_t* res_vec, ch_word* vec_len_io )
 {
     delim_device_priv_t* priv = DEVICE_GET_PRIVATE(this);
 
@@ -138,7 +138,7 @@ static camio_error_t delim_channel_result(camio_device_t* this, camio_msg_t* res
  * Setup and teardown
  **************************************************************************************************************************/
 
-static camio_error_t delim_construct(camio_device_t* this, void** params, ch_word params_size)
+static camio_error_t delim_construct(camio_dev_t* this, void** params, ch_word params_size)
 {
     //Basic sanity check that the params is the right one.
     if(params_size != sizeof(delim_params_t)){
@@ -187,7 +187,7 @@ static camio_error_t delim_construct(camio_device_t* this, void** params, ch_wor
 }
 
 
-static void delim_destroy(camio_device_t* this)
+static void delim_destroy(camio_dev_t* this)
 {
     DBG("Destroying delim device...\n");
     delim_device_priv_t* priv = DEVICE_GET_PRIVATE(this);

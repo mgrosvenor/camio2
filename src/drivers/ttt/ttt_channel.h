@@ -16,6 +16,6 @@
 
 NEW_CHANNEL_DECLARE(ttt);
 
-camio_error_t ttt_channel_construct(camio_channel_t* this, camio_device_t* device /**, ... , **/);
+camio_error_t ttt_channel_construct(camio_channel_t* this, camio_dev_t* dev /**, ... , **/);
 
 #endif /* SRC_DRIVERS_TTT_TTT_CHANNEL_H_ */

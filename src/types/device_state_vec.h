@@ -18,7 +18,7 @@
 #include <deps/chaste/data_structs/vector/vector_typed_declare_template.h>
 #include <src/utils/uri_parser/uri_parser.h>
 
-typedef camio_error_t (*camio_new_dev_f)(void** params, ch_word params_size, camio_device_t** device_o);
+typedef camio_error_t (*camio_new_dev_f)(void** params, ch_word params_size, camio_dev_t** device_o);
 
 typedef struct camio_device_state_s {
     ch_ccstr scheme;                                // The short name for this channel eg: "tcp" or "udp"

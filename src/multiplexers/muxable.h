@@ -62,7 +62,7 @@ typedef struct camio_muxable_s {
      */
     union{
         camio_channel_t*    channel;
-        camio_device_t* device;
+        camio_dev_t* dev;
     } parent;
 
     //Let users keep a pointer to some local state, this is ignored by CamIO

@@ -20,7 +20,7 @@
  */
 camio_error_t camio_easy_channel_new(char* uri, camio_channel_t** channel);
 
-camio_error_t camio_easy_device_new(char* uri, camio_device_t** device_o);
+camio_error_t camio_easy_device_new(char* uri, camio_dev_t** device_o);
 
 
 #endif /* API_EASY_H_ */

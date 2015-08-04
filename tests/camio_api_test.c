@@ -21,7 +21,7 @@ int main(int argc, char** argv)
     (void)argc; //We don't use these for the test ... yet
     (void)argv;
 
-    camio_device_t* device = NULL;
+    camio_dev_t* device = NULL;
 
     new_camio_device_bin("netm",NULL,&device);
 

@@ -32,7 +32,7 @@ camio_error_t populate_mux( camio_mux_t* mux, CH_VECTOR(cstr)* uris, ch_word* mu
     DBG("populate mux count=%lli\n", uris->count);
     for (int i = 0; i < uris->count; i++) {
         ch_cstr* uri = uris->off(uris, i);
-        camio_device_t* device = NULL;
+        camio_dev_t* device = NULL;
         DBG("Adding device with uri=%s\n", *uri);
         camio_error_t err = camio_device_new(*uri, &device);
         if (err) {
@@ -116,7 +116,7 @@ int main(int argc, char** argv)
                     continue; //The connection is dead!
                 }
 
-                err = camio_connect(muxable->parent.device,&channel);
+                err = camio_connect(muxable->parent.dev,&channel);
                 if(err){
                     ERR("Cannot connect to channel with id=%lli\n", which );
                     continue;

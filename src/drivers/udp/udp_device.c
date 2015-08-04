@@ -20,9 +20,9 @@
 static const char* const scheme = "udp";
 
 
-static camio_error_t construct(void** params, ch_word params_size, camio_device_t** device_o)
+static camio_error_t construct(void** params, ch_word params_size, camio_dev_t** device_o)
 {
-    camio_device_t* dev = NEW_DEVICE(udp);
+    camio_dev_t* dev = NEW_DEVICE(udp);
     if(!dev){
         *device_o = NULL;
         return CAMIO_ENOMEM;

@@ -18,7 +18,7 @@ NEW_CHANNEL_DECLARE(mfio);
 
 camio_error_t mfio_channel_construct(
     camio_channel_t* this,
-    camio_device_t* device,
+    camio_dev_t* dev,
     int base_fd,
     void* base_mem_start,
     ch_word base_mem_len

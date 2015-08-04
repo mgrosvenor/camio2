@@ -29,7 +29,7 @@
 #define CAMIO_UDP_BUFFER_COUNT (1)
 
 typedef struct udp_channel_priv_s {
-    camio_device_t device;
+    camio_dev_t device;
 
     //These are the actual underlying file descriptors that we're going to work with. Defualt is -1
     int rd_fd;
@@ -536,7 +536,7 @@ static void udp_destroy(camio_channel_t* this)
 
 }
 
-camio_error_t udp_channel_construct(camio_channel_t* this, camio_device_t* device, udp_params_t* params, int rd_fd, int wr_fd)
+camio_error_t udp_channel_construct(camio_channel_t* this, camio_dev_t* device, udp_params_t* params, int rd_fd, int wr_fd)
 {
     //Basic sanity checks -- TODO XXX: Should these be made into (compile time optional?) asserts for runtime performance?
     if( NULL == this){

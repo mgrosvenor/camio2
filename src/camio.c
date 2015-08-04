@@ -341,7 +341,7 @@ exit_uri:
 
 
 
-camio_error_t camio_device_new(ch_word id, void** params, ch_word params_size, camio_device_t** device_o)
+camio_error_t camio_device_new(ch_word id, void** params, ch_word params_size, camio_dev_t** device_o)
 {
     CH_VECTOR(CAMIO_TRANSPORT_STATE_VEC)* trans_state = __camio_state_container.trans_state;
     camio_device_state_t* state = trans_state->off(trans_state,id);

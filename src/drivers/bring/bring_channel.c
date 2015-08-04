@@ -37,7 +37,7 @@
 #define BRING_SYNC_BUFF_RXD   0x1ULL
 
 typedef struct bring_channel_priv_s {
-    camio_device_t device;
+    camio_dev_t device;
     bring_params_t params;
     volatile bring_header_t* bring_head;
     ch_bool connected;              //Is the channel currently running? Or has close been called?
@@ -70,7 +70,7 @@ typedef struct bring_channel_priv_s {
     ch_word wr_out_index;           //Current slot for sending data
     ch_word wr_rel_index;           //Current slot for sending data
 
-} bring_channel_priv_t;
+} bring_chan_priv_t;
 
 /**************************************************************************************************************************
  * UTLITIES
@@ -138,7 +138,7 @@ static camio_error_t bring_read_buffer_request(camio_channel_t* this, camio_msg_
 
     DBG("Doing bring read buffer request...!\n");
 
-    bring_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this);
+    bring_chan_priv_t* priv = CHANNEL_GET_PRIVATE(this);
     //ch_word attempted = *vec_len_io;
     if(unlikely(NULL == cbq_push_back_carray(priv->rd_buff_q, req_vec,vec_len_io))){
         //ERR("Could not push any items on to queue.");
@@ -152,7 +152,7 @@ static camio_error_t bring_read_buffer_request(camio_channel_t* this, camio_msg_
 
 static camio_error_t bring_read_buffer_ready(camio_muxable_t* this)
 {
-    bring_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this->parent.channel);
+    bring_chan_priv_t* priv = CHANNEL_GET_PRIVATE(this->parent.channel);
     //DBG("Doing read buffer ready\n");
 
     //Try to fill as many read requests as we can
@@ -248,7 +248,7 @@ static camio_error_t bring_read_buffer_result( camio_channel_t* this, camio_msg_
 {
     DBG("Getting read buffer result\n");
 
-    bring_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this);
+    bring_chan_priv_t* priv = CHANNEL_GET_PRIVATE(this);
 
     //Is there any data waiting? If not, try to get some
     if(unlikely(priv->rd_buff_q->in_use <= 0)){
@@ -298,7 +298,7 @@ static camio_error_t bring_read_buffer_result( camio_channel_t* this, camio_msg_
 static camio_error_t bring_read_buffer_release(camio_channel_t* this, camio_buffer_t* buffer)
 {
     //DBG("Doing read release\n");
-    bring_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this);
+    bring_chan_priv_t* priv = CHANNEL_GET_PRIVATE(this);
 
     //Check that the buffers are being freed in order
     if(unlikely(buffer->__internal.__buffer_id != priv->rd_rel_index)){
@@ -333,7 +333,7 @@ static camio_error_t bring_read_buffer_release(camio_channel_t* this, camio_buff
 static camio_error_t bring_read_data_request(camio_channel_t* this, camio_msg_t* req_vec, ch_word* vec_len_io )
 {
     //DBG("Doing bring read request...!\n");
-    bring_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this);
+    bring_chan_priv_t* priv = CHANNEL_GET_PRIVATE(this);
 
     if(unlikely(NULL == cbq_push_back_carray(priv->rd_data_q, req_vec,vec_len_io))){
         //ERR("Could not push any items on to queue.");
@@ -352,7 +352,7 @@ static camio_error_t bring_read_data_request(camio_channel_t* this, camio_msg_t*
 //copying. There is a bit of dancing required to get around the async calls so I'll defer this work to a TODO XXX.
 static camio_error_t bring_read_data_ready(camio_muxable_t* this)
 {
-    bring_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this->parent.channel);
+    bring_chan_priv_t* priv = CHANNEL_GET_PRIVATE(this->parent.channel);
     //DBG("Doing read ready\n");
 
     //Try to fill as many read requests as we can
@@ -418,7 +418,7 @@ static camio_error_t bring_read_data_result( camio_channel_t* this, camio_msg_t*
 {
     //DBG("Trying to get read result\n");
 
-    bring_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this);
+    bring_chan_priv_t* priv = CHANNEL_GET_PRIVATE(this);
 
     //Is there any data waiting? If not, try to get some
     if(unlikely(priv->rd_data_q->in_use <= 0)){
@@ -470,7 +470,7 @@ static camio_error_t bring_read_data_result( camio_channel_t* this, camio_msg_t*
 //Ask for write buffers
 static camio_error_t bring_write_buffer_request(camio_channel_t* this, camio_msg_t* req_vec, ch_word* vec_len_io )
 {
-    bring_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this);
+    bring_chan_priv_t* priv = CHANNEL_GET_PRIVATE(this);
     //DBG("Doing write buffer request. There are currently %lli items in the queue\n", priv->wr_buff_q->count);
 
     if(unlikely(NULL == cbq_push_back_carray(priv->wr_buff_q, req_vec,vec_len_io))){
@@ -486,7 +486,7 @@ static camio_error_t bring_write_buffer_request(camio_channel_t* this, camio_msg
 static camio_error_t bring_write_buffer_ready(camio_muxable_t* this)
 {
     //DBG("Doing write buffer ready\n");
-    bring_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this->parent.channel);
+    bring_chan_priv_t* priv = CHANNEL_GET_PRIVATE(this->parent.channel);
 
     camio_msg_t* msg = cbq_use_front(priv->wr_buff_q);
     for( ; msg != NULL; msg = cbq_use_front(priv->wr_buff_q)){
@@ -543,7 +543,7 @@ camio_error_t bring_write_buffer_result(camio_channel_t* this, camio_msg_t* res_
 {
     //DBG("Getting write buffer result\n");
 
-    bring_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this);
+    bring_chan_priv_t* priv = CHANNEL_GET_PRIVATE(this);
 
     //Is there any data waiting? If not, try to get some
     if(unlikely(priv->wr_buff_q->in_use <= 0)){
@@ -589,7 +589,7 @@ static camio_error_t bring_write_buffer_release(camio_channel_t* this, camio_buf
 {
     //DBG("Doing write buffer release\n");
 
-    bring_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this);
+    bring_chan_priv_t* priv = CHANNEL_GET_PRIVATE(this);
     //Check that the buffers are being released in order
     if(buffer->__internal.__buffer_id != priv->wr_rel_index){
         ERR("Cannot release this buffer (id=%lli) until buffer with id=%lli is released\n",
@@ -625,7 +625,7 @@ static camio_error_t bring_write_buffer_release(camio_channel_t* this, camio_buf
 static camio_error_t bring_write_data_request(camio_channel_t* this, camio_msg_t* req_vec, ch_word* vec_len_io)
 {
 
-    bring_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this);
+    bring_chan_priv_t* priv = CHANNEL_GET_PRIVATE(this);
     //DBG("Doing write request -- there are currently %lli items in the queue\n", priv->wr_data_q->count);
 
     //Trim so that we fit
@@ -724,7 +724,7 @@ static camio_error_t bring_write_data_request(camio_channel_t* this, camio_msg_t
 //Is the underlying channel done writing and ready for more?
 static camio_error_t bring_write_data_ready(camio_muxable_t* this)
 {
-    bring_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this->parent.channel);
+    bring_chan_priv_t* priv = CHANNEL_GET_PRIVATE(this->parent.channel);
     camio_msg_t* msg = cbq_use_front(priv->wr_data_q);
     for(; msg != NULL; msg = cbq_use_front(priv->wr_data_q)){
 
@@ -785,7 +785,7 @@ static camio_error_t bring_write_data_ready(camio_muxable_t* this)
 static camio_error_t bring_write_data_result(camio_channel_t* this, camio_msg_t* res_vec, ch_word* vec_len_io)
 {
    // DBG("Getting write buffer result\n");
-    bring_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this);
+    bring_chan_priv_t* priv = CHANNEL_GET_PRIVATE(this);
 
     //Is there any data waiting? If not, try to get some
     if(unlikely(priv->wr_data_q->in_use <= 0)){
@@ -837,7 +837,7 @@ static camio_error_t bring_write_data_result(camio_channel_t* this, camio_msg_t*
 static void bring_destroy(camio_channel_t* this)
 {
 
-    bring_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this);
+    bring_chan_priv_t* priv = CHANNEL_GET_PRIVATE(this);
 
     if(priv->bring_head){
         munlock((void*)priv->bring_head,priv->bring_head->total_mem);
@@ -873,7 +873,7 @@ static void bring_destroy(camio_channel_t* this)
 
 camio_error_t bring_channel_construct(
     camio_channel_t* this,
-    camio_device_t* device,
+    camio_dev_t* device,
     volatile bring_header_t* bring_head,
     bring_params_t* params,
     int fd
@@ -881,7 +881,7 @@ camio_error_t bring_channel_construct(
 {
 
     //DBG("Constructing bring channel\n");
-    bring_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this);
+    bring_chan_priv_t* priv = CHANNEL_GET_PRIVATE(this);
 
     priv->device  = *device; //Keep a copy of the device state
     priv->params     = *params;
@@ -952,5 +952,5 @@ camio_error_t bring_channel_construct(
 }
 
 
-NEW_CHANNEL_DEFINE(bring,bring_channel_priv_t)
+NEW_CHANNEL_DEFINE(bring,bring_chan_priv_t)
 

@@ -17,6 +17,6 @@
 
 NEW_CHANNEL_DECLARE(udp);
 
-camio_error_t udp_channel_construct(camio_channel_t* this, camio_device_t* device, udp_params_t* params, int rd_fd, int wr_fd);
+camio_error_t udp_channel_construct(camio_channel_t* this, camio_dev_t* dev, udp_params_t* params, int rd_fd, int wr_fd);
 
 #endif /* SRC_DRIVERS_UDP_UDP_CHANNEL_H_ */

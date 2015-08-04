@@ -63,7 +63,7 @@ typedef struct {
 
 camio_error_t bring_channel_construct(
     camio_channel_t* this,
-    camio_device_t* device,
+    camio_dev_t* dev,
     volatile bring_header_t* bring_head,
     bring_params_t* params,
     int fd

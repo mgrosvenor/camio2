@@ -49,7 +49,7 @@ typedef struct mfio_priv_s {
  **************************************************************************************************************************/
 
 //Try to see if connecting is possible. With UDP, it is always possible.
-static camio_error_t mfio_connect_peek(camio_device_t* this)
+static camio_error_t mfio_connect_peek(camio_dev_t* this)
 {
     DBG("Doing connect peek\n");
     mfio_device_priv_t* priv = DEVICE_GET_PRIVATE(this);
@@ -95,7 +95,7 @@ static camio_error_t mfio_device_ready(camio_muxable_t* this)
         return CAMIO_EREADY;
     }
 
-    camio_error_t err = mfio_connect_peek(this->parent.device);
+    camio_error_t err = mfio_connect_peek(this->parent.dev);
     if(err != CAMIO_ENOERROR){
         return err;
     }
@@ -103,7 +103,7 @@ static camio_error_t mfio_device_ready(camio_muxable_t* this)
     return CAMIO_EREADY;
 }
 
-static camio_error_t mfio_connect(camio_device_t* this, camio_channel_t** channel_o )
+static camio_error_t mfio_connect(camio_dev_t* this, camio_channel_t** channel_o )
 {
     mfio_device_priv_t* priv = DEVICE_GET_PRIVATE(this);
     camio_error_t err = mfio_connect_peek(this);
@@ -139,7 +139,7 @@ static camio_error_t mfio_connect(camio_device_t* this, camio_channel_t** channe
  * Setup and teardown
  **************************************************************************************************************************/
 
-static camio_error_t mfio_construct(camio_device_t* this, void** params, ch_word params_size)
+static camio_error_t mfio_construct(camio_dev_t* this, void** params, ch_word params_size)
 {
 
     mfio_device_priv_t* priv = DEVICE_GET_PRIVATE(this);
@@ -161,7 +161,7 @@ static camio_error_t mfio_construct(camio_device_t* this, void** params, ch_word
 
     //Populate the rest of the muxable structure
     this->muxable.mode              = CAMIO_MUX_MODE_CONNECT;
-    this->muxable.parent.device  = this;
+    this->muxable.parent.dev  = this;
     this->muxable.vtable.ready      = mfio_device_ready;
     this->muxable.fd                = -1;
 
@@ -169,7 +169,7 @@ static camio_error_t mfio_construct(camio_device_t* this, void** params, ch_word
 }
 
 
-static void mfio_destroy(camio_device_t* this)
+static void mfio_destroy(camio_dev_t* this)
 {
     DBG("Destorying mfio device\n");
     mfio_device_priv_t* priv = DEVICE_GET_PRIVATE(this);

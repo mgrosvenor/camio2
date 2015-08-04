@@ -33,7 +33,7 @@
  **************************************************************************************************************************/
 
 //Try to see if connecting is possible. With UDP, it is always possible.
-static camio_error_t fio_connect_peek(camio_device_t* this)
+static camio_error_t fio_connect_peek(camio_dev_t* this)
 {
     DBG("Doing connect peek\n");
     fio_device_priv_t* priv = DEVICE_GET_PRIVATE(this);
@@ -96,7 +96,7 @@ static camio_error_t fio_connect_peek(camio_device_t* this)
 
 camio_error_t fio_device_ready(camio_muxable_t* this)
 {
-    fio_device_priv_t* priv = DEVICE_GET_PRIVATE(this->parent.device);
+    fio_device_priv_t* priv = DEVICE_GET_PRIVATE(this->parent.dev);
     if(priv->is_connected){
         return CAMIO_ENOMORE; // We're already connected!
     }
@@ -105,7 +105,7 @@ camio_error_t fio_device_ready(camio_muxable_t* this)
         return CAMIO_EREADY;
     }
 
-    camio_error_t err = fio_connect_peek(this->parent.device);
+    camio_error_t err = fio_connect_peek(this->parent.dev);
     if(err != CAMIO_ENOERROR){
         return err;
     }
@@ -113,7 +113,7 @@ camio_error_t fio_device_ready(camio_muxable_t* this)
     return CAMIO_EREADY;
 }
 
-camio_error_t fio_connect(camio_device_t* this, camio_channel_t** channel_o )
+camio_error_t fio_connect(camio_dev_t* this, camio_channel_t** channel_o )
 {
     fio_device_priv_t* priv = DEVICE_GET_PRIVATE(this);
     camio_error_t err = fio_connect_peek(this);
@@ -149,7 +149,7 @@ camio_error_t fio_connect(camio_device_t* this, camio_channel_t** channel_o )
  * Setup and teardown
  **************************************************************************************************************************/
 
-camio_error_t fio_construct(camio_device_t* this, void** params, ch_word params_size)
+camio_error_t fio_construct(camio_dev_t* this, void** params, ch_word params_size)
 {
 
     fio_device_priv_t* priv = DEVICE_GET_PRIVATE(this);
@@ -205,7 +205,7 @@ camio_error_t fio_construct(camio_device_t* this, void** params, ch_word params_
 
     //Populate the rest of the muxable structure
     this->muxable.mode              = CAMIO_MUX_MODE_CONNECT;
-    this->muxable.parent.device  = this;
+    this->muxable.parent.dev  = this;
     this->muxable.vtable.ready      = fio_device_ready;
     this->muxable.fd                = -1;
 
@@ -213,7 +213,7 @@ camio_error_t fio_construct(camio_device_t* this, void** params, ch_word params_
 }
 
 
-void fio_destroy(camio_device_t* this)
+void fio_destroy(camio_dev_t* this)
 {
     DBG("Destorying fio device\n");
     fio_device_priv_t* priv = DEVICE_GET_PRIVATE(this);

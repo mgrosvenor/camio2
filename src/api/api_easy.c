@@ -26,7 +26,7 @@ camio_error_t camio_easy_channel_new(char* uri, camio_channel_t** channel)
    //DBG("Got parameter at %p with size %i and id=%i\n", params, params_size, id);
 
    //Use the parameters structure to construct a new device object
-   camio_device_t* device = NULL;
+   camio_dev_t* device = NULL;
    err = camio_device_new(id,&params,params_size,&device);
    if(err){
        DBG("Could not construct device\n");
@@ -57,7 +57,7 @@ camio_error_t camio_easy_channel_new(char* uri, camio_channel_t** channel)
 //   }
 //
 //   //If not true, we have a problem!
-//   assert(muxable->parent.device == device);
+//   assert(muxable->parent.dev == device);
    camio_msg_t msg = {0};
    ch_word len = 1;
    err = camio_ctrl_chan_req(device,&msg,&len);
@@ -99,7 +99,7 @@ camio_error_t camio_easy_channel_new(char* uri, camio_channel_t** channel)
    return CAMIO_ENOERROR;
 }
 
-camio_error_t camio_easy_device_new(char* uri, camio_device_t** device_o)
+camio_error_t camio_easy_device_new(char* uri, camio_dev_t** device_o)
 {
     ch_word id = -1;
     void* params = NULL;

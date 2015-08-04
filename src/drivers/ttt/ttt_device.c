@@ -21,9 +21,9 @@
 static const char* const scheme = "ttt";
 
 
-static camio_error_t construct(void** params, ch_word params_size, camio_device_t** device_o)
+static camio_error_t construct(void** params, ch_word params_size, camio_dev_t** device_o)
 {
-    camio_device_t* dev = NEW_DEVICE(ttt);
+    camio_dev_t* dev = NEW_DEVICE(ttt);
     if(!dev){
         *device_o = NULL;
         return CAMIO_ENOMEM;

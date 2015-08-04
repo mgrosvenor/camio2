@@ -148,7 +148,7 @@ static camio_error_t resolve_bind_connect(char* address, char* prot, ch_bool do_
 }
 
 //Try to see if connecting is possible. With TCP, it is always possible.
-static camio_error_t tcp_connect_peek(camio_device_t* this)
+static camio_error_t tcp_connect_peek(camio_dev_t* this)
 {
 
     DBG("Doing TCP connect peek\n");
@@ -206,7 +206,7 @@ static camio_error_t tcp_connect_peek(camio_device_t* this)
 static camio_error_t tcp_device_ready(camio_muxable_t* this)
 {
     DBG("Checking if TCP is ready to connect...\n");
-    tcp_device_priv_t* priv = DEVICE_GET_PRIVATE(this->parent.device);
+    tcp_device_priv_t* priv = DEVICE_GET_PRIVATE(this->parent.dev);
 
     if(priv->connected_client){
         DBG("Already connected!\n");
@@ -218,7 +218,7 @@ static camio_error_t tcp_device_ready(camio_muxable_t* this)
         return CAMIO_EREADY;
     }
 
-    camio_error_t err = tcp_connect_peek(this->parent.device);
+    camio_error_t err = tcp_connect_peek(this->parent.dev);
     if(err == CAMIO_ETRYAGAIN){
         DBG("Not ready to connect, try again in a while\n");
         return CAMIO_ENOTREADY;
@@ -232,7 +232,7 @@ static camio_error_t tcp_device_ready(camio_muxable_t* this)
     return CAMIO_EREADY;
 }
 
-static camio_error_t tcp_connect(camio_device_t* this, camio_channel_t** channel_o )
+static camio_error_t tcp_connect(camio_dev_t* this, camio_channel_t** channel_o )
 {
     tcp_device_priv_t* priv = DEVICE_GET_PRIVATE(this);
     camio_error_t err = tcp_device_ready(&this->muxable);
@@ -271,7 +271,7 @@ static camio_error_t tcp_connect(camio_device_t* this, camio_channel_t** channel
  * Setup and teardown
  **************************************************************************************************************************/
 
-static camio_error_t tcp_construct(camio_device_t* this, void** params, ch_word params_size)
+static camio_error_t tcp_construct(camio_dev_t* this, void** params, ch_word params_size)
 {
 
     tcp_device_priv_t* priv = DEVICE_GET_PRIVATE(this);
@@ -317,7 +317,7 @@ static camio_error_t tcp_construct(camio_device_t* this, void** params, ch_word 
 
     //Populate the muxable structure
     this->muxable.mode              = CAMIO_MUX_MODE_CONNECT;
-    this->muxable.parent.device  = this;
+    this->muxable.parent.dev  = this;
     this->muxable.vtable.ready      = tcp_device_ready;
     this->muxable.fd                = -1;
 
@@ -325,7 +325,7 @@ static camio_error_t tcp_construct(camio_device_t* this, void** params, ch_word 
 }
 
 
-static void tcp_destroy(camio_device_t* this)
+static void tcp_destroy(camio_dev_t* this)
 {
     DBG("Destorying tcp device\n");
     tcp_device_priv_t* priv = DEVICE_GET_PRIVATE(this);

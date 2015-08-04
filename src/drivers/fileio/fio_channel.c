@@ -27,7 +27,7 @@
 #define CAMIO_FIO_BUFFER_COUNT (1)
 
 typedef struct fio_channel_priv_s {
-    camio_device_t device;
+    camio_dev_t device;
 
     //The actual underlying file descriptors that we're going to work with. Default is -1
     int rd_fd;
@@ -512,7 +512,7 @@ static void fio_destroy(camio_channel_t* this)
 
 }
 
-camio_error_t fio_channel_construct(camio_channel_t* this, camio_device_t* device, fio_params_t* params, int rd_fd, int wr_fd)
+camio_error_t fio_channel_construct(camio_channel_t* this, camio_dev_t* device, fio_params_t* params, int rd_fd, int wr_fd)
 {
     //Basic sanity checks -- TODO XXX: Should these be made into (compile time optional?) asserts for runtime performance?
     if( NULL == this){

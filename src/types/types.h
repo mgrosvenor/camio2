@@ -33,7 +33,7 @@ typedef struct camio_channel_s camio_channel_t;
 
 //Forward declaration, the real definition is found in channels/device.h
 struct camio_device_s;
-typedef struct camio_device_s camio_device_t;
+typedef struct camio_device_s camio_dev_t;
 
 //Forward declaration, the real definition is found in channels/device.h
 struct camio_device_interface_s;

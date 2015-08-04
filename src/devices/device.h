@@ -23,7 +23,7 @@
 #define CAMIO_CTRL_REQ_INF 0x001
 
 
-typedef camio_error_t (*camio_dev_construct_f)(camio_device_t* device_o, void** params, ch_word params_size);
+typedef camio_error_t (*camio_dev_construct_f)(camio_dev_t* dev_o, void** params, ch_word params_size);
 
 
 /**
@@ -31,9 +31,9 @@ typedef camio_error_t (*camio_dev_construct_f)(camio_device_t* device_o, void** 
  */
 typedef struct camio_device_interface_s{
     camio_dev_construct_f construct;
-    camio_error_t (*channel_request)( camio_device_t* this, camio_msg_t* req_vec, ch_word* vec_len_io);
-    camio_error_t (*channel_result)( camio_device_t* this, camio_msg_t* res_vec, ch_word* vec_len_io);
-    void (*destroy)(camio_device_t* this);
+    camio_error_t (*channel_request)( camio_dev_t* this, camio_msg_t* req_vec, ch_word* vec_len_io);
+    camio_error_t (*channel_result)( camio_dev_t* this, camio_msg_t* res_vec, ch_word* vec_len_io);
+    void (*destroy)(camio_dev_t* this);
 } camio_device_interface_t;
 
 
@@ -61,7 +61,7 @@ typedef struct camio_device_s {
      * Return the features supported by this device. Not valid until the device constructor has been called.
      */
     camio_device_features_t features;
-} camio_device_t;
+} camio_dev_t;
 
 
 
@@ -75,7 +75,7 @@ typedef struct camio_device_s {
         new_##name##_device
 
 #define NEW_DEVICE_DECLARE(NAME)\
-        camio_error_t new_##NAME##_device(void** params, ch_word params_size, camio_device_t** device_o)
+        camio_error_t new_##NAME##_device(void** params, ch_word params_size, camio_dev_t** device_o)
 
 #define NEW_DEVICE_DEFINE(NAME, PRIVATE_TYPE) \
     static const char* const scheme = #NAME;\
@@ -89,12 +89,12 @@ typedef struct camio_device_s {
     \
     NEW_DEVICE_DECLARE(NAME)\
     {\
-        camio_device_t* result = (camio_device_t*)calloc(1,sizeof(camio_device_t) + sizeof(PRIVATE_TYPE));\
+        camio_dev_t* result = (camio_dev_t*)calloc(1,sizeof(camio_dev_t) + sizeof(PRIVATE_TYPE));\
         if(!result) return CAMIO_ENOMEM;\
         *device_o = result; \
         result->vtable                      = NAME##_device_interface;\
         result->muxable.mode                = CAMIO_MUX_MODE_CONNECT;\
-        result->muxable.parent.device       = result;\
+        result->muxable.parent.dev       = result;\
         result->muxable.vtable.ready        = NAME##_channel_ready;\
         result->muxable.fd                  = -1;\
         \

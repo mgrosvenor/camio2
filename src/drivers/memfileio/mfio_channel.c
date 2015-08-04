@@ -28,7 +28,7 @@
  * PER CHANNEL STATE
  **************************************************************************************************************************/
 typedef struct mfio_channel_priv_s {
-    camio_device_t device;
+    camio_dev_t device;
 
     //To manage read buffer/requests --TODO should harmonize the naming convention. read vs rd etc
     ch_bool is_rd_closed;
@@ -541,7 +541,7 @@ void init_buffer(camio_buffer_t* buff, ch_bool read_only, camio_channel_t* paren
 
 camio_error_t mfio_channel_construct(
     camio_channel_t* this,
-    camio_device_t* device,
+    camio_dev_t* device,
     int base_fd,
     void* base_mem_start,
     ch_word base_mem_len
