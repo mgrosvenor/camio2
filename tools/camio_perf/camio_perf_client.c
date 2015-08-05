@@ -380,25 +380,25 @@ static camio_error_t get_new_buffers(camio_channel_t* channel, ch_word chan_id)
     return CAMIO_ENOERROR;
 }
 
-static camio_error_t on_new_rd_buffs(camio_muxable_t* muxable, camio_error_t err, void* usr_state, ch_word id)
-{
-    DBG("Got new read buffers?? I didn't expect to get these?\n");
-    (void)muxable;
-    (void)err;
-    (void)usr_state;
-    (void)id;
-    return CAMIO_EINVALID;
-}
-
-static camio_error_t on_new_rd_datas(camio_muxable_t* muxable, camio_error_t err, void* usr_state, ch_word id)
-{
-    DBG("Got new read data?? I didn't expect to get these?\n");
-    (void)muxable;
-    (void)err;
-    (void)usr_state;
-    (void)id;
-    return CAMIO_EINVALID;
-}
+//static camio_error_t on_new_rd_buffs(camio_muxable_t* muxable, camio_error_t err, void* usr_state, ch_word id)
+//{
+//    DBG("Got new read buffers?? I didn't expect to get these?\n");
+//    (void)muxable;
+//    (void)err;
+//    (void)usr_state;
+//    (void)id;
+//    return CAMIO_EINVALID;
+//}
+//
+//static camio_error_t on_new_rd_datas(camio_muxable_t* muxable, camio_error_t err, void* usr_state, ch_word id)
+//{
+//    DBG("Got new read data?? I didn't expect to get these?\n");
+//    (void)muxable;
+//    (void)err;
+//    (void)usr_state;
+//    (void)id;
+//    return CAMIO_EINVALID;
+//}
 
 
 static camio_error_t on_new_channels(camio_muxable_t* muxable, camio_error_t err, void* usr_state, ch_word id)
@@ -458,8 +458,8 @@ static camio_error_t on_new_channels(camio_muxable_t* muxable, camio_error_t err
                     continue;
                 }
 
-                camio_mux_insert(mux,&res->channel->rd_data_muxable,on_new_rd_datas, NULL, chan_id );
-                camio_mux_insert(mux,&res->channel->rd_buff_muxable,on_new_rd_buffs, NULL, chan_id );
+                //camio_mux_insert(mux,&res->channel->rd_data_muxable,on_new_rd_datas, NULL, chan_id );
+                //camio_mux_insert(mux,&res->channel->rd_buff_muxable,on_new_rd_buffs, NULL, chan_id );
                 camio_mux_insert(mux,&res->channel->wr_data_muxable,on_new_wr_datas, NULL, chan_id );
                 camio_mux_insert(mux,&res->channel->wr_buff_muxable,on_new_wr_buffs, NULL, chan_id );
 

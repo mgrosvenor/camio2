@@ -803,10 +803,11 @@ static camio_error_t bring_write_data_ready(camio_muxable_t* this)
 
     if(likely(priv->wr_data_q->in_use == 0)){
         //DBG("There are no buffers yet available\n");
+        ch_perf_event_start(61,9,0);
         return CAMIO_ETRYAGAIN;
     }
 
-    ch_perf_event_start(61,9,0);
+    ch_perf_event_start(61,10,0);
     //DBG("%lli write data requests have been RX'd. \n", priv->wr_data_q->in_use);
     return CAMIO_ENOERROR;
 

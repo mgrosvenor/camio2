@@ -94,25 +94,25 @@ static camio_error_t connect_delim(ch_cstr server_channel_uri, camio_dev_t** dev
     return CAMIO_ENOERROR;
 }
 
-static camio_error_t on_new_wr_buffs(camio_muxable_t* muxable, camio_error_t err, void* usr_state, ch_word id)
-{
-    DBG("Got new write buffers?? I didn't expect to get these?\n");
-    (void)muxable;
-    (void)err;
-    (void)usr_state;
-    (void)id;
-    return CAMIO_EINVALID;
-}
-
-static camio_error_t on_new_wr_datas(camio_muxable_t* muxable, camio_error_t err, void* usr_state, ch_word id)
-{
-    DBG("Got new write data?? I didn't expect to get these?\n");
-    (void)muxable;
-    (void)err;
-    (void)usr_state;
-    (void)id;
-    return CAMIO_EINVALID;
-}
+//static camio_error_t on_new_wr_buffs(camio_muxable_t* muxable, camio_error_t err, void* usr_state, ch_word id)
+//{
+//    DBG("Got new write buffers?? I didn't expect to get these?\n");
+//    (void)muxable;
+//    (void)err;
+//    (void)usr_state;
+//    (void)id;
+//    return CAMIO_EINVALID;
+//}
+//
+//static camio_error_t on_new_wr_datas(camio_muxable_t* muxable, camio_error_t err, void* usr_state, ch_word id)
+//{
+//    DBG("Got new write data?? I didn't expect to get these?\n");
+//    (void)muxable;
+//    (void)err;
+//    (void)usr_state;
+//    (void)id;
+//    return CAMIO_EINVALID;
+//}
 
 static camio_error_t on_new_rd_datas(camio_muxable_t* muxable, camio_error_t err, void* usr_state, ch_word id)
 {
@@ -370,8 +370,8 @@ static camio_error_t on_new_channels(camio_muxable_t* muxable, camio_error_t err
 
         camio_mux_insert(mux,&res->channel->rd_data_muxable,on_new_rd_datas, NULL, DEVICE_ID + 1);
         camio_mux_insert(mux,&res->channel->rd_buff_muxable,on_new_rd_buffs, NULL, DEVICE_ID + 2);
-        camio_mux_insert(mux,&res->channel->wr_data_muxable,on_new_wr_datas, NULL, DEVICE_ID + 3);
-        camio_mux_insert(mux,&res->channel->wr_buff_muxable,on_new_wr_buffs, NULL, DEVICE_ID + 4);
+        //camio_mux_insert(mux,&res->channel->wr_data_muxable,on_new_wr_datas, NULL, DEVICE_ID + 3);
+        //camio_mux_insert(mux,&res->channel->wr_buff_muxable,on_new_wr_buffs, NULL, DEVICE_ID + 4);
 
         //Get the stream started by asking for some new buffers to read into
         get_new_buffers(res->channel);
