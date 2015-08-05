@@ -15,6 +15,7 @@ struct options_t {
     ch_cstr client;
     ch_cstr server;
     ch_word len;
+    //ch_word batching;
     ch_word batching;
 };
 

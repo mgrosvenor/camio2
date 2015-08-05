@@ -9,30 +9,26 @@
  *  <INSERT DESCRIPTION HERE> 
  */
 
+#include <fcntl.h>
+#include <errno.h>
+
+#include <deps/chaste/data_structs/circular_queue/circular_queue.h>
+#include <deps/chaste/utils/debug.h>
+#include <deps/chaste/utils/util.h>
 
 #include <src/devices/channel.h>
 #include <src/devices/device.h>
 #include <src/buffers/buffer_malloc_linear.h>
-#include <deps/chaste/utils/util.h>
 #include <src/api/api.h>
-
-#include <deps/chaste/utils/debug.h>
 
 #include "delim_channel.h"
 
-#include <fcntl.h>
-#include <errno.h>
 
 /**************************************************************************************************************************
  * PER CHANNEL STATE
  **************************************************************************************************************************/
 #define BASE_MSGS_MAX 256
-typedef enum {
-    DELIM_STATE_WB_NEED_MORE = 0,
-    DELIM_STATE_WORK_BUFF,
-    DELIM_STATE_RDY_RD_BUFFS,
-    DELIM_STATE_RDY_RD_DATAS,
-} delim_states_e;
+#define BASE_BUFFS_MAX 1024
 
 
 typedef struct delim_channel_priv_s {
@@ -44,22 +40,18 @@ typedef struct delim_channel_priv_s {
     //The result buffers is where we put stuff when there are results to send out to the outside world
     ch_word rd_buffs_count;     //Number of result buffers and request queue slots
     ch_cbq_t* rd_buff_q;        //queue for inbound read buffer requests
-    ch_cbq_t* rd_data_q;      //queue for inbound read data requests
+    ch_cbq_t* rd_data_q;        //queue for inbound read data requests
     camio_buffer_t* rd_buffs;   //All buffers for the read side, basically pointers to the results
     ch_word rd_acq_index;       //Current index for acquiring new read buffers
     ch_word rd_rel_index;       //Current index for releasing new read buffers
 
 
     ch_word base_msgs_max;           //Maximum size of the following queues
-    camio_msg_t* base_req_buff_msgs; //A message queue for requesting buffers
-    camio_msg_t* base_res_buff_msgs; //A message queue for getting buffer responses
-    camio_msg_t* base_req_data_msgs; //A message queue for requesting datas
-    camio_msg_t* base_res_data_msgs; //A message queue for getting data responses
-    ch_word base_req_buff_msgs_len;
-    ch_word base_res_buff_msgs_len;
-    ch_word base_req_data_msgs_len;
-    ch_word base_res_data_msgs_len;
+    camio_msg_t* base_msgs; //A message queue for requesting buffers
+    ch_word base_msgs_len;
 
+    camio_msg_t* base_buff_states;
+    ch_word base_buffs_max;
 
     camio_mux_t* mux; //A local mux to handle the base stream
     ch_word unused_rd_buff_resps;
@@ -97,117 +89,108 @@ static void delim_read_close(camio_channel_t* this){
 
 static camio_error_t on_read_datas(camio_muxable_t* muxable, camio_error_t err, void* usr_state, ch_word id)
 {
-    delim_channel_priv_t* priv = CHANNEL_GET_PRIVATE(usr_state);
+    delim_channel_priv_t* priv = CHANNEL_GET_PRIVATE(muxable->parent.channel);
     DBG("Read data available\n");
 
-    //Woah, wait one second, no point in asking for  data buffers if we already have some hanging around!
-    //This assumes that the multiplexer is level-triggered, so we'll keep coming back here until this problem goes away.
-    if(priv->unused_rd_data_resps){
-        DBG("Ignoring data ready because there are %lli unused datas\n", priv->unused_rd_data_resps);
-        return CAMIO_ETRYAGAIN;
-    }
+    //Currently ignoring these values
+    (void)usr_state;
+    (void)id;
 
     if(unlikely(err)){
         DBG("Unexpected error %lli\n", err);
         return err;
     }
 
-    //Retrieve the data responses
-    priv->base_res_buff_msgs_len = priv->base_msgs_max;
-    err = camio_chan_rd_data_res(muxable->parent.channel, priv->base_res_data_msgs, &priv->base_res_data_msgs_len );
+    priv->base_msgs_len = priv->base_msgs_max;
+    err = camio_chan_wr_data_res(muxable->parent.channel, priv->base_msgs, &priv->base_msgs_len );
     if(unlikely(err)){
+        DBG("Could not retrieve write data responses\n");
         return err;
     }
-    if(priv->base_res_data_msgs_len == 0){
-        DBG("Huh? Data is ready, but got no new read completions?\n");
+
+    if(unlikely(priv->base_msgs_len == 0)){
+        DBG("Huh? Got no new read data completions?\n");
         return CAMIO_EINVALID;
     }
 
-    DBG("Received %lli/%lli data responses\n", priv->base_req_data_msgs_len, priv->unused_rd_buff_resps);
+    ch_word reusable_buffs = 0; //See how many buffers we can potentially reuse
+    ch_word batch_bytes = 0;    //How many bytes did we get in this batch?
+    camio_msg_t* buff_states = priv->base_buff_states;
+    for(ch_word i = 0 ; i < priv->base_msgs_len; i++ ){
+        const ch_word buff_id = priv->base_msgs[i].id;
+        buff_states[buff_id] = priv->base_msgs[i];
+
+        if(unlikely(priv->base_msgs[i].type != CAMIO_MSG_TYPE_READ_DATA_RES)){
+            WARN("Expected to get read (id=%lli) response message (%lli), but got %i instead.\n",
+                    priv->base_msgs[i].id, CAMIO_MSG_TYPE_READ_DATA_RES, priv->base_msgs[i].type);
+            continue;
+        }
+
+        camio_rd_data_res_t* res = &priv->base_msgs[i].rd_data_res;
+        if(unlikely(res->status && res->status != CAMIO_ECANNOTREUSE)){
+            ERR("Error %i getting data response with id=%lli\n", res->status, priv->base_msgs[i].id);
+            continue;
+        }
+
+        batch_bytes += res->buffer->data_len;
+
+        if(res->status == CAMIO_ENOERROR){
+            reusable_buffs++;
+        }
+
+    }
+
+    DBG("Received %lli bytes, in %lli messages with %lli reusable bufferers\n",
+            batch_bytes, priv->base_msgs_len, reusable_buffs);
+
+    //We will need to free or reuse these buffers later!
     return CAMIO_ENOERROR;
 }
 
 
-static camio_error_t get_datas(camio_channel_t* this)
+//We need some more data, try to get some
+static camio_error_t get_new_datas(camio_channel_t* this)
 {
     delim_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this);
 
-    //Issue all buffer data requests -- This assumes that someone else has set them up! Check that assumption now.
-    if(unlikely(priv->unused_rd_buff_resps <= 0)){
-        DBG("Error! you've asked to get data, but not queue up any data requests!\n");
-        exit(255);
-        return CAMIO_EINVALID;
+    DBG("Getting datas...\n");
+    //Initialize a batch of messages based on the current buffer state
+    ch_word to_send = 0;
+    camio_msg_t* buff_states = priv->base_buff_states;
+    for(ch_word i = 0; i < priv->base_buffs_max && to_send < priv->base_msgs_max; i++){
+        switch(buff_states[i].type){
+            case CAMIO_MSG_TYPE_READ_BUFF_RES:{
+                buff_states[i].type = CAMIO_MSG_TYPE_READ_DATA_REQ;
+                priv->base_msgs[to_send] = buff_states[i];
+                to_send++;
+                break;
+            }
+            default:{}
+        }
     }
 
-    ch_word start_offset = priv->base_msgs_max - priv->unused_rd_buff_resps;
-    camio_error_t err = camio_chan_rd_data_req(
-        priv->base,
-        priv->base_req_data_msgs + start_offset,
-        &priv->base_req_data_msgs_len
-    );
+    if(eqlikely(to_send == 0)){
+        //There's no new work for us to do, exit now
+        DBG("No work to do, exiting now\n");
+        return CAMIO_ENOERROR;
+    }
+
+    priv->base_msgs_len = to_send;
+    DBG("Requesting %lli read buffs\n", priv->base_msgs_len);
+    camio_error_t err = camio_chan_rd_data_req( priv->base, priv->base_msgs, &priv->base_msgs_len);
     if(unlikely(err)){
-        ERR("Could not request read data\n");
+        DBG("Could not request datas with error %lli\n", err);
         return err;
     }
+    DBG("Successfully issued %lli/%lli data requests\n", priv->base_msgs_len, to_send);
 
-    //Account for the number of responses that we managed to enqueue
-    priv->unused_rd_buff_resps -= priv->base_req_data_msgs_len;
-    DBG("Successfully issued %lli/%lli data requests\n", priv->base_req_data_msgs_len, priv->unused_rd_buff_resps);
+    //The result of sending the messages, will still need to wait for the responses
+    for(ch_word i = 0 ; i < priv->base_msgs_len; i++ ){
+        const ch_word buff_id = priv->base_msgs[i].id;
+        buff_states[buff_id] = priv->base_msgs[i];
+    }
+
     return CAMIO_ENOERROR;
-}
-
-
-static camio_error_t get_reuse_datas(camio_channel_t* this){
-    delim_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this);
-
-    //Hun? We don't have any reuse buffers!
-    if(unlikely(priv->resuse_buffers <= 0)){
-        DBG("Error! you've asked to get data, but not queue up any data requests!\n");
-        exit(255);
-        return CAMIO_EINVALID;
-    }
-
-    if(unlikely(priv->unused_rd_buff_resps >0 )){
-        DBG("Error! you've asked to get data, but there are outstanding buffers to be used!\n");
-        exit(255);
-        return CAMIO_EINVALID;
-    }
-
-    //Now process the buffer responses and turn them into data requests
-    //Just aliasing these to make the code make more sense
-    priv->unused_rd_buff_resps = 0; //This should be true anyway, just leaving here for clarity!
-    for(ch_word i = 0; i < priv->base_res_data_msgs_len; i++){
-        //Sanity check the base response
-        if(unlikely(priv->base_res_data_msgs[i].type == CAMIO_MSG_TYPE_IGNORE)){
-            DBG("Ignoring read buffer at index %lli\n", i);
-            continue;
-        }
-        if(unlikely(priv->base_res_data_msgs[i].type != CAMIO_MSG_TYPE_READ_BUFF_RES)){
-            ERR("Expected to get read buffer response message (%li), but got %i instead.\n",
-                    CAMIO_MSG_TYPE_READ_BUFF_RES, priv->base_res_data_msgs[i].type);
-            continue;
-        }
-
-        camio_rd_buff_res_t* res = priv->base_res_data_msgs[i].rd_buff_res;
-        if(res->status){
-            ERR("Error %i getting buffer with id=%lli\n", res->status, priv->base_res_data_msgs[i].id);
-            priv->base_res_data_msgs[i].type = CAMIO_MSG_TYPE_IGNORE;
-            continue;
-        }
-
-        //Convert buffer responses into a data requests
-        priv->base_req_data_msgs[i].type = CAMIO_MSG_TYPE_READ_DATA_REQ;
-        camio_rd_data_req_t* req = &priv->base_req_data_msgs[i].rd_data_req;
-        req->dst_offset_hint = CAMIO_READ_REQ_DST_OFFSET_NONE;
-        req->src_offset_hint = CAMIO_READ_REQ_SRC_OFFSET_NONE;
-        req->read_size_hint  = CAMIO_READ_REQ_SIZE_ANY;
-        priv->unused_rd_buff_resps++; //Account for the number of actual buffers that we've received
-    }
-
-    //OK, now that we have a pile of buffer requests, maybe we should issue them!
-    priv->base_req_data_msgs_len = priv->unused_rd_buff_resps;
-    return get_datas(this);
-
 }
 
 
@@ -215,67 +198,53 @@ static camio_error_t get_reuse_datas(camio_channel_t* this){
 //When the base channel has some buffers for us to use, we'll wake up here!
 static camio_error_t on_read_buffs(camio_muxable_t* muxable, camio_error_t err, void* usr_state, ch_word id)
 {
-    delim_channel_priv_t* priv = CHANNEL_GET_PRIVATE(usr_state);
+    delim_channel_priv_t* priv = CHANNEL_GET_PRIVATE(muxable->parent.channel);
     DBG("Handling new buffers to read into\n");
+
+    //Currently ignoring this values
+    (void)usr_state;
+    (void)id;
+
     if(unlikely(err)){
         DBG("Unexpected error %lli\n", err);
         return err;
     }
 
-    //Woah, wait one second, no point in asking for more data buffers if we already have some hanging around!
-    //This assumes that the multiplexer is level-triggered, so we'll keep coming back here until this problem goes away.
-    if(eqlikely(priv->unused_rd_buff_resps)){
-        DBG("Ignoring buffer ready because there are %lli unused responses\n", priv->unused_rd_buff_resps);
-        return get_datas(usr_state); //But try to use them up
-    }
-    if(eqlikely(priv->resuse_buffers)){
-        DBG("Ignoring buffer ready because there are %lli reusable buffers\n", priv->resuse_buffers);
-        return get_reuse_datas(usr_state); //But try to use them up
-    }
-
-
-    //Get all of the buffer request responses here.
-    priv->base_res_buff_msgs_len = priv->base_msgs_max;
-    err = camio_chan_rd_buff_res(muxable->parent.channel, priv->base_res_buff_msgs, &priv->base_res_buff_msgs_len);
+    priv->base_msgs_len = priv->base_buffs_max;
+    err = camio_chan_rd_buff_res(muxable->parent.channel, priv->base_msgs, &priv->base_msgs_len);
     if(unlikely(err)){
-        ERR("Could not get reading buffers even though they are ready? err=%i\n", err);
-        return err;
+        ERR("Could not get a reading buffers\n");
+        return CAMIO_EINVALID;
     }
 
-    //Now process the buffer responses and turn them into data requests
-    priv->unused_rd_buff_resps = 0; //This should be true anyway, just leaving here for clarity!
-    for(ch_word i = 0; i < priv->base_res_buff_msgs_len; i++){
-        //Sanity check the base response
-        if(unlikely(priv->base_res_buff_msgs[i].type == CAMIO_MSG_TYPE_IGNORE)){
-            DBG("Ignoring read buffer at index %lli\n", i);
-            continue;
-        }
-        if(unlikely(priv->base_res_buff_msgs[i].type != CAMIO_MSG_TYPE_READ_BUFF_RES)){
-            ERR("Expected to get read buffer response message (%li), but got %i instead. Ignoring\n",
-                    CAMIO_MSG_TYPE_READ_BUFF_RES, priv->base_res_buff_msgs[i].type);
+    DBG("Got %lli new reading buffers\n", priv->base_msgs_len);
+    //Yay! We got the responses, update the buffer states.
+    camio_msg_t* buff_states = priv->base_buff_states;
+    for(ch_word i = 0 ; i < priv->base_msgs_len; i++ ){
+        const ch_word buff_id = priv->base_msgs[i].id;
+        buff_states[buff_id] = priv->base_msgs[i];
+
+        if(unlikely(priv->base_msgs[i].type != CAMIO_MSG_TYPE_READ_BUFF_RES)){
+            WARN("Expected to get buffer  (id=%lli) response message (%lli), but got %lli instead.\n",
+                    priv->base_msgs[i].id, CAMIO_MSG_TYPE_READ_BUFF_RES, priv->base_msgs[i].type);
             continue;
         }
 
-        camio_rd_buff_res_t* res = priv->base_res_buff_msgs[i].rd_buff_res;
+        camio_wr_buff_res_t* res = &priv->base_msgs[i].wr_buff_res;
         if(unlikely(res->status)){
-            ERR("Error %i getting buffer with id=%lli. Ignoring\n", res->status, priv->base_res_buff_msgs[i].id);
+            ERR("Error %lli getting buffer with id=%lli\n", res->status, priv->base_msgs[i].id);
+            priv->base_msgs[i].type = CAMIO_MSG_TYPE_ERROR;
+            priv->base_msgs[i].err_res.status = res->status;
             continue;
         }
 
-        //Copy buffer responses into a data requests
-        priv->base_req_data_msgs[i].type = CAMIO_MSG_TYPE_READ_DATA_REQ;
-        camio_rd_data_req_t* req = &priv->base_req_data_msgs[i].rd_data_req;
-        req->buffer              = res->buffer;
-        req->dst_offset_hint     = CAMIO_READ_REQ_DST_OFFSET_NONE;
-        req->src_offset_hint     = CAMIO_READ_REQ_SRC_OFFSET_NONE;
-        req->read_size_hint      = CAMIO_READ_REQ_SIZE_ANY;
-
-        priv->unused_rd_buff_resps++; //Account for the number of actual buffers that we've received
+        //Woot! This looks like a valid buffer!
     }
 
-    //OK, now that we have a pile of buffer requests, maybe we should issue them!
-    priv->base_req_data_msgs_len = priv->unused_rd_buff_resps;
-    return get_datas(usr_state);
+    err = get_new_datas(muxable->parent.channel);
+    return err;
+
+
 }
 
 
@@ -284,27 +253,57 @@ static camio_error_t get_new_buffers(camio_channel_t* this)
 {
     delim_channel_priv_t* priv = CHANNEL_GET_PRIVATE(this);
 
-    //Initialize a full batch of messages to request some write buffers
-    for(int i = 0; i < priv->base_msgs_max; i++){
-        priv->base_req_buff_msgs[i].type = CAMIO_MSG_TYPE_READ_BUFF_REQ;
-        priv->base_req_buff_msgs[i].id = i;
-        camio_rd_buff_req_t* req = &priv->base_req_buff_msgs[i].rd_buff_req;
-        req->dst_offset_hint = CAMIO_READ_REQ_DST_OFFSET_NONE;
-        req->src_offset_hint = CAMIO_READ_REQ_SRC_OFFSET_NONE;
-        req->read_size_hint  = CAMIO_READ_REQ_SIZE_ANY;
+    DBG("Getting buffers...\n");
+    //Initialize a batch of messages based on the current buffer state
+    ch_word to_send = 0;
+    camio_msg_t* buff_states = priv->base_buff_states;
+    for(ch_word i = 0; i < priv->base_buffs_max && to_send < priv->base_msgs_max; i++){
+        switch(buff_states[i].type){
+            case CAMIO_MSG_TYPE_NONE:{}
+            //no break
+            case CAMIO_MSG_TYPE_IGNORE:{}
+            //no break
+            case CAMIO_MSG_TYPE_WRITE_BUFF_REQ:{}
+            //no break
+            case CAMIO_MSG_TYPE_ERROR:{
+                buff_states[i].type = CAMIO_MSG_TYPE_READ_BUFF_REQ;
+                buff_states[i].id = i;
+                camio_rd_buff_req_t* req = &buff_states[i].rd_buff_req;
+                req->dst_offset_hint = CAMIO_READ_REQ_DST_OFFSET_NONE;
+                req->src_offset_hint = CAMIO_READ_REQ_SRC_OFFSET_NONE;
+                req->read_size_hint  = CAMIO_READ_REQ_SIZE_ANY;
+
+                priv->base_msgs[to_send] = buff_states[i];
+                to_send++;
+                break;
+            }
+            default:{}
+        }
     }
 
-    priv->base_req_buff_msgs_len = priv->base_msgs_max;
-    DBG("Requesting %lli read_buffs\n", priv->base_req_buff_msgs_len);
-    camio_error_t err = camio_chan_rd_buff_req( priv->base, priv->base_req_buff_msgs, &priv->base_req_buff_msgs_len);
-    if(err){
+    if(eqlikely(to_send == 0)){
+        //There's no work for us to do, exit now
+        DBG("No work to do, exiting now\n");
+        return CAMIO_ENOERROR;
+    }
+
+    priv->base_msgs_len = to_send;
+    DBG("Requesting %lli read buffs\n", priv->base_msgs_len);
+    camio_error_t err = camio_chan_rd_buff_req( priv->base, priv->base_msgs, &priv->base_msgs_len);
+    if(unlikely(err)){
         DBG("Could not request buffers with error %lli\n", err);
         return err;
     }
+    DBG("Successfully issued %lli/%lli buffer requests\n", priv->base_msgs_len, to_send);
 
-    //It doesn't matter if not all of these succeed (so long as some do).
-    DBG("Successfully issued %lli/%lli buffer requests\n", priv->base_req_buff_msgs_len, priv->base_msgs_max);
+    //The result of sending the messages, will still need to wait for the responses
+    for(ch_word i = 0 ; i < priv->base_msgs_len; i++ ){
+        const ch_word buff_id = priv->base_msgs[i].id;
+        buff_states[buff_id] = priv->base_msgs[i];
+    }
+
     return CAMIO_ENOERROR;
+
 }
 
 
@@ -315,48 +314,14 @@ static camio_error_t delim_read_buffer_request(camio_channel_t* this, camio_msg_
 
     camio_error_t err = CAMIO_ENOERROR;
     //Firstly, push any new requests into our local queue
-    if(unlikely(NULL == cbuff_push_back_carray(priv->rd_buff_q, req_vec, vec_len_io))){
+    if(unlikely(NULL == cbq_push_back_carray(priv->rd_buff_q, req_vec, vec_len_io))){
         ERR("Could not push any items on to queue.");
         err = CAMIO_ETRYAGAIN;
     }
 
-    //Secondly use this an an excuse to stimulate our base stream
-    //Do we have need some buffers to get data into??
-    if(priv->resuse_buffers == 0 && priv->unused_rd_buff_resps == 0 ){
-        camio_error_t err = get_new_buffers(this); //Nope? OK, get some more buffers to put responses into
-        if(err && err != CAMIO_ETRYAGAIN){
-            DBG("Unexpected error %i\n", err);
-            return err;
-        }
-    }
-
-    //If we have some buffers, maybe we should get some data into them
-    if(priv->unused_rd_buff_resps){
-        camio_error_t err = get_datas(this);
-        if(err && err != CAMIO_ETRYAGAIN){
-            DBG("Unexpected error %i\n", err);
-            return err;
-        }
-    }
-
-    //Or if we have some reusable buffers, we can use those
-    if(priv->resuse_buffers){
-        camio_error_t err = get_reuse_datas(this);
-        if(err && err != CAMIO_ETRYAGAIN){
-            DBG("Unexpected error %i\n", err);
-            return err;
-        }
-    }
-
-    if(!err){ DBG("Bring read buffer request done - %lli requests added\n", *vec_len_io); }
+    if(!err){ DBG("Delim read buffer request done - %lli requests added\n", *vec_len_io); }
     return err;
 }
-
-
-
-
-
-
 
 
 static inline camio_error_t grow_working_buff(delim_channel_priv_t* priv, ch_word size_needed) {
@@ -1116,27 +1081,18 @@ camio_error_t delim_channel_construct(
     //TODO XXX - This should be populated as parameter, but not sure how to do it well. Don't want to as the user a question
     //they don't understand how to answer.
     priv->base_msgs_max = BASE_MSGS_MAX;
-    priv->base_req_buff_msgs = (camio_msg_t*)calloc(priv->base_msgs_max, sizeof(camio_msg_t));
-    if(!priv->base_req_buff_msgs){
-        DBG("Could not allocate memory for base request buffer messages!\n");
-        return CAMIO_ENOMEM;
-    }
-    priv->base_req_data_msgs = (camio_msg_t*)calloc(priv->base_msgs_max, sizeof(camio_msg_t));
-    if(!priv->base_req_data_msgs){
-        DBG("Could not allocate memory for base request data messages!\n");
-        return CAMIO_ENOMEM;
-    }
-    priv->base_res_buff_msgs = (camio_msg_t*)calloc(priv->base_msgs_max, sizeof(camio_msg_t));
-    if(!priv->base_res_buff_msgs){
-        DBG("Could not allocate memory for base response buffer messages!\n");
-        return CAMIO_ENOMEM;
-    }
-    priv->base_res_data_msgs = (camio_msg_t*)calloc(priv->base_msgs_max, sizeof(camio_msg_t));
-    if(!priv->base_res_data_msgs){
-        DBG("Could not allocate memory for base response data messages!\n");
+    priv->base_msgs = (camio_msg_t*)calloc(priv->base_msgs_max, sizeof(camio_msg_t));
+    if(!priv->base_msgs){
+        DBG("Could not allocate memory for base messages!\n");
         return CAMIO_ENOMEM;
     }
 
+    priv->base_buffs_max = BASE_BUFFS_MAX;
+    priv->base_buff_states = (camio_msg_t*)calloc(priv->base_buffs_max, sizeof(camio_msg_t));
+    if(!priv->base_buff_states){
+        DBG("Could not allocate memory for base messages!\n");
+        return CAMIO_ENOMEM;
+    }
 
 
     camio_error_t err = camio_mux_new(CAMIO_MUX_HINT_PERFORMANCE,&priv->mux);
