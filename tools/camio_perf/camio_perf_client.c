@@ -264,7 +264,7 @@ static inline void prepare_data_msg(camio_msg_t* msg)
     msg->type = CAMIO_MSG_TYPE_WRITE_DATA_REQ;
     camio_wr_data_req_t* wr_data_req = &msg->wr_data_req;
     //Put data in the packet from the packet template
-    //memcpy(wr_data_req->buffer->data_start, packet_data, bytes_to_send);
+    memcpy(wr_data_req->buffer->data_start, packet_data, bytes_to_send);
     wr_data_req->buffer->data_len = bytes_to_send;
     wr_data_req->dst_offset_hint = CAMIO_WRITE_REQ_DST_OFFSET_NONE;
     wr_data_req->src_offset_hint = CAMIO_WRITE_REQ_SRC_OFFSET_NONE;

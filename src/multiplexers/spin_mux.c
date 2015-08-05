@@ -103,6 +103,7 @@ camio_error_t spin_select(camio_mux_t* this, struct timeval* timeout, camio_muxa
             camio_error_t err        = muxable->vtable.ready(muxable);
 
             if(err == CAMIO_ETRYAGAIN){
+                __asm__ __volatile__("pause;"); 
                 continue;  //Nothing more to see here folks, come back later
             }
 
