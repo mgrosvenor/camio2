@@ -27,13 +27,14 @@ USE_CH_LOGGER_DEFAULT;
 struct options_t options;
 static ch_word stop = 0;
 
-USE_CH_PERF(10 * 1000 * 1000);
+USE_CH_PERF(1 * 1000 * 1000);
 
 void term(int signum){
     (void)signum;
     const char* filename = options.client ? "camio_perf_client.perf" : "camio_perf_server.perf";
     ch_perf_finish_(ch_perf_output_tofile,ch_perf_format_csv,filename);
     stop = true;
+    ERR("Terminating safely...\n");
     exit(0);
 }
 

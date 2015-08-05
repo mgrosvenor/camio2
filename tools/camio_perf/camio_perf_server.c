@@ -19,6 +19,7 @@
 #include "camio_perf_server.h"
 #include "options.h"
 #include <deps/chaste/utils/debug.h>
+#include <deps/chaste/perf/perf.h>
 
 
 extern struct options_t options;
@@ -164,6 +165,7 @@ static camio_error_t on_new_rd_datas(camio_muxable_t* muxable, camio_error_t err
             continue;
         }
 
+        ch_perf_event_stop(30,0,buffer->__internal.__buffer_id)
         intv_bytes += buffer->data_len;
         camio_perf_packet_head_t* head = (camio_perf_packet_head_t*)buffer->data_start;
         //hexdump(head,sizeof(*head) * 2);

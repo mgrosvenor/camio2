@@ -20,6 +20,7 @@
 #include <deps/chaste/utils/util.h>
 #include <src/api/api.h>
 #include <deps/chaste/data_structs/circular_queue/circular_queue.h>
+#include <deps/chaste/perf/perf.h>
 
 #include "bring_channel.h"
 #include "bring_device.h"
@@ -88,7 +89,7 @@ static inline ch_word get_head_seq(camio_buffer_t* buffers, ch_word idx)
     volatile ch_word result = ~0;
     //__sync_synchronize();
     result = *(volatile ch_word*)(&hdr->seq_no);
-    __sync_synchronize();
+    //__sync_synchronize();
 
     return result;
 }
@@ -123,7 +124,7 @@ static inline void set_head(camio_buffer_t* buffers, ch_word idx, ch_word seq_no
     *(volatile ch_word*)(&hdr->data_size) = data_size;
     //__sync_synchronize();
     *(volatile ch_word*)(&hdr->seq_no) = seq_no;
-    __sync_synchronize();
+    //__sync_synchronize();
 
     //ERR("%p / (%lli)\n", &((volatile bring_slot_header_t*)(hdr_mem))->seq_no, (size_t)(&(((volatile bring_slot_header_t*)(hdr_mem))->seq_no)) % 8 );
 
@@ -192,6 +193,7 @@ static camio_error_t bring_read_buffer_ready(camio_muxable_t* this)
         if(likely(seq_no == BRING_SYNC_BUFF_EMPTY || seq_no == BRING_SYNC_BUFF_RXD )){
             break; //There is no data available. Exit the loop which will return ETRYAGAIN
         }
+        ch_perf_event_start(30,0,priv->rd_acq_index);//At this moment, there is data
 
         if(unlikely( seq_no != priv->rd_sync_counter)){
             ERR( "Ring synchronization error. This should not happen with a blocking ring %llu to %llu\n",
@@ -309,6 +311,7 @@ static camio_error_t bring_read_buffer_release(camio_channel_t* this, camio_buff
     }
 
     //DBG("Trying to release buffer at index=%lli\n", priv->rd_rel_index);
+    ch_perf_event_stop(40,0,priv->rd_rel_index);
     set_head(priv->rd_buffs,priv->rd_rel_index,BRING_SYNC_BUFF_RXD,buffer->data_len);
 
     buffer->__internal.__in_use   = false;
@@ -507,6 +510,7 @@ static camio_error_t bring_write_buffer_ready(camio_muxable_t* this)
         if(likely( seq_no != BRING_SYNC_BUFF_EMPTY)){
             break;
         }
+        ch_perf_event_start(20,0,priv->wr_buff_acq_idx);
 
         //We have a request structure and a valid buffer, so we can return it
         camio_wr_buff_res_t* res = &msg->wr_buff_res;
@@ -569,6 +573,7 @@ camio_error_t bring_write_buffer_result(camio_channel_t* this, camio_msg_t* res_
 
         res_vec[i] = *msg;
         const camio_wr_buff_res_t* res = &res_vec[i].wr_buff_res;
+        ch_perf_event_start(60,0,0);
 
         if(likely(res->status == CAMIO_ENOERROR)){
             //DBG("Returning write buffer data_start=%p, data_size=%lli\n", res->buffer->data_start, res->buffer->data_len );
@@ -625,6 +630,7 @@ static camio_error_t bring_write_buffer_release(camio_channel_t* this, camio_buf
 static camio_error_t bring_write_data_request(camio_channel_t* this, camio_msg_t* req_vec, ch_word* vec_len_io)
 {
 
+    ch_perf_event_start(17,0,0);
     bring_chan_priv_t* priv = CHANNEL_GET_PRIVATE(this);
     //DBG("Doing write request -- there are currently %lli items in the queue\n", priv->wr_data_q->count);
 
@@ -636,6 +642,7 @@ static camio_error_t bring_write_data_request(camio_channel_t* this, camio_msg_t
         DBG2("now =%lli\n", vec_len);
     }
 
+    ch_perf_event_start(18,0,0);
     //Try to perform the write requests
     ch_word sent = 0;
     for(ch_word i = 0 ; i < vec_len; i++){
@@ -702,7 +709,9 @@ static camio_error_t bring_write_data_request(camio_channel_t* this, camio_msg_t
 
         //OK. Looks like the request is ok, do we have space for it, we should do!
         //Make the write visible to the read side
+        ch_perf_event_stop(20,0,priv->wr_out_index);
         set_head(priv->wr_buffs,priv->wr_out_index,priv->wr_sync_counter,buff->data_len);
+        ch_perf_event_start(21,0,priv->wr_out_index);
 
 //        DBG("Write data request to idx=%lli of size %lli with data start=%p sent with seq=%lli\n",
 //                priv->wr_out_index, req->buffer->data_len, req->buffer->data_start, priv->wr_sync_counter);
@@ -715,6 +724,7 @@ static camio_error_t bring_write_data_request(camio_channel_t* this, camio_msg_t
         }
     }
 
+    ch_perf_event_start(27,0,priv->wr_out_index);
     //DBG("There are %lli write datas sent to the receiver from a total of %lli\n", sent, priv->wr_data_q->count);
     return CAMIO_ENOERROR;
 }
@@ -750,6 +760,8 @@ static camio_error_t bring_write_data_ready(camio_muxable_t* this)
         if(likely(seq_no != BRING_SYNC_BUFF_RXD)){
             break;
         }
+        ch_perf_event_stop(21,0,buff_idx);
+        ch_perf_event_start(22,0,buff_idx);
 
         volatile ch_word data_size = get_head_size(priv->wr_buffs, buff_idx);
         //DBG("Buffer at index=%lli hass been read by the receiver. %lli bytes transfered!\n", buff_idx, data_size);
@@ -784,6 +796,7 @@ static camio_error_t bring_write_data_ready(camio_muxable_t* this)
 
 static camio_error_t bring_write_data_result(camio_channel_t* this, camio_msg_t* res_vec, ch_word* vec_len_io)
 {
+    ch_perf_event_start(25,0,*vec_len_io);
    // DBG("Getting write buffer result\n");
     bring_chan_priv_t* priv = CHANNEL_GET_PRIVATE(this);
 
@@ -824,6 +837,8 @@ static camio_error_t bring_write_data_result(camio_channel_t* this, camio_msg_t*
             DBG("Error returning write result. Err=%i\n", res->status);
         }
     }
+
+    ch_perf_event_stop(10,0,*vec_len_io);
 
     //DBG("Returning %lli write data completion messages\n", count);
     return CAMIO_ENOERROR;
