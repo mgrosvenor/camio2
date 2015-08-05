@@ -33,7 +33,8 @@ for line in open(pfile):
 #    
 #    #if(mode == "O" and (id=="100")):
 #    elif(last >= 0):
-    if mode == "A" and id=="4" and cond =="0":
+#    if mode == "A" and id=="4" and cond =="0":
+    if 1:
         if(start == 0):
             start=int(ts)
         cycles  = int(ts) - start

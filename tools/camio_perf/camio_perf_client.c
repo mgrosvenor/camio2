@@ -134,10 +134,13 @@ static camio_error_t on_new_wr_datas(camio_muxable_t* muxable, camio_error_t err
 
     if(unlikely(data_msgs_len == 0)){
         DBG("Huh? Got no new write completions?\n");
-        ch_perf_event_stop(5,2,0);
         return CAMIO_EINVALID;
     }
 
+        
+
+    ch_perf_event_stop(51,0,0);
+    
     ch_word reusable_buffs = 0; //See how many buffers we can potentially reuse
     ch_word batch_bytes = 0;    //How many bytes did send get in this batch?
     camio_msg_t* buff_states = chan_states[id].buff_states;
@@ -170,8 +173,10 @@ static camio_error_t on_new_wr_datas(camio_muxable_t* muxable, camio_error_t err
 
         //Convert this write data response into a write data request!
         buff_states[buff_id].type = CAMIO_MSG_TYPE_WRITE_DATA_REQ;
-        reusable_buffs++;
+        reusable_buffs++;        
+        ch_perf_event_stop(51,1,0);
     }
+    ch_perf_event_stop(51,2,0);
 
     DBG("Sent %lli bytes, in %lli messages with %lli reusable bufferers\n", batch_bytes, data_msgs_len, reusable_buffs);
     if(reusable_buffs){
