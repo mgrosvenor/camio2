@@ -116,26 +116,31 @@ static camio_error_t on_new_wr_datas(camio_muxable_t* muxable, camio_error_t err
 
 static camio_error_t on_new_rd_datas(camio_muxable_t* muxable, camio_error_t err, void* usr_state, ch_word id)
 {
+    ch_perf_event_start(3,0,0);
     DBG("Read data complete()\n");
 
-    if(err){
+    if(unlikely(err)){
         DBG("Unexpected error %lli\n", err);
+        ch_perf_event_stop(3,1,0);
         return err;
     }
 
     data_msgs_len = MIN(MSGS_MAX,options.batching);
     err = camio_chan_rd_data_res(muxable->parent.channel, data_msgs, &data_msgs_len );
-    if(err){
+    if(unlikely(err)){
+        ch_perf_event_stop(3,2,0);
         return err;
     }
 
-    if(data_msgs_len == 0){
+    if(unlikely(data_msgs_len == 0)){
         DBG("Got no new read completions?\n");
+        ch_perf_event_stop(3,3,0);
         return CAMIO_EINVALID;
     }
 
     ch_word reusable_buffs = 0; //See how many buffers we can potentially reuse
 
+    ch_perf_event_stop(3,4,0);
     for(ch_word i = 0; i < data_msgs_len; i++){
 
         if(data_msgs[i].type == CAMIO_MSG_TYPE_IGNORE){
@@ -165,7 +170,6 @@ static camio_error_t on_new_rd_datas(camio_muxable_t* muxable, camio_error_t err
             continue;
         }
 
-        ch_perf_event_stop(30,0,buffer->__internal.__buffer_id)
         intv_bytes += buffer->data_len;
         camio_perf_packet_head_t* head = (camio_perf_packet_head_t*)buffer->data_start;
         //hexdump(head,sizeof(*head) * 2);
@@ -194,19 +198,27 @@ static camio_error_t on_new_rd_datas(camio_muxable_t* muxable, camio_error_t err
                 return err;//Don't know how to recover from this!
             }
             res->buffer = NULL;
+            ch_perf_event_stop(3,5,0);
             continue;
         }
 
         //If we get here, the buffer can be used again.
         reusable_buffs++;
+        ch_perf_event_stop(3,6,0);
     }
 
     if(reusable_buffs){
+        ch_perf_event_start(3,7,0);
         on_new_rd_buffs(muxable, 0, usr_state, id);
+        ch_perf_event_stop(3,8,0);
     }
     else{
+        ch_perf_event_start(3,9,0);
         get_new_buffers(muxable->parent.channel);
+        ch_perf_event_stop(3,10,0);
     }
+
+    ch_perf_event_stop(3,11,0);
 
     return CAMIO_ENOERROR;
 }
@@ -215,20 +227,22 @@ static camio_error_t on_new_rd_datas(camio_muxable_t* muxable, camio_error_t err
 static camio_error_t on_new_rd_buffs(camio_muxable_t* muxable, camio_error_t err, void* usr_state, ch_word id)
 {
     DBG("Handling new buffs\n");
-
+    ch_perf_event_start(2,0,0);
     //Currently ignoring these values
     (void)usr_state;
     (void)id;
 
-    if(err){
+    if(unlikely(err)){
         DBG("Unexpected error %lli\n", err);
+        ch_perf_event_stop(2,1,0);
         return err;
     }
 
     data_msgs_len = MIN(MSGS_MAX,options.batching);
     err = camio_chan_rd_buff_res(muxable->parent.channel, data_msgs, &data_msgs_len);
-    if(err){
+    if(unlikely(err)){
         ERR("Could not get a writing buffers\n");
+        ch_perf_event_stop(2,2,0);
         return err;
     }
 
@@ -259,11 +273,14 @@ static camio_error_t on_new_rd_buffs(camio_muxable_t* muxable, camio_error_t err
         req->dst_offset_hint = CAMIO_READ_REQ_DST_OFFSET_NONE;
         req->src_offset_hint = CAMIO_READ_REQ_SRC_OFFSET_NONE;
         req->read_size_hint  = CAMIO_READ_REQ_SIZE_ANY;
+        ch_perf_event_start(2,3,0);
     }
 
+    ch_perf_event_stop(2,4,0);
     err = camio_chan_rd_data_req(muxable->parent.channel, data_msgs, &data_msgs_len);
-    if(err){
+    if(unlikely(err)){
         ERR("Could not request read data\n");
+        ch_perf_event_stop(2,5,0);
         return err;
     }
 
@@ -272,7 +289,7 @@ static camio_error_t on_new_rd_buffs(camio_muxable_t* muxable, camio_error_t err
 
 static camio_error_t get_new_buffers(camio_channel_t* channel)
 {
-
+    ch_perf_event_start(1,0,0);
     //Initialize a batch of messages to request some write buffers
     for(int i = 0; i < MIN(MSGS_MAX,options.batching); i++){
         data_msgs[i].type = CAMIO_MSG_TYPE_READ_BUFF_REQ;
@@ -286,12 +303,13 @@ static camio_error_t get_new_buffers(camio_channel_t* channel)
     data_msgs_len = MIN(MSGS_MAX,options.batching);
     DBG("Requesting %lli read_buffs\n", data_msgs_len);
     camio_error_t err = camio_chan_rd_buff_req( channel, data_msgs, &data_msgs_len);
-    if(err){
-        DBG("Could not request buffers with error %lli\n", err);
+    if(unlikely(err)){
+        ERR("Could not request buffers with error %lli\n", err);
+        ch_perf_event_stop(1,1,0);
         return err;
     }
     DBG("Successfully issued %lli buffer requests\n", data_msgs_len);
-
+    ch_perf_event_stop(1,2,0);
     return CAMIO_ENOERROR;
 }
 
