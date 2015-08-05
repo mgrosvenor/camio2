@@ -12,6 +12,7 @@
 #include <stdio.h>
 #include <src/api/api_easy.h>
 #include <deps/chaste/chaste.h>
+#include <signal.h>
 
 #include "camio_perf_client.h"
 #include "camio_perf_server.h"
