@@ -630,7 +630,7 @@ static camio_error_t bring_write_buffer_release(camio_channel_t* this, camio_buf
 static camio_error_t bring_write_data_request(camio_channel_t* this, camio_msg_t* req_vec, ch_word* vec_len_io)
 {
 
-    //ch_perf_event_start(17,0,0);
+    ch_perf_event_start(41,0,0);
     bring_chan_priv_t* priv = CHANNEL_GET_PRIVATE(this);
     //DBG("Doing write request -- there are currently %lli items in the queue\n", priv->wr_data_q->count);
 
@@ -642,22 +642,26 @@ static camio_error_t bring_write_data_request(camio_channel_t* this, camio_msg_t
         DBG2("now =%lli\n", vec_len);
     }
 
-    //ch_perf_event_start(18,0,0);
+    ch_perf_event_start(41,1,0);
     //Try to perform the write requests
     ch_word sent = 0;
     for(ch_word i = 0 ; i < vec_len; i++){
          camio_msg_t* msg = &req_vec[i];
 
+         ch_perf_event_start(41,2,0);
         //Sanity check the message first
         if(unlikely(msg->type == CAMIO_MSG_TYPE_IGNORE)){
+            ch_perf_event_start(41,3,0);
             continue; //We don't care about this message
         }
-
+        ch_perf_event_start(41,4,0);
         if(unlikely(msg->type != CAMIO_MSG_TYPE_WRITE_DATA_REQ)){
             ERR("Expected a write data request (%i) but got %i instead.\n",CAMIO_MSG_TYPE_WRITE_DATA_REQ, msg->type);
+            ch_perf_event_start(41,5,0);
             continue;
         }
 
+        ch_perf_event_start(41,6,0);
         camio_wr_data_req_t* req = &req_vec[i].wr_data_req;
         req_vec[i].type= CAMIO_MSG_TYPE_WRITE_DATA_RES;
         camio_buffer_t* buff = req->buffer;
@@ -669,8 +673,10 @@ static camio_error_t bring_write_data_request(camio_channel_t* this, camio_msg_t
         msg = cbq_push_back(priv->wr_data_q,msg);
         if(unlikely(!msg)){
             ERR("Could not push item on to queue??");
+            ch_perf_event_start(41,7,0);
             return CAMIO_ETOOMANY; //Exit now, this is unrecoverable
         }
+        ch_perf_event_start(41,8,0);
 
         camio_wr_data_res_t* res = &msg->wr_data_res;
         msg->type = CAMIO_MSG_TYPE_WRITE_DATA_RES;
@@ -696,7 +702,7 @@ static camio_error_t bring_write_data_request(camio_channel_t* this, camio_msg_t
             exit(1);
             continue;
         }
-
+        ch_perf_event_start(41,9,0);
         //Check that the data is not corrupted
         if(unlikely(buff->data_len > buff->__internal.__mem_len)){
             ERR("Data length (%lli) is longer than buffer length (%lli), corruption has probably occured\n",
@@ -709,9 +715,7 @@ static camio_error_t bring_write_data_request(camio_channel_t* this, camio_msg_t
 
         //OK. Looks like the request is ok, do we have space for it, we should do!
         //Make the write visible to the read side
-        //ch_perf_event_stop(20,0,priv->wr_out_index);
         set_head(priv->wr_buffs,priv->wr_out_index,priv->wr_sync_counter,buff->data_len);
-        //ch_perf_event_start(21,0,priv->wr_out_index);
 
 //        DBG("Write data request to idx=%lli of size %lli with data start=%p sent with seq=%lli\n",
 //                priv->wr_out_index, req->buffer->data_len, req->buffer->data_start, priv->wr_sync_counter);
@@ -722,9 +726,10 @@ static camio_error_t bring_write_data_request(camio_channel_t* this, camio_msg_t
         if(unlikely(priv->wr_out_index >= (ch_word)priv->wr_buffs_count)){
             priv->wr_out_index = 0;
         }
+        ch_perf_event_start(41,10,0);
     }
 
-    //ch_perf_event_start(27,0,priv->wr_out_index);
+    ch_perf_event_start(41,11,0);
     //DBG("There are %lli write datas sent to the receiver from a total of %lli\n", sent, priv->wr_data_q->count);
     return CAMIO_ENOERROR;
 }
@@ -734,45 +739,52 @@ static camio_error_t bring_write_data_request(camio_channel_t* this, camio_msg_t
 //Is the underlying channel done writing and ready for more?
 static camio_error_t bring_write_data_ready(camio_muxable_t* this)
 {
+    ch_perf_event_start(61,0,0);
     bring_chan_priv_t* priv = CHANNEL_GET_PRIVATE(this->parent.channel);
     camio_msg_t* msg = cbq_use_front(priv->wr_data_q);
     for(; msg != NULL; msg = cbq_use_front(priv->wr_data_q)){
 
+        ch_perf_event_start(61,1,0);
         //Sanity check the message first
         if(unlikely(msg->type == CAMIO_MSG_TYPE_IGNORE)){
             continue; //We don't care about this message
         }
 
+        ch_perf_event_start(61,2,0);
         if(unlikely(msg->type != CAMIO_MSG_TYPE_WRITE_DATA_RES)){
             ERR("Expected a write data response (%lli) but got %lli instead.\n",CAMIO_MSG_TYPE_WRITE_DATA_RES, msg->type);
             continue;
         }
 
+        ch_perf_event_start(61,3,0);
         camio_wr_data_res_t* res = &msg->wr_data_res;
         if(unlikely(res->status)){
             //An error was detected, so there's no point in going on with this request.
             continue;
         }
 
+        ch_perf_event_start(61,4,0);
         const ch_word buff_idx = res->buffer->__internal.__buffer_id;
         volatile ch_word seq_no = get_head_seq(priv->wr_buffs, buff_idx);
 
+        ch_perf_event_start(61,5,0);
         if(likely(seq_no != BRING_SYNC_BUFF_RXD)){
             break;
         }
-        //ch_perf_event_stop(21,0,buff_idx);
-        //ch_perf_event_start(22,0,buff_idx);
 
+        ch_perf_event_start(61,6,0);
         volatile ch_word data_size = get_head_size(priv->wr_buffs, buff_idx);
         //DBG("Buffer at index=%lli hass been read by the receiver. %lli bytes transfered!\n", buff_idx, data_size);
         res->written = data_size;
 
+        ch_perf_event_start(61,7,0);
         //This is an auto release channel, once buffer is written out, it goes away, you'll need to acquire another
         camio_error_t err = camio_chan_wr_buff_release(this->parent.channel,res->buffer);
         if(unlikely(err)){
             return err;
         }
 
+        ch_perf_event_start(61,8,0);
         //Tell the user that we released this buffer!
         res->buffer = NULL;
         res->status = CAMIO_EBUFFRELEASED;
@@ -788,6 +800,7 @@ static camio_error_t bring_write_data_ready(camio_muxable_t* this)
         return CAMIO_ETRYAGAIN;
     }
 
+    ch_perf_event_start(61,9,0);
     //DBG("%lli write data requests have been RX'd. \n", priv->wr_data_q->in_use);
     return CAMIO_ENOERROR;
 

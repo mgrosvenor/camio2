@@ -284,6 +284,7 @@ static camio_error_t on_new_rd_buffs(camio_muxable_t* muxable, camio_error_t err
         return err;
     }
 
+    ch_perf_event_stop(2,6,0);
     return err;
 }
 
