@@ -176,8 +176,9 @@ static camio_error_t on_new_rd_datas(camio_muxable_t* muxable, camio_error_t err
         }
         else{
             found_count++;
-            gettimeofday(&now, NULL);
-            time_now_ns = now.tv_sec * 1000 * 1000 * 1000 + now.tv_usec * 1000;
+            //gettimeofday(&now, NULL);
+            //time_now_ns = now.tv_sec * 1000 * 1000 * 1000 + now.tv_usec * 1000;
+            ch_perf_cycles_now(time_now_ns);
             const ch_word latency = time_now_ns - head->time_stamp;
             min_latency = MIN(min_latency, latency);
             max_latency = MAX(max_latency, latency);
@@ -443,13 +444,13 @@ int camio_perf_server(ch_cstr client_channel_uri, ch_word* stop)
             double loss_rate        = (double)lost_count / ((double)lost_count + (double)found_count) * 100;
             double ave_latency      = (double)total_latency / (double)found_count;
 
-            printf("#### inst rate=%3.3fMbs, average rate=%3.3fMBs loss=%3.3f%% latency [%lli, %3.3f, %lli]us\n",
+            printf("#### inst rate=%3.3fMbs, average rate=%3.3fMBs loss=%3.3f%% latency [%3.0f, %3.0f, %3.0f]ns\n",
                 inst_rate_mbs * 8,
                 ave_rate_mbs,
                 loss_rate,
-                min_latency / 1000,
-                ave_latency / 1000,
-                max_latency / 1000
+                (double)min_latency / 3.1,
+                (double)ave_latency / 3.1,
+                (double)max_latency / 3.1
             );
 
             lost_count          = 0;

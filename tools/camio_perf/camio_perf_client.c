@@ -113,12 +113,14 @@ static camio_error_t connect_delim(ch_cstr client_channel_uri, camio_dev_t** dev
 static camio_error_t on_new_wr_datas(camio_muxable_t* muxable, camio_error_t err, void* usr_state, ch_word id)
 {
     DBG("Handling write complete on id=%lli\n", id);
+    ch_perf_event_start(5,0,0);
 
     //Currently ignoring this values
     (void)usr_state;
 
     if(unlikely(err)){
         DBG("Unexpected error %lli\n", err);
+        ch_perf_event_stop(5,0,0);
         return err;
     }
 
@@ -126,11 +128,13 @@ static camio_error_t on_new_wr_datas(camio_muxable_t* muxable, camio_error_t err
     err = camio_chan_wr_data_res(muxable->parent.channel, data_msgs, &data_msgs_len );
     if(unlikely(err)){
         DBG("Could not retrieve write data responses\n");
+        ch_perf_event_stop(5,1,0);
         return err;
     }
 
     if(unlikely(data_msgs_len == 0)){
         DBG("Huh? Got no new write completions?\n");
+        ch_perf_event_stop(5,2,0);
         return CAMIO_EINVALID;
     }
 
@@ -175,11 +179,12 @@ static camio_error_t on_new_wr_datas(camio_muxable_t* muxable, camio_error_t err
         send_perf_messages(muxable->parent.channel, id);
     }
 
-    ch_perf_event_stop(100,0,0);
+    ch_perf_event_stop(5,3,0);
 
     //Try to get some new buffers now just in case
     get_new_buffers(muxable->parent.channel, id);
 
+    ch_perf_event_stop(5,4,0);
     return CAMIO_ENOERROR;
 }
 
@@ -187,7 +192,7 @@ static camio_error_t on_new_wr_datas(camio_muxable_t* muxable, camio_error_t err
 static camio_error_t send_perf_messages(camio_channel_t* channel, ch_word chan_id)
 {
     DBG("#### Trying to send message on chan_id=%lli!\n", chan_id);
-    ch_perf_event_start(400,0,0);
+    ch_perf_event_start(4,0,chan_id);
     ch_word to_send = 0;
     ch_word inflight_bytes = 0;
     camio_msg_t* buff_states = chan_states[chan_id].buff_states;
@@ -200,9 +205,10 @@ static camio_error_t send_perf_messages(camio_channel_t* channel, ch_word chan_i
                 head->size = req->buffer->data_len;
                 head->seq_number = seq;
 
-                struct timeval now = {0};
-                gettimeofday(&now, NULL);
-                time_now_ns = now.tv_sec * 1000 * 1000 * 1000 + now.tv_usec * 1000;
+                //struct timeval now = {0};
+                //gettimeofday(&now, NULL);
+                //time_now_ns = now.tv_sec * 1000 * 1000 * 1000 + now.tv_usec * 1000;
+                ch_perf_cycles_now(time_now_ns);
                 head->time_stamp = time_now_ns;
 
                 seq++;
@@ -218,15 +224,16 @@ static camio_error_t send_perf_messages(camio_channel_t* channel, ch_word chan_i
             default:{}
         }
     }
-    ch_perf_event_start(401,0,0);
+    ch_perf_event_start(4,1,chan_id);
     data_msgs_len = to_send;
     DBG("Trying to send %lli bytes in %lli messages\n", inflight_bytes, data_msgs_len);
     camio_error_t err = camio_chan_wr_data_req(channel,data_msgs,&data_msgs_len);
     if(unlikely(err)){
         DBG("Could not request data writes with error %lli\n", err);
+        ch_perf_event_stop(4,0,chan_id);
         return err;
     }
-    ch_perf_event_start(420,0,0);
+    ch_perf_event_start(4,2,chan_id);
     DBG("Successfully issued %lli/%lli data write requests\n", data_msgs_len, to_send);
 
     //Deal with the immidiate result of sending the messages, will still need to wait for the responses
@@ -235,14 +242,14 @@ static camio_error_t send_perf_messages(camio_channel_t* channel, ch_word chan_i
         buff_states[buff_id] = data_msgs[i];
     }
 
-    ch_perf_event_start(440,0,0);
+    ch_perf_event_stop(4,1,data_msgs_len);
     return CAMIO_ENOERROR;
 }
 
 
 static inline void prepare_data_msg(camio_msg_t* msg)
 {
-    ch_perf_event_start(300,0,0);
+    ch_perf_event_start(3,0,0);
     camio_wr_buff_res_t* wr_buff_res = &msg->wr_buff_res;
 
     //Figure out how much we should send with some basic sanity checking
@@ -252,24 +259,25 @@ static inline void prepare_data_msg(camio_msg_t* msg)
     msg->type = CAMIO_MSG_TYPE_WRITE_DATA_REQ;
     camio_wr_data_req_t* wr_data_req = &msg->wr_data_req;
     //Put data in the packet from the packet template
-    memcpy(wr_data_req->buffer->data_start, packet_data, bytes_to_send);
+    //memcpy(wr_data_req->buffer->data_start, packet_data, bytes_to_send);
     wr_data_req->buffer->data_len = bytes_to_send;
     wr_data_req->dst_offset_hint = CAMIO_WRITE_REQ_DST_OFFSET_NONE;
     wr_data_req->src_offset_hint = CAMIO_WRITE_REQ_SRC_OFFSET_NONE;
-    ch_perf_event_start(310,0,0);
+    ch_perf_event_stop(3,0,bytes_to_send);
 }
 
 
 static camio_error_t on_new_wr_buffs(camio_muxable_t* muxable, camio_error_t err, void* usr_state, ch_word id)
 {
     DBG("Handling new buffs on chan_id=%lli\n", id);
-    ch_perf_event_start(200,0,0);
+    ch_perf_event_start(2,0,id);
 
     //Currently ignoring this values
     (void)usr_state;
 
     if(unlikely(err)){
         DBG("Unexpected error %lli\n", err);
+        ch_perf_event_stop(2,0,id);
         return err;
     }
 
@@ -277,9 +285,10 @@ static camio_error_t on_new_wr_buffs(camio_muxable_t* muxable, camio_error_t err
     err = camio_chan_wr_buff_res(muxable->parent.channel, data_msgs, &data_msgs_len);
     if(unlikely(err)){
         ERR("Could not get a writing buffers\n");
+        ch_perf_event_stop(2,1,id);
         return CAMIO_EINVALID;
     }
-    ch_perf_event_stop(210,0,0);
+    ch_perf_event_stop(2,2,id);
     DBG("Got %lli new writing buffers\n", data_msgs_len);
     //Yay! We got the responses, update the buffer states.
     camio_msg_t* buff_states = chan_states[id].buff_states;
@@ -305,10 +314,10 @@ static camio_error_t on_new_wr_buffs(camio_muxable_t* muxable, camio_error_t err
         DBG("Preparing message at buff_state idx=%lli\n", buff_id);
         prepare_data_msg(&buff_states[buff_id]);
     }
-    ch_perf_event_stop(220,0,0);
+    ch_perf_event_stop(2,3,id);
 
     err = send_perf_messages(muxable->parent.channel, id);
-    ch_perf_event_stop(230,0,0);
+    ch_perf_event_stop(2,4,id);
     return err;
 }
 
@@ -341,22 +350,19 @@ static camio_error_t get_new_buffers(camio_channel_t* channel, ch_word chan_id)
 
     if(eqlikely(to_send == 0)){
         //There's no work for us to do, exit now
-        DBG("No work to do, exting now\n");
+        DBG("No work to do, exiting now\n");
         ch_perf_event_stop(1,0,0);
         return CAMIO_ENOERROR;
     }
 
     data_msgs_len = to_send;
     DBG("Requesting %lli wirte_buffs\n", data_msgs_len);
-    ch_perf_event_start(2,0,to_send);
     camio_error_t err = camio_chan_wr_buff_req( channel, data_msgs, &data_msgs_len);
     if(unlikely(err)){
         DBG("Could not request buffers with error %lli\n", err);
         ch_perf_event_stop(1,1,0);
-        ch_perf_event_stop(2,1,0);
         return err;
     }
-    ch_perf_event_stop(2,2,data_msgs_len);
     DBG("Successfully issued %lli/%lli buffer requests\n", data_msgs_len, to_send);
 
     //The result of sending the messages, will still need to wait for the responses
