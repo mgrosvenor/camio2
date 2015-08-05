@@ -155,6 +155,7 @@ static camio_error_t bring_read_buffer_ready(camio_muxable_t* this)
 {
     bring_chan_priv_t* priv = CHANNEL_GET_PRIVATE(this->parent.channel);
     //DBG("Doing read buffer ready\n");
+    ch_perf_event_start(91,0,0);
 
     //Try to fill as many read requests as we can
     camio_msg_t* msg = cbq_use_front(priv->rd_buff_q);
@@ -193,7 +194,7 @@ static camio_error_t bring_read_buffer_ready(camio_muxable_t* this)
         if(likely(seq_no == BRING_SYNC_BUFF_EMPTY || seq_no == BRING_SYNC_BUFF_RXD )){
             break; //There is no data available. Exit the loop which will return ETRYAGAIN
         }
-        //ch_perf_event_start(30,0,priv->rd_acq_index);//At this moment, there is data
+        ch_perf_event_start(91,2,0);
 
         if(unlikely( seq_no != priv->rd_sync_counter)){
             ERR( "Ring synchronization error. This should not happen with a blocking ring %llu to %llu\n",
@@ -239,16 +240,19 @@ static camio_error_t bring_read_buffer_ready(camio_muxable_t* this)
         cbq_unuse_front(priv->rd_buff_q);
     }
     if(likely(priv->rd_buff_q->in_use == 0)){
+        ch_perf_event_start(91,3,0);
         return CAMIO_ETRYAGAIN;
     }
 
     //DBG("There are %lli new buffers to read into\n", priv->rd_buff_q->in_use);
+    ch_perf_event_start(91,4,0);
     return CAMIO_ENOERROR;
 }
 
 static camio_error_t bring_read_buffer_result( camio_channel_t* this, camio_msg_t* res_vec, ch_word* vec_len_io )
 {
     DBG("Getting read buffer result\n");
+
 
     bring_chan_priv_t* priv = CHANNEL_GET_PRIVATE(this);
 
@@ -257,6 +261,7 @@ static camio_error_t bring_read_buffer_result( camio_channel_t* this, camio_msg_
         camio_error_t err = bring_read_buffer_ready(&this->rd_data_muxable);
         if(err){
             ERR("There is no data available to return. Did you use read_ready()?\n");
+            ch_perf_event_stop(91,1,0);
             return err;
         }
     }
@@ -358,6 +363,7 @@ static camio_error_t bring_read_data_ready(camio_muxable_t* this)
     bring_chan_priv_t* priv = CHANNEL_GET_PRIVATE(this->parent.channel);
     //DBG("Doing read ready\n");
 
+    ch_perf_event_start(81,0,0);
     //Try to fill as many read requests as we can
     camio_msg_t* msg = cbq_use_front(priv->rd_data_q);
     for(; msg != NULL; msg = cbq_use_front(priv->rd_data_q)){
@@ -409,10 +415,12 @@ static camio_error_t bring_read_data_ready(camio_muxable_t* this)
     }
 
     if(likely(priv->rd_data_q->in_use == 0)){
+        ch_perf_event_stop(81,1,0);
         return CAMIO_ETRYAGAIN;
     }
 
     //DBG("There are now %lli new read datas available\n", priv->rd_data_q->in_use);
+    ch_perf_event_stop(81,2,0);
     return CAMIO_ENOERROR;
 }
 
@@ -490,7 +498,7 @@ static camio_error_t bring_write_buffer_ready(camio_muxable_t* this)
 {
     //DBG("Doing write buffer ready\n");
     bring_chan_priv_t* priv = CHANNEL_GET_PRIVATE(this->parent.channel);
-
+    ch_perf_event_start(71,0,0);
     camio_msg_t* msg = cbq_use_front(priv->wr_buff_q);
     for( ; msg != NULL; msg = cbq_use_front(priv->wr_buff_q)){
 
@@ -510,6 +518,7 @@ static camio_error_t bring_write_buffer_ready(camio_muxable_t* this)
         if(likely( seq_no != BRING_SYNC_BUFF_EMPTY)){
             break;
         }
+        ch_perf_event_stop(71,2,0);
         //ch_perf_event_start(20,0,priv->wr_buff_acq_idx);
 
         //We have a request structure and a valid buffer, so we can return it
@@ -535,9 +544,11 @@ static camio_error_t bring_write_buffer_ready(camio_muxable_t* this)
     }
 
     if(likely(priv->wr_buff_q->in_use == 0)){
+        ch_perf_event_stop(71,3,0);
         return CAMIO_ETRYAGAIN;
     }
 
+    ch_perf_event_stop(71,5,0);
     //DBG("There are now %lli new write buffers available and %lli items in total\n", priv->wr_buff_q->in_use, priv->wr_buff_q->count);
     return CAMIO_ENOERROR;
 }
@@ -744,30 +755,25 @@ static camio_error_t bring_write_data_ready(camio_muxable_t* this)
     camio_msg_t* msg = cbq_use_front(priv->wr_data_q);
     for(; msg != NULL; msg = cbq_use_front(priv->wr_data_q)){
 
-        ch_perf_event_start(61,1,0);
         //Sanity check the message first
         if(unlikely(msg->type == CAMIO_MSG_TYPE_IGNORE)){
             continue; //We don't care about this message
         }
 
-        ch_perf_event_start(61,2,0);
         if(unlikely(msg->type != CAMIO_MSG_TYPE_WRITE_DATA_RES)){
             ERR("Expected a write data response (%lli) but got %lli instead.\n",CAMIO_MSG_TYPE_WRITE_DATA_RES, msg->type);
             continue;
         }
 
-        ch_perf_event_start(61,3,0);
         camio_wr_data_res_t* res = &msg->wr_data_res;
         if(unlikely(res->status)){
             //An error was detected, so there's no point in going on with this request.
             continue;
         }
 
-        ch_perf_event_start(61,4,0);
         const ch_word buff_idx = res->buffer->__internal.__buffer_id;
         volatile ch_word seq_no = get_head_seq(priv->wr_buffs, buff_idx);
 
-        ch_perf_event_start(61,5,0);
         if(likely(seq_no != BRING_SYNC_BUFF_RXD)){
             break;
         }
