@@ -7,7 +7,7 @@ CamIO is a generic, high speed I/O interface designed to give programmers straig
 
 This is a work in progress. For an idea of what's going on here, take a look at this: 
 
-https://github.com/mgrosvenor/camio2/blob/mpg39/src/api/api.h
+https://github.com/mgrosvenor/camio2/blob/master/src/api/api.h
 
 
 Installing and building
